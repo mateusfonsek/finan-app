@@ -27,6 +27,9 @@ pub fn run() {
         commands::summary::summary_kpis,
         commands::summary::summary_by_category,
         commands::summary::summary_by_month,
+        commands::backup::db_path,
+        commands::backup::export_backup,
+        commands::backup::restore_backup,
     ]);
 
     #[cfg(debug_assertions)]
