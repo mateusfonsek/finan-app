@@ -4,6 +4,8 @@
   "description": "Default capabilities for finan",
   "windows": ["main"],
   "permissions": [
-    "core:default"
+    "core:default",
+    "dialog:default",
+    "opener:default"
   ]
 }
