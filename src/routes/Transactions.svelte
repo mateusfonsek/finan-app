@@ -1,26 +1,72 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import TxTable from "$lib/components/transactions/TxTable.svelte";
-  import { listTransactions } from "$lib/api/transactions";
-  import type { Transaction } from "$lib/bindings";
+  import TxFilterBar from "$lib/components/transactions/TxFilterBar.svelte";
+  import { filters } from "$lib/stores/filters.svelte";
+  import { listCategories, createCategory } from "$lib/api/categories";
+  import { listTransactions, updateTransactionCategory } from "$lib/api/transactions";
+  import type { Category, Transaction } from "$lib/bindings";
 
   let transactions = $state<Transaction[]>([]);
+  let categories = $state<Category[]>([]);
   let loading = $state(true);
   let error = $state<string | null>(null);
 
+  async function refresh() {
+    try {
+      transactions = await listTransactions({
+        account_id: null,
+        month: filters.month,
+        category_id: filters.categoryId,
+      });
+    } catch (e) {
+      error = e instanceof Error ? e.message : String(e);
+    }
+  }
+
   onMount(async () => {
     try {
-      transactions = await listTransactions();
+      categories = await listCategories();
+      await refresh();
     } catch (e) {
       error = e instanceof Error ? e.message : String(e);
     } finally {
       loading = false;
     }
   });
+
+  async function onCategoryChange(transactionId: number, categoryId: number | null) {
+    await updateTransactionCategory(transactionId, categoryId);
+    transactions = transactions.map((t) =>
+      t.id === transactionId ? { ...t, category_id: categoryId } : t,
+    );
+    if (filters.categoryId !== null && filters.categoryId !== categoryId) {
+      await refresh();
+    }
+  }
+
+  async function onCategoryCreate(name: string): Promise<Category> {
+    const created = await createCategory({
+      name,
+      color_token: "--color-cat-outros",
+      kind: "expense",
+    });
+    categories = [...categories, created];
+    return created;
+  }
+
+  async function onMonthChange(m: string | null) {
+    filters.month = m;
+    await refresh();
+  }
+  async function onCategoryFilterChange(id: number | null) {
+    filters.categoryId = id;
+    await refresh();
+  }
 </script>
 
 <section class="p-8 max-w-5xl mx-auto flex flex-col gap-5">
-  <header class="flex items-baseline justify-between">
+  <header class="flex items-baseline justify-between gap-4 flex-wrap">
     <h2 class="text-xl font-semibold tracking-tight" style="font-family: var(--font-display)">
       Transações
     </h2>
@@ -29,11 +75,24 @@
     </span>
   </header>
 
+  <TxFilterBar
+    {categories}
+    month={filters.month}
+    categoryId={filters.categoryId}
+    {onMonthChange}
+    onCategoryChange={onCategoryFilterChange}
+  />
+
   {#if loading}
     <div class="text-fg-faint text-sm">Carregando…</div>
   {:else if error}
     <div class="rounded-lg border border-border bg-surface p-3 text-sm text-neg">{error}</div>
   {:else}
-    <TxTable {transactions} />
+    <TxTable
+      {transactions}
+      {categories}
+      {onCategoryChange}
+      {onCategoryCreate}
+    />
   {/if}
 </section>
