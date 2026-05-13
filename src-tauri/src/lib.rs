@@ -1,5 +1,6 @@
 mod commands;
 mod db;
+mod domain;
 mod error;
 
 use tauri::Manager;
