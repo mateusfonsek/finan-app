@@ -29,6 +29,7 @@ pub struct NewTransaction {
 pub struct InsertResult {
     pub inserted: u32,
     pub skipped_duplicates: u32,
+    pub auto_categorized: u32,
 }
 
 impl NewTransaction {
