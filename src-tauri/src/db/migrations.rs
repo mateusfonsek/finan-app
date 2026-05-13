@@ -2,8 +2,10 @@ use rusqlite::Connection;
 
 use crate::error::AppResult;
 
-const MIGRATIONS: &[(&str, &str)] =
-    &[("0001_init", include_str!("../../migrations/0001_init.sql"))];
+const MIGRATIONS: &[(&str, &str)] = &[
+    ("0001_init", include_str!("../../migrations/0001_init.sql")),
+    ("0002_rules", include_str!("../../migrations/0002_rules.sql")),
+];
 
 pub fn apply(conn: &Connection) -> AppResult<()> {
     conn.execute_batch(
@@ -86,5 +88,23 @@ mod tests {
             .query_row("SELECT COUNT(*) FROM categories", [], |row| row.get(0))
             .unwrap();
         assert_eq!(count, 9, "re-running migrations should not duplicate seeds");
+    }
+
+    #[test]
+    fn applies_rules_migration() {
+        let conn = Connection::open_in_memory().unwrap();
+        apply(&conn).unwrap();
+
+        assert!(table_exists(&conn, "rules"));
+        let applied: Vec<String> = {
+            let mut stmt = conn
+                .prepare("SELECT name FROM _migrations ORDER BY name")
+                .unwrap();
+            stmt.query_map([], |r| r.get::<_, String>(0))
+                .unwrap()
+                .map(|r| r.unwrap())
+                .collect()
+        };
+        assert_eq!(applied, vec!["0001_init".to_string(), "0002_rules".to_string()]);
     }
 }
