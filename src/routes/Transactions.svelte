@@ -24,6 +24,7 @@
         account_id: null,
         month: filters.month,
         category_id: filters.categoryId,
+        limit: null,
       });
       if (selectedTx) {
         const fresh = transactions.find((t) => t.id === selectedTx?.id);
