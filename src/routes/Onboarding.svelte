@@ -1,9 +1,19 @@
 <script lang="ts">
-  import { Button } from "$lib/components/ui/button";
+  import DropZone from "$lib/components/import/DropZone.svelte";
+  import type { ParsedOfx } from "$lib/ofx/types";
   import { push } from "svelte-spa-router";
 
-  function goToImport() {
+  let error = $state<string | null>(null);
+
+  function onparsed(detail: { file: File; parsed: ParsedOfx }) {
+    // Hand off to /import via window. Svelte stores would be cleaner;
+    // acceptable for MVP, refactor in fase 5.
+    (window as unknown as { __finanPending?: typeof detail }).__finanPending = detail;
     push("/import");
+  }
+
+  function onerror(msg: string) {
+    error = msg;
   }
 </script>
 
@@ -18,8 +28,15 @@
     </p>
   </header>
 
-  <div class="flex justify-center gap-2">
-    <Button onclick={goToImport}>Importar meu primeiro OFX</Button>
-    <Button variant="outline" onclick={() => push("/dashboard")}>Ver dashboard</Button>
-  </div>
+  <DropZone {onparsed} {onerror} />
+
+  {#if error}
+    <div class="rounded-lg border border-border bg-surface p-3 text-sm text-neg">
+      Erro ao ler o arquivo: {error}
+    </div>
+  {/if}
+
+  <p class="text-fg-faint text-xs text-center">
+    Seus dados ficam em <span class="font-mono text-fg-muted">~/Library/Application Support/app.finan/finan.db</span>
+  </p>
 </section>
