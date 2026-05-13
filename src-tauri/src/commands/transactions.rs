@@ -360,11 +360,7 @@ mod tests {
     fn limit_clause_caps_result_count() {
         let mut conn = fresh_conn();
         let acc = insert_account(&conn, "test", Some("ACC1"));
-        let txs = vec![
-            mk("F1", "10.00"),
-            mk("F2", "20.00"),
-            mk("F3", "30.00"),
-        ];
+        let txs = vec![mk("F1", "10.00"), mk("F2", "20.00"), mk("F3", "30.00")];
         raw_insert_batch(&mut conn, acc, &txs);
 
         let mut stmt = conn

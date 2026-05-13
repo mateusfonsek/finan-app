@@ -14,9 +14,8 @@ pub fn summary_kpis(db: State<'_, Db>, month: Option<String>) -> AppResult<KpiSu
     let conn = db.conn.lock().expect("db mutex poisoned");
     let pattern: Option<String> = month.as_ref().map(|m| format!("{m}-%"));
 
-    let mut stmt = conn.prepare(
-        "SELECT amount FROM transactions WHERE (?1 IS NULL OR date LIKE ?1)",
-    )?;
+    let mut stmt =
+        conn.prepare("SELECT amount FROM transactions WHERE (?1 IS NULL OR date LIKE ?1)")?;
     let pat_ref: Option<&str> = pattern.as_deref();
     let rows: Vec<String> = stmt
         .query_map(params![pat_ref], |row| row.get::<_, String>(0))?
@@ -59,8 +58,9 @@ pub fn summary_by_category(
          LEFT JOIN categories c ON c.id = t.category_id
          WHERE (?1 IS NULL OR t.date LIKE ?1)",
     )?;
+    type CategoryRow = (String, Option<i64>, Option<String>, Option<String>);
     let pat_for_query: Option<&str> = pattern.as_deref();
-    let rows: Vec<(String, Option<i64>, Option<String>, Option<String>)> = stmt
+    let rows: Vec<CategoryRow> = stmt
         .query_map(params![pat_for_query], |row| {
             Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?))
         })?
@@ -70,8 +70,8 @@ pub fn summary_by_category(
     let mut total_expense = Decimal::ZERO;
 
     for (amt, cat_id, name, color) in rows {
-        let d = Decimal::from_str(&amt)
-            .map_err(|e| AppError::Invalid(format!("bad amount: {e}")))?;
+        let d =
+            Decimal::from_str(&amt).map_err(|e| AppError::Invalid(format!("bad amount: {e}")))?;
         if !d.is_sign_negative() {
             continue;
         }
@@ -90,10 +90,7 @@ pub fn summary_by_category(
             let percent = if total_expense.is_zero() {
                 0.0
             } else {
-                let p: f64 = (total / total_expense)
-                    .to_string()
-                    .parse()
-                    .unwrap_or(0.0);
+                let p: f64 = (total / total_expense).to_string().parse().unwrap_or(0.0);
                 p * 100.0
             };
             CategorySpend {
@@ -116,10 +113,7 @@ pub fn summary_by_category(
 
 #[tauri::command]
 #[specta::specta]
-pub fn summary_by_month(
-    db: State<'_, Db>,
-    months_back: u32,
-) -> AppResult<Vec<MonthSummary>> {
+pub fn summary_by_month(db: State<'_, Db>, months_back: u32) -> AppResult<Vec<MonthSummary>> {
     let conn = db.conn.lock().expect("db mutex poisoned");
     let cutoff = compute_cutoff(months_back);
 
@@ -135,8 +129,8 @@ pub fn summary_by_month(
 
     let mut by_month: HashMap<String, (Decimal, Decimal)> = HashMap::new();
     for (m, amt) in rows {
-        let d = Decimal::from_str(&amt)
-            .map_err(|e| AppError::Invalid(format!("bad amount: {e}")))?;
+        let d =
+            Decimal::from_str(&amt).map_err(|e| AppError::Invalid(format!("bad amount: {e}")))?;
         let entry = by_month.entry(m).or_insert((Decimal::ZERO, Decimal::ZERO));
         if d.is_sign_negative() {
             entry.1 += -d;
@@ -159,7 +153,8 @@ pub fn summary_by_month(
 
 fn compute_cutoff(months_back: u32) -> String {
     let now = chrono::Utc::now().naive_utc().date();
-    let total_months = (chrono::Datelike::year(&now)) * 12 + (chrono::Datelike::month(&now) as i32 - 1);
+    let total_months =
+        (chrono::Datelike::year(&now)) * 12 + (chrono::Datelike::month(&now) as i32 - 1);
     let target = total_months - (months_back as i32);
     let y = target.div_euclid(12);
     let m = target.rem_euclid(12) + 1;
@@ -187,7 +182,13 @@ mod tests {
         conn.last_insert_rowid()
     }
 
-    fn insert_tx(conn: &Connection, account_id: i64, date: &str, amount: &str, category_id: Option<i64>) {
+    fn insert_tx(
+        conn: &Connection,
+        account_id: i64,
+        date: &str,
+        amount: &str,
+        category_id: Option<i64>,
+    ) {
         conn.execute(
             "INSERT INTO transactions (account_id, date, amount, description, category_id, ofx_fitid)
              VALUES (?1, ?2, ?3, 'desc', ?4, NULL)",
