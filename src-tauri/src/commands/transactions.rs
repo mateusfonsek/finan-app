@@ -5,29 +5,51 @@ use crate::db::Db;
 use crate::domain::transaction::{InsertResult, NewTransaction, Transaction};
 use crate::error::{AppError, AppResult};
 
-/// List transactions for an account (or all if account_id is None), ordered by date desc.
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize, specta::Type)]
+pub struct TransactionFilters {
+    pub account_id: Option<i64>,
+    pub month: Option<String>,
+    pub category_id: Option<i64>,
+}
+
 #[tauri::command]
 #[specta::specta]
 pub fn list_transactions(
     db: State<'_, Db>,
-    account_id: Option<i64>,
+    filters: Option<TransactionFilters>,
 ) -> AppResult<Vec<Transaction>> {
+    let f = filters.unwrap_or_default();
     let conn = db.conn.lock().expect("db mutex poisoned");
-    let (sql, params_vec): (&str, Vec<&dyn rusqlite::ToSql>) = match account_id {
-        Some(ref id) => (
-            "SELECT id, account_id, date, amount, description, category_id, notes, ofx_fitid, imported_at
-             FROM transactions WHERE account_id = ?1 ORDER BY date DESC, id DESC",
-            vec![id as &dyn rusqlite::ToSql],
-        ),
-        None => (
-            "SELECT id, account_id, date, amount, description, category_id, notes, ofx_fitid, imported_at
-             FROM transactions ORDER BY date DESC, id DESC",
-            Vec::new(),
-        ),
-    };
 
-    let mut stmt = conn.prepare(sql)?;
-    let rows = stmt.query_map(params_vec.as_slice(), |row| {
+    let mut where_clauses: Vec<String> = Vec::new();
+    let mut bound: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
+
+    if let Some(id) = f.account_id {
+        where_clauses.push(format!("account_id = ?{}", bound.len() + 1));
+        bound.push(Box::new(id));
+    }
+    if let Some(month) = f.month.as_ref() {
+        where_clauses.push(format!("date LIKE ?{}", bound.len() + 1));
+        bound.push(Box::new(format!("{month}-%")));
+    }
+    if let Some(cid) = f.category_id {
+        where_clauses.push(format!("category_id = ?{}", bound.len() + 1));
+        bound.push(Box::new(cid));
+    }
+
+    let where_sql = if where_clauses.is_empty() {
+        String::new()
+    } else {
+        format!(" WHERE {}", where_clauses.join(" AND "))
+    };
+    let sql = format!(
+        "SELECT id, account_id, date, amount, description, category_id, notes, ofx_fitid, imported_at
+         FROM transactions{where_sql} ORDER BY date DESC, id DESC",
+    );
+
+    let mut stmt = conn.prepare(&sql)?;
+    let params_refs: Vec<&dyn rusqlite::ToSql> = bound.iter().map(|b| b.as_ref()).collect();
+    let rows = stmt.query_map(params_refs.as_slice(), |row| {
         Ok(Transaction {
             id: row.get(0)?,
             account_id: row.get(1)?,
@@ -40,8 +62,7 @@ pub fn list_transactions(
             imported_at: row.get(8)?,
         })
     })?;
-    rows.collect::<rusqlite::Result<Vec<_>>>()
-        .map_err(AppError::from)
+    rows.collect::<rusqlite::Result<Vec<_>>>().map_err(AppError::from)
 }
 
 /// Insert a batch of new transactions. Returns counts of inserted vs skipped (duplicates).
@@ -127,6 +148,46 @@ pub fn check_existing_fitids(
     let existing: Vec<String> = rows.filter_map(|r| r.ok().flatten()).collect();
 
     Ok(existing)
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn update_transaction_category(
+    db: State<'_, Db>,
+    transaction_id: i64,
+    category_id: Option<i64>,
+) -> AppResult<()> {
+    let conn = db.conn.lock().expect("db mutex poisoned");
+    let changed = conn.execute(
+        "UPDATE transactions SET category_id = ?1 WHERE id = ?2",
+        params![category_id, transaction_id],
+    )?;
+    if changed == 0 {
+        return Err(AppError::Invalid(format!(
+            "transaction {transaction_id} not found"
+        )));
+    }
+    Ok(())
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn update_transaction_notes(
+    db: State<'_, Db>,
+    transaction_id: i64,
+    notes: Option<String>,
+) -> AppResult<()> {
+    let conn = db.conn.lock().expect("db mutex poisoned");
+    let changed = conn.execute(
+        "UPDATE transactions SET notes = ?1 WHERE id = ?2",
+        params![notes, transaction_id],
+    )?;
+    if changed == 0 {
+        return Err(AppError::Invalid(format!(
+            "transaction {transaction_id} not found"
+        )));
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -260,5 +321,55 @@ mod tests {
         let existing: Vec<String> = rows.filter_map(|r| r.ok().flatten()).collect();
 
         assert_eq!(existing, vec!["F1".to_string()]);
+    }
+
+    #[test]
+    fn list_transactions_filter_by_month() {
+        let mut conn = fresh_conn();
+        let acc = insert_account(&conn, "test", Some("ACC1"));
+        let mut a = mk("F1", "10.00");
+        a.date = "2026-03-15".into();
+        let mut b = mk("F2", "-5.00");
+        b.date = "2026-04-02".into();
+        raw_insert_batch(&mut conn, acc, &[a, b]);
+
+        let mut stmt = conn
+            .prepare(
+                "SELECT id FROM transactions WHERE account_id = ?1 AND date LIKE ?2 ORDER BY date DESC",
+            )
+            .unwrap();
+        let ids: Vec<i64> = stmt
+            .query_map(params![acc, "2026-03-%"], |r| r.get(0))
+            .unwrap()
+            .map(|r| r.unwrap())
+            .collect();
+        assert_eq!(ids.len(), 1, "only March transaction should match");
+    }
+
+    #[test]
+    fn update_transaction_category_changes_value() {
+        let mut conn = fresh_conn();
+        let acc = insert_account(&conn, "test", Some("ACC1"));
+        let txs = vec![mk("F1", "10")];
+        raw_insert_batch(&mut conn, acc, &txs);
+        let tx_id: i64 = conn
+            .query_row("SELECT id FROM transactions WHERE ofx_fitid = 'F1'", [], |r| r.get(0))
+            .unwrap();
+        let cat_id: i64 = conn
+            .query_row("SELECT id FROM categories WHERE name = 'Mercado'", [], |r| r.get(0))
+            .unwrap();
+
+        conn.execute(
+            "UPDATE transactions SET category_id = ?1 WHERE id = ?2",
+            params![cat_id, tx_id],
+        )
+        .unwrap();
+
+        let stored: i64 = conn
+            .query_row("SELECT category_id FROM transactions WHERE id = ?1", params![tx_id], |r| {
+                r.get(0)
+            })
+            .unwrap();
+        assert_eq!(stored, cat_id);
     }
 }
