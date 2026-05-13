@@ -1,3 +1,4 @@
+import IndexRedirect from "./IndexRedirect.svelte";
 import Onboarding from "./Onboarding.svelte";
 import Dashboard from "./Dashboard.svelte";
 import Transactions from "./Transactions.svelte";
@@ -7,7 +8,7 @@ import Rules from "./Rules.svelte";
 import Settings from "./Settings.svelte";
 
 export const routes = {
-  "/": Dashboard,
+  "/": IndexRedirect,
   "/onboarding": Onboarding,
   "/dashboard": Dashboard,
   "/transactions": Transactions,
