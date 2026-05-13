@@ -11,6 +11,7 @@
         account_id: null,
         month: null,
         category_id: null,
+        q: null,
         limit: 1,
       });
       push(some.length === 0 ? "/onboarding" : "/dashboard");

@@ -32,6 +32,7 @@
           account_id: null,
           month: filters.month,
           category_id: null,
+          q: null,
           limit: 8,
         }),
       ]);

@@ -18,12 +18,15 @@
   let error = $state<string | null>(null);
   let selectedTx = $state<Transaction | null>(null);
 
+  let searchInputRef = $state<HTMLInputElement | null>(null);
+
   async function refresh() {
     try {
       transactions = await listTransactions({
         account_id: null,
         month: filters.month,
         category_id: filters.categoryId,
+        q: filters.q === "" ? null : filters.q,
         limit: null,
       });
       if (selectedTx) {
@@ -75,6 +78,11 @@
     await refresh();
   }
 
+  async function onQueryChange(v: string) {
+    filters.q = v;
+    await refresh();
+  }
+
   function onRowClick(t: Transaction) {
     selectedTx = t;
   }
@@ -103,8 +111,11 @@
     {categories}
     month={filters.month}
     categoryId={filters.categoryId}
+    q={filters.q}
     {onMonthChange}
     onCategoryChange={onCategoryFilterChange}
+    {onQueryChange}
+    bind:searchInputRef
   />
 
   {#if loading}

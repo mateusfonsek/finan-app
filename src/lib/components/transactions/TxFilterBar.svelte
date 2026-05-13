@@ -1,16 +1,29 @@
 <script lang="ts">
   import MonthStepper from "$lib/components/shell/MonthStepper.svelte";
+  import SearchBox from "$lib/components/shell/SearchBox.svelte";
   import type { Category } from "$lib/bindings";
 
   type Props = {
     categories: Category[];
     month: string | null;
     categoryId: number | null;
+    q: string;
     onMonthChange: (m: string | null) => void;
     onCategoryChange: (id: number | null) => void;
+    onQueryChange: (v: string) => void;
+    searchInputRef?: HTMLInputElement | null;
   };
 
-  let { categories, month, categoryId, onMonthChange, onCategoryChange }: Props = $props();
+  let {
+    categories,
+    month,
+    categoryId,
+    q,
+    onMonthChange,
+    onCategoryChange,
+    onQueryChange,
+    searchInputRef = $bindable(null),
+  }: Props = $props();
 
   let currentCategory = $derived(categories.find((c) => c.id === categoryId));
 </script>
@@ -35,4 +48,8 @@
   {#if currentCategory}
     <span class="text-[11px] text-fg-faint">· {currentCategory.kind}</span>
   {/if}
+
+  <div class="ml-auto">
+    <SearchBox value={q} onInput={onQueryChange} bind:ref={searchInputRef} />
+  </div>
 </div>

@@ -10,6 +10,7 @@ pub struct TransactionFilters {
     pub account_id: Option<i64>,
     pub month: Option<String>,
     pub category_id: Option<i64>,
+    pub q: Option<String>,
     pub limit: Option<u32>,
 }
 
@@ -36,6 +37,16 @@ pub fn list_transactions(
     if let Some(cid) = f.category_id {
         where_clauses.push(format!("category_id = ?{}", bound.len() + 1));
         bound.push(Box::new(cid));
+    }
+    if let Some(q) = f.q.as_ref() {
+        let trimmed = q.trim();
+        if !trimmed.is_empty() {
+            where_clauses.push(format!(
+                "(LOWER(description) LIKE ?{n} OR LOWER(COALESCE(notes, '')) LIKE ?{n})",
+                n = bound.len() + 1
+            ));
+            bound.push(Box::new(format!("%{}%", trimmed.to_lowercase())));
+        }
     }
 
     let where_sql = if where_clauses.is_empty() {
@@ -372,6 +383,39 @@ mod tests {
             .map(|r| r.unwrap())
             .collect();
         assert_eq!(rows.len(), 2);
+    }
+
+    #[test]
+    fn list_transactions_filter_by_q_matches_description_and_notes() {
+        let mut conn = fresh_conn();
+        let acc = insert_account(&conn, "test", Some("ACC1"));
+        let txs = vec![mk("F1", "10"), mk("F2", "20"), mk("F3", "30")];
+        raw_insert_batch(&mut conn, acc, &txs);
+        conn.execute(
+            "UPDATE transactions SET notes = 'pagar uber depois' WHERE ofx_fitid = 'F2'",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "UPDATE transactions SET description = 'UBER TRIP' WHERE ofx_fitid = 'F3'",
+            [],
+        )
+        .unwrap();
+
+        let mut stmt = conn
+            .prepare(
+                "SELECT ofx_fitid FROM transactions
+                 WHERE LOWER(description) LIKE ?1 OR LOWER(COALESCE(notes, '')) LIKE ?1
+                 ORDER BY id",
+            )
+            .unwrap();
+        let hits: Vec<String> = stmt
+            .query_map(params!["%uber%"], |r| r.get::<_, Option<String>>(0))
+            .unwrap()
+            .filter_map(|r| r.ok().flatten())
+            .collect();
+
+        assert_eq!(hits, vec!["F2".to_string(), "F3".to_string()]);
     }
 
     #[test]
