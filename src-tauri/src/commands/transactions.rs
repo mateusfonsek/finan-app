@@ -10,6 +10,7 @@ pub struct TransactionFilters {
     pub account_id: Option<i64>,
     pub month: Option<String>,
     pub category_id: Option<i64>,
+    pub limit: Option<u32>,
 }
 
 #[tauri::command]
@@ -42,9 +43,13 @@ pub fn list_transactions(
     } else {
         format!(" WHERE {}", where_clauses.join(" AND "))
     };
+    let limit_sql = match f.limit {
+        Some(n) => format!(" LIMIT {n}"),
+        None => String::new(),
+    };
     let sql = format!(
         "SELECT id, account_id, date, amount, description, category_id, notes, ofx_fitid, imported_at
-         FROM transactions{where_sql} ORDER BY date DESC, id DESC",
+         FROM transactions{where_sql} ORDER BY date DESC, id DESC{limit_sql}",
     );
 
     let mut stmt = conn.prepare(&sql)?;
@@ -349,6 +354,28 @@ mod tests {
             .map(|r| r.unwrap())
             .collect();
         assert_eq!(ids.len(), 1, "only March transaction should match");
+    }
+
+    #[test]
+    fn limit_clause_caps_result_count() {
+        let mut conn = fresh_conn();
+        let acc = insert_account(&conn, "test", Some("ACC1"));
+        let txs = vec![
+            mk("F1", "10.00"),
+            mk("F2", "20.00"),
+            mk("F3", "30.00"),
+        ];
+        raw_insert_batch(&mut conn, acc, &txs);
+
+        let mut stmt = conn
+            .prepare("SELECT id FROM transactions ORDER BY date DESC, id DESC LIMIT 2")
+            .unwrap();
+        let rows: Vec<i64> = stmt
+            .query_map([], |r| r.get(0))
+            .unwrap()
+            .map(|r| r.unwrap())
+            .collect();
+        assert_eq!(rows.len(), 2);
     }
 
     #[test]
