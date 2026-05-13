@@ -8,6 +8,7 @@
     { section: "Visão geral", href: "/transactions", label: "Transações" },
     { section: "Importar", href: "/import", label: "Importar OFX" },
     { section: "Organizar", href: "/categories", label: "Categorias" },
+    { section: "Organizar", href: "/rules", label: "Regras" },
   ];
 
   const sections = ["Visão geral", "Importar", "Organizar"];
