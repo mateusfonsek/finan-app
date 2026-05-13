@@ -12,9 +12,13 @@ pub fn run() {
         commands::health::health_check,
         commands::accounts::list_accounts,
         commands::accounts::create_or_get_account,
+        commands::categories::list_categories,
+        commands::categories::create_category,
         commands::transactions::list_transactions,
         commands::transactions::insert_transactions,
         commands::transactions::check_existing_fitids,
+        commands::transactions::update_transaction_category,
+        commands::transactions::update_transaction_notes,
     ]);
 
     #[cfg(debug_assertions)]
