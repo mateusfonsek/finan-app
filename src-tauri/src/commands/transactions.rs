@@ -62,7 +62,8 @@ pub fn list_transactions(
             imported_at: row.get(8)?,
         })
     })?;
-    rows.collect::<rusqlite::Result<Vec<_>>>().map_err(AppError::from)
+    rows.collect::<rusqlite::Result<Vec<_>>>()
+        .map_err(AppError::from)
 }
 
 /// Insert a batch of new transactions. Returns counts of inserted vs skipped (duplicates).
@@ -353,10 +354,18 @@ mod tests {
         let txs = vec![mk("F1", "10")];
         raw_insert_batch(&mut conn, acc, &txs);
         let tx_id: i64 = conn
-            .query_row("SELECT id FROM transactions WHERE ofx_fitid = 'F1'", [], |r| r.get(0))
+            .query_row(
+                "SELECT id FROM transactions WHERE ofx_fitid = 'F1'",
+                [],
+                |r| r.get(0),
+            )
             .unwrap();
         let cat_id: i64 = conn
-            .query_row("SELECT id FROM categories WHERE name = 'Mercado'", [], |r| r.get(0))
+            .query_row(
+                "SELECT id FROM categories WHERE name = 'Mercado'",
+                [],
+                |r| r.get(0),
+            )
             .unwrap();
 
         conn.execute(
@@ -366,9 +375,11 @@ mod tests {
         .unwrap();
 
         let stored: i64 = conn
-            .query_row("SELECT category_id FROM transactions WHERE id = ?1", params![tx_id], |r| {
-                r.get(0)
-            })
+            .query_row(
+                "SELECT category_id FROM transactions WHERE id = ?1",
+                params![tx_id],
+                |r| r.get(0),
+            )
             .unwrap();
         assert_eq!(stored, cat_id);
     }

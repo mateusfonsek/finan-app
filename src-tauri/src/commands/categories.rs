@@ -21,7 +21,8 @@ pub fn list_categories(db: State<'_, Db>) -> AppResult<Vec<Category>> {
             created_at: row.get(4)?,
         })
     })?;
-    rows.collect::<rusqlite::Result<Vec<_>>>().map_err(AppError::from)
+    rows.collect::<rusqlite::Result<Vec<_>>>()
+        .map_err(AppError::from)
 }
 
 #[tauri::command]

@@ -12,7 +12,7 @@
 
   let { transaction, onClose, onSave }: Props = $props();
 
-  let draft = $state(transaction.notes ?? "");
+  let draft = $state("");
   let busy = $state(false);
   let textarea: HTMLTextAreaElement | undefined = $state();
 
