@@ -23,6 +23,12 @@ O fluxo é direto: exporto o extrato mensal do meu banco (formato OFX), arrasto 
 - Mostra dashboard com gastos por categoria e por mês
 - Filtra e busca transações
 
+## Status
+
+- ✅ Fase 0 — Scaffold (Tauri + Svelte + DB + sidebar + IPC tipado)
+- 🚧 Fase 1 — Importar OFX (próximo)
+- ⏳ Fase 2-5 — Categorização, regras, dashboard, polish
+
 ## Stack
 
 - **[Tauri 2](https://v2.tauri.app/)** — framework pra app desktop nativo

@@ -2,9 +2,8 @@ use rusqlite::Connection;
 
 use crate::error::AppResult;
 
-const MIGRATIONS: &[(&str, &str)] = &[
-    ("0001_init", include_str!("../../migrations/0001_init.sql")),
-];
+const MIGRATIONS: &[(&str, &str)] =
+    &[("0001_init", include_str!("../../migrations/0001_init.sql"))];
 
 pub fn apply(conn: &Connection) -> AppResult<()> {
     conn.execute_batch(

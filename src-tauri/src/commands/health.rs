@@ -16,11 +16,8 @@ pub struct HealthInfo {
 #[specta::specta]
 pub fn health_check(db: State<'_, Db>) -> AppResult<HealthInfo> {
     let conn = db.conn.lock().expect("db mutex poisoned");
-    let category_count: u32 = conn.query_row(
-        "SELECT COUNT(*) FROM categories",
-        [],
-        |row| row.get(0),
-    )?;
+    let category_count: u32 =
+        conn.query_row("SELECT COUNT(*) FROM categories", [], |row| row.get(0))?;
 
     Ok(HealthInfo {
         version: env!("CARGO_PKG_VERSION").to_string(),
