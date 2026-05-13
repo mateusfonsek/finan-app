@@ -19,6 +19,11 @@ pub fn run() {
         commands::transactions::check_existing_fitids,
         commands::transactions::update_transaction_category,
         commands::transactions::update_transaction_notes,
+        commands::rules::list_rules,
+        commands::rules::create_rule,
+        commands::rules::update_rule,
+        commands::rules::delete_rule,
+        commands::rules::apply_rules_to_uncategorized,
     ]);
 
     #[cfg(debug_assertions)]
