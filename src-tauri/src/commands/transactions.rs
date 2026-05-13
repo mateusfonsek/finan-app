@@ -40,7 +40,8 @@ pub fn list_transactions(
             imported_at: row.get(8)?,
         })
     })?;
-    rows.collect::<rusqlite::Result<Vec<_>>>().map_err(AppError::from)
+    rows.collect::<rusqlite::Result<Vec<_>>>()
+        .map_err(AppError::from)
 }
 
 /// Insert a batch of new transactions. Returns counts of inserted vs skipped (duplicates).
@@ -149,7 +150,11 @@ mod tests {
         conn.last_insert_rowid()
     }
 
-    fn raw_insert_batch(conn: &mut Connection, account_id: i64, txs: &[NewTransaction]) -> (u32, u32) {
+    fn raw_insert_batch(
+        conn: &mut Connection,
+        account_id: i64,
+        txs: &[NewTransaction],
+    ) -> (u32, u32) {
         let tx_conn = conn.transaction().unwrap();
         let mut inserted = 0u32;
         let mut skipped = 0u32;
@@ -163,7 +168,13 @@ mod tests {
                 .unwrap();
             for tx in txs {
                 let changes = stmt
-                    .execute(params![account_id, tx.date, tx.amount, tx.description, tx.ofx_fitid])
+                    .execute(params![
+                        account_id,
+                        tx.date,
+                        tx.amount,
+                        tx.description,
+                        tx.ofx_fitid
+                    ])
                     .unwrap();
                 if changes == 1 {
                     inserted += 1;

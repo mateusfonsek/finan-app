@@ -51,7 +51,10 @@ mod tests {
             description: "salary".into(),
             ofx_fitid: Some("ABC123".into()),
         };
-        assert_eq!(t.parse_amount().unwrap(), Decimal::from_str("123.45").unwrap());
+        assert_eq!(
+            t.parse_amount().unwrap(),
+            Decimal::from_str("123.45").unwrap()
+        );
     }
 
     #[test]
@@ -62,7 +65,10 @@ mod tests {
             description: "grocery".into(),
             ofx_fitid: Some("ABC124".into()),
         };
-        assert_eq!(t.parse_amount().unwrap(), Decimal::from_str("-50.99").unwrap());
+        assert_eq!(
+            t.parse_amount().unwrap(),
+            Decimal::from_str("-50.99").unwrap()
+        );
     }
 
     #[test]

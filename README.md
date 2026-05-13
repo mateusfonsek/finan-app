@@ -26,8 +26,9 @@ O fluxo é direto: exporto o extrato mensal do meu banco (formato OFX), arrasto 
 ## Status
 
 - ✅ Fase 0 — Scaffold (Tauri + Svelte + DB + sidebar + IPC tipado)
-- 🚧 Fase 1 — Importar OFX (próximo)
-- ⏳ Fase 2-5 — Categorização, regras, dashboard, polish
+- ✅ Fase 1 — Importar OFX (parser TS + dedup por FITID + listagem)
+- 🚧 Fase 2 — Categorização manual inline (próximo)
+- ⏳ Fase 3-5 — Regras, dashboard, polish
 
 ## Stack
 

@@ -9,9 +9,8 @@ use crate::error::{AppError, AppResult};
 #[specta::specta]
 pub fn list_accounts(db: State<'_, Db>) -> AppResult<Vec<Account>> {
     let conn = db.conn.lock().expect("db mutex poisoned");
-    let mut stmt = conn.prepare(
-        "SELECT id, name, bank, ofx_acctid, created_at FROM accounts ORDER BY id",
-    )?;
+    let mut stmt =
+        conn.prepare("SELECT id, name, bank, ofx_acctid, created_at FROM accounts ORDER BY id")?;
     let rows = stmt.query_map([], |row| {
         Ok(Account {
             id: row.get(0)?,
@@ -21,7 +20,8 @@ pub fn list_accounts(db: State<'_, Db>) -> AppResult<Vec<Account>> {
             created_at: row.get(4)?,
         })
     })?;
-    rows.collect::<rusqlite::Result<Vec<_>>>().map_err(AppError::from)
+    rows.collect::<rusqlite::Result<Vec<_>>>()
+        .map_err(AppError::from)
 }
 
 /// Returns existing account matching `ofx_acctid` if any, otherwise creates one.
@@ -85,7 +85,12 @@ mod tests {
         conn
     }
 
-    fn create_account_raw(conn: &Connection, name: &str, bank: Option<&str>, acctid: Option<&str>) -> i64 {
+    fn create_account_raw(
+        conn: &Connection,
+        name: &str,
+        bank: Option<&str>,
+        acctid: Option<&str>,
+    ) -> i64 {
         conn.execute(
             "INSERT INTO accounts (name, bank, ofx_acctid) VALUES (?1, ?2, ?3)",
             params![name, bank, acctid],
