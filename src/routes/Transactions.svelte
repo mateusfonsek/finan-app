@@ -2,15 +2,21 @@
   import { onMount } from "svelte";
   import TxTable from "$lib/components/transactions/TxTable.svelte";
   import TxFilterBar from "$lib/components/transactions/TxFilterBar.svelte";
+  import TxNotesPanel from "$lib/components/transactions/TxNotesPanel.svelte";
   import { filters } from "$lib/stores/filters.svelte";
   import { listCategories, createCategory } from "$lib/api/categories";
-  import { listTransactions, updateTransactionCategory } from "$lib/api/transactions";
+  import {
+    listTransactions,
+    updateTransactionCategory,
+    updateTransactionNotes,
+  } from "$lib/api/transactions";
   import type { Category, Transaction } from "$lib/bindings";
 
   let transactions = $state<Transaction[]>([]);
   let categories = $state<Category[]>([]);
   let loading = $state(true);
   let error = $state<string | null>(null);
+  let selectedTx = $state<Transaction | null>(null);
 
   async function refresh() {
     try {
@@ -19,6 +25,10 @@
         month: filters.month,
         category_id: filters.categoryId,
       });
+      if (selectedTx) {
+        const fresh = transactions.find((t) => t.id === selectedTx?.id);
+        selectedTx = fresh ?? null;
+      }
     } catch (e) {
       error = e instanceof Error ? e.message : String(e);
     }
@@ -63,6 +73,19 @@
     filters.categoryId = id;
     await refresh();
   }
+
+  function onRowClick(t: Transaction) {
+    selectedTx = t;
+  }
+  function closePanel() {
+    selectedTx = null;
+  }
+  async function onSaveNotes(transactionId: number, notes: string | null) {
+    await updateTransactionNotes(transactionId, notes);
+    transactions = transactions.map((t) =>
+      t.id === transactionId ? { ...t, notes } : t,
+    );
+  }
 </script>
 
 <section class="p-8 max-w-5xl mx-auto flex flex-col gap-5">
@@ -93,6 +116,12 @@
       {categories}
       {onCategoryChange}
       {onCategoryCreate}
+      {onRowClick}
+      selectedId={selectedTx?.id ?? null}
     />
   {/if}
 </section>
+
+{#if selectedTx}
+  <TxNotesPanel transaction={selectedTx} onClose={closePanel} onSave={onSaveNotes} />
+{/if}
