@@ -1,0 +1,785 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <title>finan — Importar OFX</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <link rel="stylesheet" href="assets/app.css" />
+  <style>
+    /* import-specific */
+    .import-grid {
+      display: grid;
+      grid-template-columns: 1fr 280px;
+      gap: 16px;
+      align-items: start;
+    }
+    .file-card {
+      background: var(--surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--r-4);
+      padding: 14px 16px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .file-card .file-ico {
+      width: 38px; height: 38px;
+      border-radius: 9px;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      display: grid; place-items: center;
+      color: var(--accent-hi);
+    }
+    .file-card .file-ico svg { width: 18px; height: 18px; }
+    .file-meta { flex: 1; min-width: 0; }
+    .file-name {
+      font-family: var(--font-display);
+      font-size: 13.5px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+    }
+    .file-sub {
+      font-size: 11px; color: var(--fg-faint);
+      font-variant-numeric: tabular-nums;
+      display: flex; gap: 10px; margin-top: 2px;
+    }
+    .file-sub span { display: inline-flex; align-items: center; gap: 4px; }
+    .badge-detected {
+      font-size: 10.5px;
+      color: var(--accent-hi);
+      background: var(--accent-soft);
+      border: 1px solid oklch(66% 0.115 145 / 0.28);
+      padding: 2px 7px;
+      border-radius: 999px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      display: inline-flex; align-items: center; gap: 4px;
+    }
+
+    .summary-card {
+      background: var(--surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--r-4);
+      padding: 14px 16px;
+    }
+    .summary-row {
+      display: flex; align-items: baseline; justify-content: space-between;
+      padding: 7px 0;
+      border-bottom: 1px solid var(--border-subtle);
+      font-size: 12px;
+    }
+    .summary-row:last-child { border-bottom: 0; }
+    .summary-row .label { color: var(--fg-muted); }
+    .summary-row .val { font-variant-numeric: tabular-nums; font-weight: 500; }
+
+    .preview-wrap {
+      background: var(--surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--r-4);
+      overflow: hidden;
+    }
+    .preview-toolbar {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+    .preview-toolbar .left {
+      display: flex; align-items: center; gap: 8px;
+      font-family: var(--font-display);
+      font-size: 12.5px; font-weight: 600;
+    }
+    .pill-count {
+      font-size: 11px;
+      color: var(--fg-muted);
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      padding: 1px 7px;
+      border-radius: 999px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .tx-table .col-pick { width: 32px; padding-left: 14px; }
+    .tx-table .col-suggest { width: 170px; }
+    .ck {
+      width: 14px; height: 14px;
+      border-radius: 4px;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      display: inline-grid; place-items: center;
+    }
+    .ck.is-on {
+      background: var(--accent);
+      border-color: oklch(56% 0.12 145);
+    }
+    .ck.is-on::after {
+      content: "";
+      width: 8px; height: 5px;
+      border: 1.5px solid var(--accent-on);
+      border-top: 0; border-right: 0;
+      transform: rotate(-45deg) translateY(-1px);
+    }
+
+    .suggest {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 2px 8px 2px 6px;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      font-size: 11px;
+      color: var(--fg);
+      cursor: pointer;
+    }
+    .suggest:hover { background: var(--surface-3); }
+    .suggest .chev {
+      width: 10px; height: 10px;
+      color: var(--fg-faint);
+      margin-left: 1px;
+    }
+    .suggest.is-rule {
+      border-color: oklch(66% 0.115 145 / 0.4);
+      background: oklch(66% 0.115 145 / 0.1);
+    }
+    .suggest.is-rule .why {
+      font-size: 9.5px;
+      color: var(--accent-hi);
+      text-transform: uppercase;
+      letter-spacing: .05em;
+      font-weight: 600;
+    }
+    .suggest.is-empty {
+      color: var(--fg-faint);
+    }
+
+    .footer-bar {
+      display: flex; align-items: center; gap: 12px;
+      padding: 12px 14px;
+      border-top: 1px solid var(--border-subtle);
+      background: var(--surface);
+    }
+    .footer-bar .sum {
+      font-size: 11.5px; color: var(--fg-muted);
+      font-variant-numeric: tabular-nums;
+    }
+    .footer-bar .sum strong { color: var(--fg); font-weight: 600; }
+
+    .rules-card .rule {
+      display: flex; align-items: center; gap: 8px;
+      padding: 6px 0;
+      font-size: 11.5px;
+      color: var(--fg-muted);
+      border-bottom: 1px solid var(--border-subtle);
+    }
+    .rules-card .rule:last-child { border-bottom: 0; }
+    .rules-card .rule .pat {
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      color: var(--fg);
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      padding: 1px 6px;
+      border-radius: 4px;
+    }
+    .rules-card .rule .arrow { color: var(--fg-faint); }
+    .rules-card .rule .target {
+      display: inline-flex; align-items: center; gap: 5px;
+      color: var(--fg);
+      font-size: 11px;
+    }
+
+    .h-stack { display: flex; align-items: center; gap: 8px; }
+  </style>
+</head>
+<body>
+
+<div class="app">
+
+  <!-- ─── Sidebar ─────────────────────────────────────────────── -->
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-mark">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M11 20A7 7 0 0 1 4 13c0-7 7-9 16-9 0 9-2 16-9 16Z"/>
+          <path d="M4 13c4-1 9-1 13-5"/>
+        </svg>
+      </div>
+      <div>
+        <div class="brand-name">finan</div>
+        <div style="font-size:10px;color:var(--fg-faint);margin-top:1px">100% local</div>
+      </div>
+    </div>
+
+    <nav class="nav-section">
+      <div class="nav-label">Visão geral</div>
+      <a href="dashboard.html" class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.5"/></svg>
+        Dashboard
+        <span class="count">3 m</span>
+      </a>
+      <div class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h12M8 12h12M8 18h12"/><circle cx="4.5" cy="6" r=".9" fill="currentColor"/><circle cx="4.5" cy="12" r=".9" fill="currentColor"/><circle cx="4.5" cy="18" r=".9" fill="currentColor"/></svg>
+        Transações
+        <span class="count">412</span>
+      </div>
+    </nav>
+
+    <nav class="nav-section">
+      <div class="nav-label">Importar</div>
+      <div class="nav-item is-active">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11m0 0 4-4m-4 4-4-4"/><path d="M4 17v2.5A1.5 1.5 0 0 0 5.5 21h13a1.5 1.5 0 0 0 1.5-1.5V17"/></svg>
+        Importar OFX
+      </div>
+    </nav>
+
+    <nav class="nav-section">
+      <div class="nav-label">Organizar</div>
+      <div class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 12.5 11 5h8v8l-7.5 7.5a2 2 0 0 1-2.83 0L3.5 15.32a2 2 0 0 1 0-2.83Z"/><circle cx="15.5" cy="8.5" r="1.2"/></svg>
+        Categorias
+        <span class="count">14</span>
+      </div>
+    </nav>
+
+    <div class="nav-spacer"></div>
+
+    <nav class="nav-section">
+      <div class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1.2l1.9-1.4-2-3.4-2.2.8a7 7 0 0 0-2.1-1.2L14 3h-4l-.5 2.6a7 7 0 0 0-2.1 1.2l-2.2-.8-2 3.4 1.9 1.4A7 7 0 0 0 5 12c0 .4 0 .8.1 1.2l-1.9 1.4 2 3.4 2.2-.8a7 7 0 0 0 2.1 1.2L10 21h4l.5-2.6a7 7 0 0 0 2.1-1.2l2.2.8 2-3.4-1.9-1.4c.1-.4.1-.8.1-1.2Z"/></svg>
+        Configurações
+      </div>
+    </nav>
+
+    <div class="account">
+      <div class="account-dot"></div>
+      <div class="account-text">
+        <div class="account-name">Mateus</div>
+        <div class="account-sub">~/Library/finan.db</div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ─── Main ────────────────────────────────────────────────── -->
+  <main class="main">
+    <div class="toolbar">
+      <div class="toolbar-title">Importar OFX</div>
+      <span class="toolbar-crumbs">/ extrato-itau-abr2026.ofx</span>
+      <div class="toolbar-spacer"></div>
+      <button class="btn btn-ghost">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 16-5.7L21 8M21 4v4h-4M21 12a9 9 0 0 1-16 5.7L3 16M3 20v-4h4"/></svg>
+        Reanalisar
+      </button>
+      <div class="seg">
+        <button class="is-active">Visualizar</button>
+        <button>Bruto (OFX)</button>
+      </div>
+    </div>
+
+    <div class="view">
+
+      <!-- File card -->
+      <div class="file-card" style="margin-bottom:12px">
+        <div class="file-ico">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5Z"/><path d="M14 3v5h5"/></svg>
+        </div>
+        <div class="file-meta">
+          <div class="file-name">extrato-itau-abr2026.ofx</div>
+          <div class="file-sub">
+            <span>OFX 2.1.1</span>
+            <span>·</span>
+            <span>148 KB</span>
+            <span>·</span>
+            <span>Itaú Unibanco · Conta corrente 4321-X</span>
+            <span>·</span>
+            <span>01 abr → 30 abr 2026</span>
+          </div>
+        </div>
+        <span class="badge-detected">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5L20 7"/></svg>
+          Banco detectado
+        </span>
+      </div>
+
+      <div class="import-grid">
+
+        <!-- ─── Preview table ─── -->
+        <div class="preview-wrap">
+          <div class="preview-toolbar">
+            <div class="left">
+              <span>Pré-visualização</span>
+              <span class="pill-count">87 transações</span>
+            </div>
+            <div style="flex:1"></div>
+            <div class="search" style="width:180px">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.3-4.3"/></svg>
+              <input placeholder="Filtrar"/>
+            </div>
+            <div class="seg">
+              <button class="is-active">Todas</button>
+              <button>Saídas</button>
+              <button>Entradas</button>
+            </div>
+          </div>
+
+          <div style="max-height:440px; overflow-y:auto">
+            <table class="tx-table">
+              <thead>
+                <tr>
+                  <th class="col-pick"><span class="ck is-on"></span></th>
+                  <th class="col-date">Data</th>
+                  <th>Descrição</th>
+                  <th class="col-suggest">Sugestão</th>
+                  <th class="col-amt">Valor</th>
+                </tr>
+              </thead>
+              <tbody>
+
+                <tr>
+                  <td class="col-pick"><span class="ck is-on"></span></td>
+                  <td class="col-date">02 abr</td>
+                  <td>
+                    <div class="merchant">
+                      <div>
+                        <div class="merchant-name">Pão de Açúcar</div>
+                        <div class="merchant-sub">COMPRA DEBITO PAO DE ACUCAR 4127</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td>
+                    <span class="suggest is-rule">
+                      <span class="dot" style="background:var(--cat-mercado)"></span>
+                      Mercado
+                      <span class="why">regra</span>
+                      <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+                    </span>
+                  </td>
+                  <td class="col-amt">−R$ 287,40</td>
+                </tr>
+
+                <tr>
+                  <td class="col-pick"><span class="ck is-on"></span></td>
+                  <td class="col-date">02 abr</td>
+                  <td>
+                    <div class="merchant">
+                      <div>
+                        <div class="merchant-name">Uber Trip</div>
+                        <div class="merchant-sub">UBER *TRIP HELP.UBER.COM</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td>
+                    <span class="suggest is-rule">
+                      <span class="dot" style="background:var(--cat-transporte)"></span>
+                      Transporte
+                      <span class="why">regra</span>
+                      <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+                    </span>
+                  </td>
+                  <td class="col-amt">−R$ 18,90</td>
+                </tr>
+
+                <tr>
+                  <td class="col-pick"><span class="ck is-on"></span></td>
+                  <td class="col-date">03 abr</td>
+                  <td>
+                    <div class="merchant">
+                      <div>
+                        <div class="merchant-name">iFood</div>
+                        <div class="merchant-sub">DEB AUT IFOOD COM AGENCIADO</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td>
+                    <span class="suggest is-rule">
+                      <span class="dot" style="background:var(--cat-restaurante)"></span>
+                      Restaurantes
+                      <span class="why">regra</span>
+                      <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+                    </span>
+                  </td>
+                  <td class="col-amt">−R$ 42,80</td>
+                </tr>
+
+                <tr>
+                  <td class="col-pick"><span class="ck is-on"></span></td>
+                  <td class="col-date">04 abr</td>
+                  <td>
+                    <div class="merchant">
+                      <div>
+                        <div class="merchant-name">Spotify Brasil</div>
+                        <div class="merchant-sub">ASSINATURA SPOTIFY MENSAL</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td>
+                    <span class="suggest is-rule">
+                      <span class="dot" style="background:var(--cat-assinatura)"></span>
+                      Assinatura
+                      <span class="why">regra</span>
+                      <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+                    </span>
+                  </td>
+                  <td class="col-amt">−R$ 21,90</td>
+                </tr>
+
+                <tr>
+                  <td class="col-pick"><span class="ck is-on"></span></td>
+                  <td class="col-date">05 abr</td>
+                  <td>
+                    <div class="merchant">
+                      <div>
+                        <div class="merchant-name">Pix recebido — Lab. Diagnose</div>
+                        <div class="merchant-sub">PIX QRS CASA 12345 LAB DIAGNOSE</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td>
+                    <span class="suggest is-empty">
+                      <span class="dot" style="background:var(--cat-outros)"></span>
+                      Sem sugestão
+                      <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+                    </span>
+                  </td>
+                  <td class="col-amt pos">+R$ 320,00</td>
+                </tr>
+
+                <tr>
+                  <td class="col-pick"><span class="ck is-on"></span></td>
+                  <td class="col-date">07 abr</td>
+                  <td>
+                    <div class="merchant">
+                      <div>
+                        <div class="merchant-name">Posto Shell</div>
+                        <div class="merchant-sub">POSTO SHELL CIDADE JARDIM</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td>
+                    <span class="suggest is-rule">
+                      <span class="dot" style="background:var(--cat-transporte)"></span>
+                      Transporte
+                      <span class="why">regra</span>
+                      <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+                    </span>
+                  </td>
+                  <td class="col-amt">−R$ 218,40</td>
+                </tr>
+
+                <tr>
+                  <td class="col-pick"><span class="ck is-on"></span></td>
+                  <td class="col-date">08 abr</td>
+                  <td>
+                    <div class="merchant">
+                      <div>
+                        <div class="merchant-name">Drogaria São Paulo</div>
+                        <div class="merchant-sub">DROGSP CONS REC 09875432</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td>
+                    <span class="suggest is-rule">
+                      <span class="dot" style="background:var(--cat-saude)"></span>
+                      Saúde
+                      <span class="why">regra</span>
+                      <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+                    </span>
+                  </td>
+                  <td class="col-amt">−R$ 98,30</td>
+                </tr>
+
+                <tr>
+                  <td class="col-pick"><span class="ck is-on"></span></td>
+                  <td class="col-date">10 abr</td>
+                  <td>
+                    <div class="merchant">
+                      <div>
+                        <div class="merchant-name">Conta de Luz — Enel SP</div>
+                        <div class="merchant-sub">DEB AUT ENEL SP REF 04 2026</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td>
+                    <span class="suggest is-rule">
+                      <span class="dot" style="background:var(--cat-casa)"></span>
+                      Casa
+                      <span class="why">regra</span>
+                      <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+                    </span>
+                  </td>
+                  <td class="col-amt">−R$ 412,55</td>
+                </tr>
+
+                <tr>
+                  <td class="col-pick"><span class="ck is-on"></span></td>
+                  <td class="col-date">12 abr</td>
+                  <td>
+                    <div class="merchant">
+                      <div>
+                        <div class="merchant-name">Outback Steakhouse</div>
+                        <div class="merchant-sub">COMPRA DEB OUTBACK CIDADE JARDIM</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td>
+                    <span class="suggest">
+                      <span class="dot" style="background:var(--cat-restaurante)"></span>
+                      Restaurantes
+                      <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+                    </span>
+                  </td>
+                  <td class="col-amt">−R$ 168,90</td>
+                </tr>
+
+                <tr>
+                  <td class="col-pick"><span class="ck is-on"></span></td>
+                  <td class="col-date">14 abr</td>
+                  <td>
+                    <div class="merchant">
+                      <div>
+                        <div class="merchant-name">Hortifruti Natural da Terra</div>
+                        <div class="merchant-sub">COMPRA DEBITO HORTIFRUTI 0231</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td>
+                    <span class="suggest is-rule">
+                      <span class="dot" style="background:var(--cat-mercado)"></span>
+                      Mercado
+                      <span class="why">regra</span>
+                      <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+                    </span>
+                  </td>
+                  <td class="col-amt">−R$ 144,15</td>
+                </tr>
+
+                <tr>
+                  <td class="col-pick"><span class="ck is-on"></span></td>
+                  <td class="col-date">15 abr</td>
+                  <td>
+                    <div class="merchant">
+                      <div>
+                        <div class="merchant-name">Cinemark Iguatemi</div>
+                        <div class="merchant-sub">CINEMARK IGUATEMI 06 INGRESSOS</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td>
+                    <span class="suggest">
+                      <span class="dot" style="background:var(--cat-lazer)"></span>
+                      Lazer
+                      <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+                    </span>
+                  </td>
+                  <td class="col-amt">−R$ 72,00</td>
+                </tr>
+
+                <tr>
+                  <td class="col-pick"><span class="ck is-on"></span></td>
+                  <td class="col-date">15 abr</td>
+                  <td>
+                    <div class="merchant">
+                      <div>
+                        <div class="merchant-name">Salário — Nubank Tecnologia</div>
+                        <div class="merchant-sub">CRED TED NUBANK TECNOLOGIA SA</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td>
+                    <span class="suggest is-rule">
+                      <span class="dot" style="background:var(--cat-renda)"></span>
+                      Salário
+                      <span class="why">regra</span>
+                      <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+                    </span>
+                  </td>
+                  <td class="col-amt pos">+R$ 12.480,00</td>
+                </tr>
+
+                <tr>
+                  <td class="col-pick"><span class="ck is-on"></span></td>
+                  <td class="col-date">17 abr</td>
+                  <td>
+                    <div class="merchant">
+                      <div>
+                        <div class="merchant-name">Leroy Merlin Morumbi</div>
+                        <div class="merchant-sub">COMPRA CRED LEROY MERLIN 04x</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td>
+                    <span class="suggest is-empty">
+                      <span class="dot" style="background:var(--cat-outros)"></span>
+                      Sem sugestão
+                      <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+                    </span>
+                  </td>
+                  <td class="col-amt">−R$ 384,90</td>
+                </tr>
+
+                <tr>
+                  <td class="col-pick"><span class="ck"></span></td>
+                  <td class="col-date">18 abr</td>
+                  <td>
+                    <div class="merchant">
+                      <div>
+                        <div class="merchant-name">Tarifa pacote serviços</div>
+                        <div class="merchant-sub">TAR PACOTE SERVICOS ABRIL 2026</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td>
+                    <span class="suggest">
+                      <span class="dot" style="background:var(--cat-outros)"></span>
+                      Tarifas
+                      <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+                    </span>
+                  </td>
+                  <td class="col-amt" style="color:var(--fg-faint)">−R$ 32,90</td>
+                </tr>
+
+                <tr>
+                  <td class="col-pick"><span class="ck is-on"></span></td>
+                  <td class="col-date">21 abr</td>
+                  <td>
+                    <div class="merchant">
+                      <div>
+                        <div class="merchant-name">99 Pop</div>
+                        <div class="merchant-sub">99 *POP CORRIDA 99POP COM</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td>
+                    <span class="suggest is-rule">
+                      <span class="dot" style="background:var(--cat-transporte)"></span>
+                      Transporte
+                      <span class="why">regra</span>
+                      <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+                    </span>
+                  </td>
+                  <td class="col-amt">−R$ 14,30</td>
+                </tr>
+
+                <tr>
+                  <td class="col-pick"><span class="ck is-on"></span></td>
+                  <td class="col-date">23 abr</td>
+                  <td>
+                    <div class="merchant">
+                      <div>
+                        <div class="merchant-name">Madero Steak House</div>
+                        <div class="merchant-sub">COMPRA DEB MADERO SHOPPING JK</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td>
+                    <span class="suggest">
+                      <span class="dot" style="background:var(--cat-restaurante)"></span>
+                      Restaurantes
+                      <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+                    </span>
+                  </td>
+                  <td class="col-amt">−R$ 254,00</td>
+                </tr>
+
+              </tbody>
+            </table>
+          </div>
+
+          <div class="footer-bar">
+            <div class="sum">
+              <strong>15</strong> selecionadas · <strong>R$ 12.800,00</strong> entradas · <strong>R$ 2.355,60</strong> saídas
+            </div>
+            <div style="flex:1"></div>
+            <button class="btn">Cancelar</button>
+            <button class="btn btn-primary">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5L20 7"/></svg>
+              Importar 15 transações
+            </button>
+          </div>
+        </div>
+
+        <!-- ─── Right column ─── -->
+        <aside style="display:flex; flex-direction:column; gap:12px">
+
+          <div class="summary-card">
+            <div style="font-family:var(--font-display); font-size:12px; font-weight:600; color:var(--fg-faint); text-transform:uppercase; letter-spacing:.05em; margin-bottom:4px">
+              Resumo do extrato
+            </div>
+            <div class="summary-row">
+              <span class="label">Período</span>
+              <span class="val">abr · 2026</span>
+            </div>
+            <div class="summary-row">
+              <span class="label">Total de transações</span>
+              <span class="val">87</span>
+            </div>
+            <div class="summary-row">
+              <span class="label">Entradas</span>
+              <span class="val" style="color:var(--pos)">+R$ 12.800,00</span>
+            </div>
+            <div class="summary-row">
+              <span class="label">Saídas</span>
+              <span class="val">−R$ 8.412,38</span>
+            </div>
+            <div class="summary-row">
+              <span class="label">Saldo final</span>
+              <span class="val">R$ 4.387,62</span>
+            </div>
+          </div>
+
+          <div class="summary-card rules-card">
+            <div style="display:flex; align-items:center; gap:6px; margin-bottom:8px">
+              <div style="font-family:var(--font-display); font-size:12px; font-weight:600; color:var(--fg-faint); text-transform:uppercase; letter-spacing:.05em; flex:1">
+                Regras aplicadas
+              </div>
+              <span class="pill-count">11</span>
+            </div>
+            <div class="rule">
+              <span class="pat">UBER*</span>
+              <svg class="arrow" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14m-5-5 5 5-5 5"/></svg>
+              <span class="target"><span class="dot" style="background:var(--cat-transporte)"></span>Transporte</span>
+            </div>
+            <div class="rule">
+              <span class="pat">IFOOD*</span>
+              <svg class="arrow" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14m-5-5 5 5-5 5"/></svg>
+              <span class="target"><span class="dot" style="background:var(--cat-restaurante)"></span>Restaurantes</span>
+            </div>
+            <div class="rule">
+              <span class="pat">PAO DE ACUCAR</span>
+              <svg class="arrow" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14m-5-5 5 5-5 5"/></svg>
+              <span class="target"><span class="dot" style="background:var(--cat-mercado)"></span>Mercado</span>
+            </div>
+            <div class="rule">
+              <span class="pat">SPOTIFY</span>
+              <svg class="arrow" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14m-5-5 5 5-5 5"/></svg>
+              <span class="target"><span class="dot" style="background:var(--cat-assinatura)"></span>Assinatura</span>
+            </div>
+            <div class="rule">
+              <span class="pat">CRED TED NUBANK</span>
+              <svg class="arrow" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14m-5-5 5 5-5 5"/></svg>
+              <span class="target"><span class="dot" style="background:var(--cat-renda)"></span>Salário</span>
+            </div>
+          </div>
+
+          <div class="callout">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8.5v.01"/></svg>
+            <div>
+              <strong style="font-weight:600">2 transações duplicadas</strong> foram ignoradas (já estavam no banco local). Nada será re-importado.
+            </div>
+          </div>
+
+        </aside>
+
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<script>
+  // toggle checkboxes
+  document.querySelectorAll('.ck').forEach(ck => {
+    ck.addEventListener('click', () => ck.classList.toggle('is-on'));
+  });
+</script>
+
+</body>
+</html>
