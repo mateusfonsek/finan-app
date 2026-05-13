@@ -23,7 +23,8 @@ pub fn list_rules(db: State<'_, Db>) -> AppResult<Vec<Rule>> {
             created_at: row.get(4)?,
         })
     })?;
-    rows.collect::<rusqlite::Result<Vec<_>>>().map_err(AppError::from)
+    rows.collect::<rusqlite::Result<Vec<_>>>()
+        .map_err(AppError::from)
 }
 
 #[tauri::command]
@@ -80,10 +81,7 @@ pub fn delete_rule(db: State<'_, Db>, rule_id: i64) -> AppResult<()> {
 /// Returns the count of transactions newly categorized.
 #[tauri::command]
 #[specta::specta]
-pub fn apply_rules_to_uncategorized(
-    db: State<'_, Db>,
-    account_id: Option<i64>,
-) -> AppResult<u32> {
+pub fn apply_rules_to_uncategorized(db: State<'_, Db>, account_id: Option<i64>) -> AppResult<u32> {
     let mut conn = db.conn.lock().expect("db mutex poisoned");
     apply_rules_internal(&mut conn, account_id)
 }
@@ -167,7 +165,12 @@ mod tests {
         conn.last_insert_rowid()
     }
 
-    fn insert_tx(conn: &Connection, account_id: i64, description: &str, category_id: Option<i64>) -> i64 {
+    fn insert_tx(
+        conn: &Connection,
+        account_id: i64,
+        description: &str,
+        category_id: Option<i64>,
+    ) -> i64 {
         conn.execute(
             "INSERT INTO transactions (account_id, date, amount, description, category_id, ofx_fitid)
              VALUES (?1, '2026-04-12', '10.00', ?2, ?3, NULL)",
@@ -263,10 +266,14 @@ mod tests {
         )
         .unwrap();
         let a1: i64 = conn
-            .query_row("SELECT id FROM accounts WHERE ofx_acctid='A1'", [], |r| r.get(0))
+            .query_row("SELECT id FROM accounts WHERE ofx_acctid='A1'", [], |r| {
+                r.get(0)
+            })
             .unwrap();
         let a2: i64 = conn
-            .query_row("SELECT id FROM accounts WHERE ofx_acctid='A2'", [], |r| r.get(0))
+            .query_row("SELECT id FROM accounts WHERE ofx_acctid='A2'", [], |r| {
+                r.get(0)
+            })
             .unwrap();
         let transporte = category_id(&conn, "Transporte");
         insert_rule(&conn, "uber", transporte, 0);

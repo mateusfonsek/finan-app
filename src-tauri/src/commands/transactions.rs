@@ -110,7 +110,7 @@ pub fn insert_transactions(
     tx_conn.commit()?;
 
     let auto_categorized =
-        crate::commands::rules::apply_rules_internal(&mut *conn, Some(account_id))?;
+        crate::commands::rules::apply_rules_internal(&mut conn, Some(account_id))?;
 
     Ok(InsertResult {
         inserted,

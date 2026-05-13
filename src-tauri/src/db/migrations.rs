@@ -4,7 +4,10 @@ use crate::error::AppResult;
 
 const MIGRATIONS: &[(&str, &str)] = &[
     ("0001_init", include_str!("../../migrations/0001_init.sql")),
-    ("0002_rules", include_str!("../../migrations/0002_rules.sql")),
+    (
+        "0002_rules",
+        include_str!("../../migrations/0002_rules.sql"),
+    ),
 ];
 
 pub fn apply(conn: &Connection) -> AppResult<()> {
@@ -105,6 +108,9 @@ mod tests {
                 .map(|r| r.unwrap())
                 .collect()
         };
-        assert_eq!(applied, vec!["0001_init".to_string(), "0002_rules".to_string()]);
+        assert_eq!(
+            applied,
+            vec!["0001_init".to_string(), "0002_rules".to_string()]
+        );
     }
 }
