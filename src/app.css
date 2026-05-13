@@ -1,0 +1,81 @@
+@import "tailwindcss";
+
+@theme inline {
+  /* surfaces */
+  --color-bg: oklch(19% 0.005 240);
+  --color-bg-translucent: oklch(19% 0.005 240 / 0.72);
+  --color-surface: oklch(22% 0.006 240);
+  --color-surface-2: oklch(25% 0.006 240);
+  --color-surface-3: oklch(28% 0.007 240);
+  --color-hover: oklch(30% 0.008 240);
+
+  /* borders */
+  --color-border: oklch(32% 0.009 240);
+  --color-border-subtle: oklch(27% 0.008 240);
+
+  /* text */
+  --color-fg: oklch(96% 0.005 240);
+  --color-fg-muted: oklch(72% 0.008 240);
+  --color-fg-subtle: oklch(55% 0.01 240);
+  --color-fg-faint: oklch(42% 0.01 240);
+
+  /* accent (moss green) */
+  --color-accent: oklch(66% 0.115 145);
+  --color-accent-hi: oklch(74% 0.13 145);
+  --color-accent-on: oklch(15% 0.04 145);
+  --color-accent-soft: oklch(66% 0.115 145 / 0.16);
+  --color-accent-ring: oklch(66% 0.115 145 / 0.32);
+
+  /* categorical (chips, charts) */
+  --color-cat-mercado: oklch(66% 0.115 145);
+  --color-cat-transporte: oklch(64% 0.10 230);
+  --color-cat-restaurante: oklch(70% 0.12 65);
+  --color-cat-casa: oklch(64% 0.10 295);
+  --color-cat-saude: oklch(66% 0.10 0);
+  --color-cat-lazer: oklch(68% 0.10 195);
+  --color-cat-assinatura: oklch(60% 0.08 320);
+  --color-cat-renda: oklch(70% 0.13 145);
+  --color-cat-outros: oklch(60% 0.005 240);
+
+  /* semantic */
+  --color-pos: oklch(70% 0.13 145);
+  --color-neg: oklch(68% 0.13 25);
+
+  /* radii */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+  --radius-2xl: 16px;
+
+  /* fonts */
+  --font-display: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Inter", system-ui, sans-serif;
+  --font-body: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", system-ui, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
+}
+
+html {
+  color-scheme: dark;
+}
+
+body {
+  margin: 0;
+  background: var(--color-bg);
+  color: var(--color-fg);
+  font-family: var(--font-body);
+  font-size: 13px;
+  line-height: 1.5;
+  letter-spacing: -0.01em;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: "calt", "ss01", "cv11";
+}
+
+::selection {
+  background: var(--color-accent-soft);
+  color: var(--color-fg);
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
