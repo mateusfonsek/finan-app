@@ -11,7 +11,7 @@
   function shortLabel(yyyymm: string): string {
     const [y, mo] = yyyymm.split("-");
     const names = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
-    return `${names[Number(mo) - 1]}/${y.slice(-2)}`;
+    return `${names[Number(mo) - 1]}/${y}`;
   }
 
   let maxValue = $derived(
