@@ -33,54 +33,48 @@
     return Number(m.slice(5, 7));
   }
 
-  let mode = $derived<"month" | "year" | "all">(
-    !month ? "all" : month.length === 7 ? "month" : "year",
+  let mode = $derived<"month" | "year">(
+    !month || month.length === 7 ? "month" : "year",
   );
 
-  let label = $derived(computeLabel(month, mode));
-
-  function computeLabel(m: string | null, mo: "month" | "year" | "all"): string {
-    if (mo === "all") return "Todos";
-    if (mo === "month" && m) {
-      return `${MONTH_NAMES[Number(m.slice(5, 7)) - 1]}/${m.slice(0, 4)}`;
-    }
-    if (mo === "year" && m) return m;
-    return "—";
-  }
-
-  function shift(delta: number) {
-    if (mode === "all") {
+  // Se a store vier null (legado), normaliza pro mês atual sem expor o "all" no UI.
+  $effect(() => {
+    if (month === null) {
       const y = currentYear();
       const mm = String(currentMonth()).padStart(2, "0");
       onChange(`${y}-${mm}`);
-      return;
     }
-    if (mode === "month" && month) {
-      const y = Number(month.slice(0, 4));
-      const m = Number(month.slice(5, 7));
+  });
+
+  let label = $derived(computeLabel(month, mode));
+
+  function computeLabel(m: string | null, mo: "month" | "year"): string {
+    if (mo === "year" && m) return m;
+    if (mo === "month" && m && m.length === 7) {
+      return `${MONTH_NAMES[Number(m.slice(5, 7)) - 1]}/${m.slice(0, 4)}`;
+    }
+    // fallback: mês atual (enquanto $effect ainda não normalizou)
+    return `${MONTH_NAMES[currentMonth() - 1]}/${currentYear()}`;
+  }
+
+  function shift(delta: number) {
+    if (mode === "month") {
+      const base = month && month.length === 7
+        ? month
+        : `${currentYear()}-${String(currentMonth()).padStart(2, "0")}`;
+      const y = Number(base.slice(0, 4));
+      const m = Number(base.slice(5, 7));
       const d = new Date(y, m - 1 + delta, 1);
       onChange(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
-    } else if (mode === "year" && month) {
+    } else if (month) {
       onChange(String(Number(month) + delta));
     }
   }
 
-  function toggleMode() {
-    if (mode === "month" && month) {
-      onChange(month.slice(0, 4));
-    } else if (mode === "year" && month) {
-      const mm = String(currentMonth()).padStart(2, "0");
-      onChange(`${month}-${mm}`);
-    } else {
-      const y = currentYear();
-      const mm = String(currentMonth()).padStart(2, "0");
-      onChange(`${y}-${mm}`);
-    }
+  function toggleToYear() {
+    const base = month && month.length === 7 ? month : `${currentYear()}-01`;
+    onChange(base.slice(0, 4));
   }
-
-  let toggleLabel = $derived(
-    mode === "month" ? "Todos os meses" : mode === "year" ? "Mês específico" : "Filtrar período",
-  );
 
   // ─── Calendar popover ────────────────────────────────────────────
   let pickerOpen = $state(false);
@@ -105,10 +99,6 @@
   function pickCurrentMonth() {
     const y = currentYear();
     onChange(`${y}-${String(currentMonth()).padStart(2, "0")}`);
-    pickerOpen = false;
-  }
-  function pickAll() {
-    onChange(null);
     pickerOpen = false;
   }
 
@@ -151,13 +141,13 @@
     </button>
   </div>
 
-  {#if mode !== "all"}
+  {#if mode === "month"}
     <button
       type="button"
-      onclick={toggleMode}
+      onclick={toggleToYear}
       class="text-[11px] text-fg-faint hover:text-fg-muted underline-offset-2 hover:underline"
     >
-      {toggleLabel}
+      Todos os meses
     </button>
   {/if}
 
@@ -233,14 +223,7 @@
         {/each}
       </div>
 
-      <div class="flex items-center justify-between border-t border-border-subtle pt-2.5 text-[11px]">
-        <button
-          type="button"
-          onclick={pickAll}
-          class="text-fg-faint hover:text-fg-muted underline-offset-2 hover:underline"
-        >
-          Todos os períodos
-        </button>
+      <div class="flex items-center justify-end border-t border-border-subtle pt-2.5 text-[11px]">
         <button
           type="button"
           onclick={pickCurrentMonth}
