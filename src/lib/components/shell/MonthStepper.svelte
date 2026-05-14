@@ -82,33 +82,42 @@
   let popoverEl: HTMLDivElement | undefined = $state();
   let pickerYear = $state(currentYear());
 
+  const POPOVER_W = 260;
+  const POPOVER_MARGIN = 8;
   let popoverStyle = $state("");
 
-  function positionPopover() {
-    if (!triggerEl) return;
+  /** Calcula a posição do popover relativa ao trigger button. Síncrono. */
+  function computePopoverStyle(): string {
+    if (!triggerEl) return "";
     const r = triggerEl.getBoundingClientRect();
-    const W = 260;
-    const margin = 8;
     const vw = window.innerWidth;
-    // Prefer right-aligned to trigger (popover extends leftward from trigger).
-    let left = r.right - W;
-    // If clips the left edge, flip to left-aligned (extends rightward).
-    if (left < margin) {
+    // Prefere alinhar à direita do trigger (popover abre pra esquerda).
+    let left = r.right - POPOVER_W;
+    // Se cortar no edge esquerdo, flipa pra abrir pra direita.
+    if (left < POPOVER_MARGIN) {
       left = r.left;
-      if (left + W > vw - margin) {
-        left = vw - W - margin;
+      if (left + POPOVER_W > vw - POPOVER_MARGIN) {
+        left = vw - POPOVER_W - POPOVER_MARGIN;
       }
     }
     const top = r.bottom + 4;
-    popoverStyle = `position: fixed; top: ${top}px; left: ${left}px;`;
+    return `position: fixed; top: ${top}px; left: ${left}px;`;
   }
 
-  $effect(() => {
-    if (pickerOpen) {
-      pickerYear = parseYear(month) ?? currentYear();
-      requestAnimationFrame(positionPopover);
-    }
-  });
+  function openPicker() {
+    popoverStyle = computePopoverStyle();
+    pickerYear = parseYear(month) ?? currentYear();
+    pickerOpen = true;
+  }
+
+  function closePicker() {
+    pickerOpen = false;
+  }
+
+  function togglePicker() {
+    if (pickerOpen) closePicker();
+    else openPicker();
+  }
 
   function pickMonth(y: number, m: number) {
     onChange(`${y}-${String(m).padStart(2, "0")}`);
@@ -133,7 +142,7 @@
       }
     }
     function handleResize() {
-      if (pickerOpen) positionPopover();
+      if (pickerOpen) popoverStyle = computePopoverStyle();
     }
     document.addEventListener("mousedown", handleClick);
     window.addEventListener("resize", handleResize);
@@ -175,7 +184,7 @@
   <button
     bind:this={triggerEl}
     type="button"
-    onclick={() => (pickerOpen = !pickerOpen)}
+    onclick={togglePicker}
     class="w-7 h-7 grid place-items-center rounded-md border border-border bg-surface-2 text-fg-muted hover:bg-hover hover:text-fg transition-colors"
     aria-label="Calendário"
   >
@@ -250,7 +259,7 @@
             type="button"
             onclick={() => {
               toggleToYear();
-              pickerOpen = false;
+              closePicker();
             }}
             class="text-fg-faint hover:text-fg-muted underline-offset-2 hover:underline"
           >
