@@ -2,9 +2,7 @@ use rusqlite::params;
 use tauri::State;
 
 use crate::db::Db;
-use crate::domain::category::{
-    is_default_category, Category, CategoryWithCount, NewCategory, UpdateCategory,
-};
+use crate::domain::category::{Category, CategoryWithCount, NewCategory, UpdateCategory};
 use crate::error::{AppError, AppResult};
 
 #[tauri::command]
@@ -71,16 +69,13 @@ pub fn list_categories_with_count(db: State<'_, Db>) -> AppResult<Vec<CategoryWi
          ORDER BY c.kind, c.name",
     )?;
     let rows = stmt.query_map([], |row| {
-        let name: String = row.get(1)?;
-        let is_default = is_default_category(&name);
         Ok(CategoryWithCount {
             id: row.get(0)?,
-            name,
+            name: row.get(1)?,
             color_token: row.get(2)?,
             kind: row.get(3)?,
             created_at: row.get(4)?,
             transaction_count: row.get::<_, i64>(5)? as u32,
-            is_default,
         })
     })?;
     rows.collect::<rusqlite::Result<Vec<_>>>()
@@ -126,25 +121,11 @@ pub fn update_category(
     .map_err(AppError::from)
 }
 
-/// Apaga uma categoria custom. Defaults (seeds) são protegidas.
-/// Transações que referenciavam a categoria ficam com category_id=NULL.
+/// Apaga uma categoria. Transações que a referenciavam ficam com category_id=NULL.
 #[tauri::command]
 #[specta::specta]
 pub fn delete_category(db: State<'_, Db>, category_id: i64) -> AppResult<()> {
     let mut conn = db.conn.lock().expect("db mutex poisoned");
-
-    let name: String = conn.query_row(
-        "SELECT name FROM categories WHERE id = ?1",
-        params![category_id],
-        |r| r.get(0),
-    )?;
-
-    if is_default_category(&name) {
-        return Err(AppError::Invalid(format!(
-            "categoria padrão '{name}' não pode ser apagada"
-        )));
-    }
-
     let tx = conn.transaction()?;
     tx.execute(
         "UPDATE transactions SET category_id = NULL WHERE category_id = ?1",
@@ -212,15 +193,6 @@ mod tests {
             params!["Mercado", "--color-cat-mercado", "expense"],
         );
         assert!(r.is_err(), "UNIQUE constraint on name should reject");
-    }
-
-    #[test]
-    fn default_category_names_recognized() {
-        use crate::domain::category::is_default_category;
-        assert!(is_default_category("Mercado"));
-        assert!(is_default_category("Renda"));
-        assert!(!is_default_category("Pets"));
-        assert!(!is_default_category(""));
     }
 
     #[test]

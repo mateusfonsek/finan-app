@@ -65,8 +65,9 @@
       Categorias
     </h2>
     <p class="text-xs text-fg-faint max-w-xl mt-1">
-      Crie, edite ou apague suas categorias. As 9 padrão (marcadas como "padrão")
-      podem ser editadas mas não apagadas — pra preservar o estado inicial do app.
+      Crie, edite ou apague qualquer categoria. As 9 categorias iniciais vêm
+      pré-criadas mas podem ser modificadas ou removidas livremente — apagar
+      deixa as transações vinculadas sem categoria.
     </p>
   </header>
 

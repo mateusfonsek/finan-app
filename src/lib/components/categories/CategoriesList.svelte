@@ -34,9 +34,6 @@
               <span class="w-2.5 h-2.5 rounded-sm shrink-0"
                     style="background: var({c.color_token ?? '--color-cat-outros'})"></span>
               <span class="font-medium">{c.name}</span>
-              {#if c.is_default}
-                <span class="text-[10px] uppercase tracking-wider text-fg-faint">padrão</span>
-              {/if}
             </span>
           </td>
           <td class="px-4 py-2.5 text-fg-muted">{kindLabel(c.kind)}</td>
@@ -49,22 +46,13 @@
             >
               Editar
             </button>
-            {#if c.is_default}
-              <span
-                class="text-[11px] text-fg-faint cursor-not-allowed"
-                title="Categoria padrão não pode ser apagada"
-              >
-                Apagar
-              </span>
-            {:else}
-              <button
-                type="button"
-                onclick={() => onDelete(c)}
-                class="text-[11px] text-neg hover:underline underline-offset-2"
-              >
-                Apagar
-              </button>
-            {/if}
+            <button
+              type="button"
+              onclick={() => onDelete(c)}
+              class="text-[11px] text-neg hover:underline underline-offset-2"
+            >
+              Apagar
+            </button>
           </td>
         </tr>
       {:else}
