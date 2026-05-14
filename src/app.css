@@ -36,6 +36,9 @@
   --color-cat-assinatura: oklch(60% 0.08 320);
   --color-cat-renda: oklch(70% 0.13 145);
   --color-cat-outros: oklch(60% 0.005 240);
+  --color-cat-amarelo: oklch(78% 0.13 95);
+  --color-cat-indigo: oklch(58% 0.13 275);
+  --color-cat-marrom: oklch(48% 0.06 50);
 
   /* semantic */
   --color-pos: oklch(70% 0.13 145);
