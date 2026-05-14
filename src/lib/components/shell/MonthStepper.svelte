@@ -82,9 +82,31 @@
   let popoverEl: HTMLDivElement | undefined = $state();
   let pickerYear = $state(currentYear());
 
+  let popoverStyle = $state("");
+
+  function positionPopover() {
+    if (!triggerEl) return;
+    const r = triggerEl.getBoundingClientRect();
+    const W = 260;
+    const margin = 8;
+    const vw = window.innerWidth;
+    // Prefer right-aligned to trigger (popover extends leftward from trigger).
+    let left = r.right - W;
+    // If clips the left edge, flip to left-aligned (extends rightward).
+    if (left < margin) {
+      left = r.left;
+      if (left + W > vw - margin) {
+        left = vw - W - margin;
+      }
+    }
+    const top = r.bottom + 4;
+    popoverStyle = `position: fixed; top: ${top}px; left: ${left}px;`;
+  }
+
   $effect(() => {
     if (pickerOpen) {
       pickerYear = parseYear(month) ?? currentYear();
+      requestAnimationFrame(positionPopover);
     }
   });
 
@@ -110,8 +132,17 @@
         pickerOpen = false;
       }
     }
+    function handleResize() {
+      if (pickerOpen) positionPopover();
+    }
     document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
+    window.addEventListener("resize", handleResize);
+    window.addEventListener("scroll", handleResize, true);
+    return () => {
+      document.removeEventListener("mousedown", handleClick);
+      window.removeEventListener("resize", handleResize);
+      window.removeEventListener("scroll", handleResize, true);
+    };
   });
 
   let selMonth = $derived(parseMonth(month));
@@ -165,8 +196,8 @@
   {#if pickerOpen}
     <div
       bind:this={popoverEl}
-      class="absolute z-30 top-full mt-1 left-0 w-[260px] rounded-lg border border-border bg-surface p-3 flex flex-col gap-2.5"
-      style="box-shadow: 0 12px 32px -8px rgba(0,0,0,.55), 0 0 0 1px var(--color-border)"
+      class="z-30 w-[260px] rounded-lg border border-border bg-surface p-3 flex flex-col gap-2.5"
+      style="{popoverStyle}; box-shadow: 0 12px 32px -8px rgba(0,0,0,.55), 0 0 0 1px var(--color-border);"
     >
       <div class="flex items-center justify-between">
         <button
