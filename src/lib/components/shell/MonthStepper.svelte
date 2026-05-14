@@ -151,13 +151,15 @@
     </button>
   </div>
 
-  <button
-    type="button"
-    onclick={toggleMode}
-    class="text-[11px] text-fg-faint hover:text-fg-muted underline-offset-2 hover:underline"
-  >
-    {toggleLabel}
-  </button>
+  {#if mode !== "all"}
+    <button
+      type="button"
+      onclick={toggleMode}
+      class="text-[11px] text-fg-faint hover:text-fg-muted underline-offset-2 hover:underline"
+    >
+      {toggleLabel}
+    </button>
+  {/if}
 
   <button
     bind:this={triggerEl}
