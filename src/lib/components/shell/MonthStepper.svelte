@@ -141,16 +141,6 @@
     </button>
   </div>
 
-  {#if mode === "month"}
-    <button
-      type="button"
-      onclick={toggleToYear}
-      class="text-[11px] text-fg-faint hover:text-fg-muted underline-offset-2 hover:underline"
-    >
-      Todos os meses
-    </button>
-  {/if}
-
   <button
     bind:this={triggerEl}
     type="button"
@@ -223,7 +213,21 @@
         {/each}
       </div>
 
-      <div class="flex items-center justify-end border-t border-border-subtle pt-2.5 text-[11px]">
+      <div class="flex items-center justify-between border-t border-border-subtle pt-2.5 text-[11px]">
+        {#if mode === "month"}
+          <button
+            type="button"
+            onclick={() => {
+              toggleToYear();
+              pickerOpen = false;
+            }}
+            class="text-fg-faint hover:text-fg-muted underline-offset-2 hover:underline"
+          >
+            Todos os meses
+          </button>
+        {:else}
+          <span></span>
+        {/if}
         <button
           type="button"
           onclick={pickCurrentMonth}
