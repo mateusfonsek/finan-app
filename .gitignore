@@ -11,6 +11,12 @@ src-tauri/target/
 src-tauri/gen/
 src-tauri/WixTools/
 
+# Tauri icon generator: iOS + Android assets (macOS-only app)
+src-tauri/icons/ios/
+src-tauri/icons/android/
+src-tauri/icons/Square*.png
+src-tauri/icons/StoreLogo.png
+
 # Tauri-specta generated bindings
 src/lib/bindings.ts
 
