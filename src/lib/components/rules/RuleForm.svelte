@@ -20,7 +20,8 @@
   let pattern = $state("");
   let categoryId = $state<number | null>(null);
   let priority = $state(0);
-  let dueDayStr = $state("");
+  /** Svelte 5 coage <input type="number"> pra number | null; mantemos compatível. */
+  let dueDayValue = $state<number | null>(null);
   let busy = $state(false);
   let error = $state<string | null>(null);
 
@@ -28,7 +29,7 @@
     pattern = initial?.pattern ?? "";
     categoryId = initial?.category_id ?? null;
     priority = initial?.priority ?? 0;
-    dueDayStr = initial?.due_day != null ? String(initial.due_day) : "";
+    dueDayValue = initial?.due_day ?? null;
   });
 
   async function submit(e: Event) {
@@ -43,13 +44,12 @@
       return;
     }
     let dueDay: number | null = null;
-    if (dueDayStr.trim() !== "") {
-      const n = Number(dueDayStr);
-      if (!Number.isInteger(n) || n < 1 || n > 31) {
+    if (dueDayValue != null) {
+      if (!Number.isInteger(dueDayValue) || dueDayValue < 1 || dueDayValue > 31) {
         error = "Dia do vencimento deve estar entre 1 e 31 (ou vazio).";
         return;
       }
-      dueDay = n;
+      dueDay = dueDayValue;
     }
     busy = true;
     try {
@@ -58,7 +58,7 @@
         pattern = "";
         categoryId = null;
         priority = 0;
-        dueDayStr = "";
+        dueDayValue = null;
       }
     } catch (e) {
       error = e instanceof Error ? e.message : String(e);
@@ -118,7 +118,7 @@
         min="1"
         max="31"
         placeholder="—"
-        bind:value={dueDayStr}
+        bind:value={dueDayValue}
         class="rounded-md border border-border bg-surface-2 px-2 py-1 text-[12px] text-fg tabular focus:outline-none focus:border-accent"
       />
     </label>
