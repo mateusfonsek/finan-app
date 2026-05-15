@@ -1,5 +1,6 @@
 <script lang="ts">
   import { link, router } from "svelte-spa-router";
+  import logoUrl from "$lib/assets/logo.png";
 
   type NavItem = { href: string; label: string; section?: string };
 
@@ -20,14 +21,13 @@
 </script>
 
 <aside class="bg-surface border-r border-border-subtle flex flex-col py-3 px-2.5 select-none">
-  <div class="flex items-center gap-2 px-2 pb-3.5">
-    <div class="w-[22px] h-[22px] rounded-md grid place-items-center"
-         style="background: linear-gradient(180deg, var(--color-accent-hi), var(--color-accent));">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-3 h-3" style="color: var(--color-accent-on);">
-        <path d="M11 20A7 7 0 0 1 4 13c0-7 7-9 16-9 0 9-2 16-9 16Z"/>
-        <path d="M4 13c4-1 9-1 13-5"/>
-      </svg>
-    </div>
+  <div class="flex items-center gap-2.5 px-2 pb-3.5">
+    <img
+      src={logoUrl}
+      alt="finan"
+      class="w-7 h-7 rounded-md shrink-0"
+      draggable="false"
+    />
     <div>
       <div class="text-[13.5px] font-semibold tracking-tight" style="font-family: var(--font-display)">finan</div>
       <div class="text-[10px] text-fg-faint mt-px">100% local</div>
