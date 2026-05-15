@@ -1,0 +1,1 @@
+ALTER TABLE rules ADD COLUMN due_day INTEGER;

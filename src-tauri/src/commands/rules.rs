@@ -2,15 +2,26 @@ use rusqlite::params;
 use tauri::State;
 
 use crate::db::Db;
-use crate::domain::rule::{NewRule, Rule, UpdateRule};
+use crate::domain::rule::{CalendarEvent, NewRule, Rule, UpdateRule};
 use crate::error::{AppError, AppResult};
+
+fn validate_due_day(d: Option<i32>) -> AppResult<()> {
+    if let Some(day) = d {
+        if !(1..=31).contains(&day) {
+            return Err(AppError::Invalid(format!(
+                "due_day deve estar entre 1 e 31 (recebido: {day})"
+            )));
+        }
+    }
+    Ok(())
+}
 
 #[tauri::command]
 #[specta::specta]
 pub fn list_rules(db: State<'_, Db>) -> AppResult<Vec<Rule>> {
     let conn = db.conn.lock().expect("db mutex poisoned");
     let mut stmt = conn.prepare(
-        "SELECT id, pattern, category_id, priority, created_at
+        "SELECT id, pattern, category_id, priority, due_day, created_at
          FROM rules
          ORDER BY priority DESC, created_at DESC",
     )?;
@@ -20,7 +31,8 @@ pub fn list_rules(db: State<'_, Db>) -> AppResult<Vec<Rule>> {
             pattern: row.get(1)?,
             category_id: row.get(2)?,
             priority: row.get(3)?,
-            created_at: row.get(4)?,
+            due_day: row.get(4)?,
+            created_at: row.get(5)?,
         })
     })?;
     rows.collect::<rusqlite::Result<Vec<_>>>()
@@ -33,10 +45,16 @@ pub fn create_rule(db: State<'_, Db>, input: NewRule) -> AppResult<Rule> {
     if input.pattern.trim().is_empty() {
         return Err(AppError::Invalid("pattern must not be empty".into()));
     }
+    validate_due_day(input.due_day)?;
     let conn = db.conn.lock().expect("db mutex poisoned");
     conn.execute(
-        "INSERT INTO rules (pattern, category_id, priority) VALUES (?1, ?2, ?3)",
-        params![input.pattern.trim(), input.category_id, input.priority],
+        "INSERT INTO rules (pattern, category_id, priority, due_day) VALUES (?1, ?2, ?3, ?4)",
+        params![
+            input.pattern.trim(),
+            input.category_id,
+            input.priority,
+            input.due_day
+        ],
     )?;
     let id = conn.last_insert_rowid();
     fetch_rule(&conn, id)
@@ -48,13 +66,15 @@ pub fn update_rule(db: State<'_, Db>, rule_id: i64, input: UpdateRule) -> AppRes
     if input.pattern.trim().is_empty() {
         return Err(AppError::Invalid("pattern must not be empty".into()));
     }
+    validate_due_day(input.due_day)?;
     let conn = db.conn.lock().expect("db mutex poisoned");
     let changed = conn.execute(
-        "UPDATE rules SET pattern = ?1, category_id = ?2, priority = ?3 WHERE id = ?4",
+        "UPDATE rules SET pattern = ?1, category_id = ?2, priority = ?3, due_day = ?4 WHERE id = ?5",
         params![
             input.pattern.trim(),
             input.category_id,
             input.priority,
+            input.due_day,
             rule_id
         ],
     )?;
@@ -120,7 +140,7 @@ pub fn apply_rules_internal(
 
 fn fetch_rule(conn: &rusqlite::Connection, id: i64) -> AppResult<Rule> {
     conn.query_row(
-        "SELECT id, pattern, category_id, priority, created_at FROM rules WHERE id = ?1",
+        "SELECT id, pattern, category_id, priority, due_day, created_at FROM rules WHERE id = ?1",
         params![id],
         |row| {
             Ok(Rule {
@@ -128,11 +148,109 @@ fn fetch_rule(conn: &rusqlite::Connection, id: i64) -> AppResult<Rule> {
                 pattern: row.get(1)?,
                 category_id: row.get(2)?,
                 priority: row.get(3)?,
-                created_at: row.get(4)?,
+                due_day: row.get(4)?,
+                created_at: row.get(5)?,
             })
         },
     )
     .map_err(AppError::from)
+}
+
+/// Cruza regras × transações do mês pra montar eventos do calendário.
+///
+/// Para cada regra:
+/// - Se `due_day` set: gera evento com vencimento (mesmo sem casar transação)
+/// - Se houver transação no mês cujo description casa o pattern: enriquece
+///   o evento com paid_day + paid_amount + paid_transaction_id
+/// - Se due_day=NULL e sem match: regra NÃO aparece (semântica do usuário:
+///   "só aparece quando paga")
+///
+/// Quando múltiplas transações casam a mesma regra no mesmo mês, pega a
+/// primeira (data ascendente).
+#[tauri::command]
+#[specta::specta]
+pub fn calendar_events(db: State<'_, Db>, month: String) -> AppResult<Vec<CalendarEvent>> {
+    if month.len() != 7 || !month.contains('-') {
+        return Err(AppError::Invalid(format!(
+            "month deve ser 'YYYY-MM' (recebido: '{month}')"
+        )));
+    }
+
+    let conn = db.conn.lock().expect("db mutex poisoned");
+    let date_prefix = format!("{month}-%");
+
+    // Step 1: load all rules with category info.
+    type RuleRow = (i64, String, Option<i32>, String, Option<String>);
+    let rule_rows: Vec<RuleRow> = {
+        let mut stmt = conn.prepare(
+            "SELECT r.id, r.pattern, r.due_day, c.name, c.color_token
+             FROM rules r
+             JOIN categories c ON c.id = r.category_id
+             ORDER BY r.created_at DESC",
+        )?;
+        let rows = stmt
+            .query_map([], |row| {
+                Ok((
+                    row.get(0)?,
+                    row.get(1)?,
+                    row.get(2)?,
+                    row.get(3)?,
+                    row.get(4)?,
+                ))
+            })?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+        rows
+    };
+
+    // Step 2: load transactions of the month (id, date, amount, description).
+    type TxRow = (i64, String, String, String);
+    let tx_rows: Vec<TxRow> = {
+        let mut stmt = conn.prepare(
+            "SELECT id, date, amount, description
+             FROM transactions
+             WHERE date LIKE ?1
+             ORDER BY date ASC, id ASC",
+        )?;
+        let rows = stmt
+            .query_map(params![date_prefix], |row| {
+                Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?))
+            })?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+        rows
+    };
+
+    // Step 3: for each rule, find first matching tx in the month.
+    let mut events: Vec<CalendarEvent> = Vec::new();
+    for (rule_id, pattern, due_day, cat_name, cat_color) in rule_rows {
+        let pattern_lc = pattern.to_lowercase();
+        let matched = tx_rows
+            .iter()
+            .find(|(_, _, _, desc)| desc.to_lowercase().contains(&pattern_lc));
+
+        let (paid_day, paid_amount, paid_tx_id) = match matched {
+            Some((tx_id, date, amount, _)) => {
+                let day: Option<i32> = date.get(8..10).and_then(|s| s.parse().ok());
+                (day, Some(amount.clone()), Some(*tx_id))
+            }
+            None => (None, None, None),
+        };
+
+        // Mostra a regra se tem due_day OU se casou alguma transação.
+        if due_day.is_some() || paid_tx_id.is_some() {
+            events.push(CalendarEvent {
+                rule_id,
+                pattern,
+                category_name: cat_name,
+                category_color_token: cat_color,
+                due_day,
+                paid_day,
+                paid_amount,
+                paid_transaction_id: paid_tx_id,
+            });
+        }
+    }
+
+    Ok(events)
 }
 
 #[cfg(test)]
@@ -182,7 +300,7 @@ mod tests {
 
     fn insert_rule(conn: &Connection, pattern: &str, cat: i64, priority: i32) -> i64 {
         conn.execute(
-            "INSERT INTO rules (pattern, category_id, priority) VALUES (?1, ?2, ?3)",
+            "INSERT INTO rules (pattern, category_id, priority, due_day) VALUES (?1, ?2, ?3, NULL)",
             params![pattern, cat, priority],
         )
         .unwrap();

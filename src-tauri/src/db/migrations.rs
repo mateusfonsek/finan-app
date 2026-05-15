@@ -8,6 +8,10 @@ const MIGRATIONS: &[(&str, &str)] = &[
         "0002_rules",
         include_str!("../../migrations/0002_rules.sql"),
     ),
+    (
+        "0003_rules_due_day",
+        include_str!("../../migrations/0003_rules_due_day.sql"),
+    ),
 ];
 
 pub fn apply(conn: &Connection) -> AppResult<()> {
@@ -110,7 +114,11 @@ mod tests {
         };
         assert_eq!(
             applied,
-            vec!["0001_init".to_string(), "0002_rules".to_string()]
+            vec![
+                "0001_init".to_string(),
+                "0002_rules".to_string(),
+                "0003_rules_due_day".to_string(),
+            ]
         );
     }
 }

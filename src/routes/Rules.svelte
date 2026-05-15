@@ -35,17 +35,33 @@
     }
   });
 
-  async function onCreate(data: { pattern: string; categoryId: number; priority: number }) {
-    await createRule({ pattern: data.pattern, category_id: data.categoryId, priority: data.priority });
+  async function onCreate(data: {
+    pattern: string;
+    categoryId: number;
+    priority: number;
+    dueDay: number | null;
+  }) {
+    await createRule({
+      pattern: data.pattern,
+      category_id: data.categoryId,
+      priority: data.priority,
+      due_day: data.dueDay,
+    });
     await refresh();
   }
 
-  async function onUpdate(data: { pattern: string; categoryId: number; priority: number }) {
+  async function onUpdate(data: {
+    pattern: string;
+    categoryId: number;
+    priority: number;
+    dueDay: number | null;
+  }) {
     if (!editing) return;
     await updateRule(editing.id, {
       pattern: data.pattern,
       category_id: data.categoryId,
       priority: data.priority,
+      due_day: data.dueDay,
     });
     editing = null;
     await refresh();

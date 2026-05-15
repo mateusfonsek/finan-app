@@ -24,7 +24,8 @@
       <tr>
         <th class="text-left px-4 py-2 font-medium text-fg-faint uppercase tracking-wider text-[10.5px]">Pattern</th>
         <th class="text-left px-4 py-2 font-medium text-fg-faint uppercase tracking-wider text-[10.5px] w-[180px]">Categoria</th>
-        <th class="text-right px-4 py-2 font-medium text-fg-faint uppercase tracking-wider text-[10.5px] w-[100px]">Prioridade</th>
+        <th class="text-right px-4 py-2 font-medium text-fg-faint uppercase tracking-wider text-[10.5px] w-[90px]">Vence</th>
+        <th class="text-right px-4 py-2 font-medium text-fg-faint uppercase tracking-wider text-[10.5px] w-[90px]">Prio</th>
         <th class="px-4 py-2 w-[120px]"></th>
       </tr>
     </thead>
@@ -37,6 +38,9 @@
               <span class="w-2 h-2 rounded-full" style="background: var({categoryToken(r.category_id)})"></span>
               {categoryName(r.category_id)}
             </span>
+          </td>
+          <td class="px-4 py-2.5 text-right tabular text-fg-muted">
+            {r.due_day ? `dia ${r.due_day}` : "—"}
           </td>
           <td class="px-4 py-2.5 text-right tabular">{r.priority}</td>
           <td class="px-4 py-2.5 text-right flex gap-2 justify-end">
@@ -58,7 +62,7 @@
         </tr>
       {:else}
         <tr>
-          <td colspan="4" class="px-4 py-10 text-center text-fg-faint">
+          <td colspan="5" class="px-4 py-10 text-center text-fg-faint">
             Nenhuma regra ainda. Crie uma acima — ex. pattern "uber" → Transporte.
           </td>
         </tr>

@@ -27,6 +27,7 @@ pub fn run() {
         commands::rules::update_rule,
         commands::rules::delete_rule,
         commands::rules::apply_rules_to_uncategorized,
+        commands::rules::calendar_events,
         commands::summary::summary_kpis,
         commands::summary::summary_by_category,
         commands::summary::summary_by_month,

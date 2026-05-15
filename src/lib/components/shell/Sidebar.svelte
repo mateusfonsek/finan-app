@@ -7,6 +7,7 @@
   const navItems: NavItem[] = [
     { section: "Visão geral", href: "/dashboard", label: "Dashboard" },
     { section: "Visão geral", href: "/transactions", label: "Transações" },
+    { section: "Visão geral", href: "/calendar", label: "Calendário" },
     { section: "Importar", href: "/import", label: "Importar OFX" },
     { section: "Organizar", href: "/categories", label: "Categorias" },
     { section: "Organizar", href: "/rules", label: "Regras" },

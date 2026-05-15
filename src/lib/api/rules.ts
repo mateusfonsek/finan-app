@@ -1,5 +1,5 @@
 import { commands } from "../bindings";
-import type { NewRule, Rule, UpdateRule } from "../bindings";
+import type { CalendarEvent, NewRule, Rule, UpdateRule } from "../bindings";
 
 function unwrap<T>(result: { status: "ok"; data: T } | { status: "error"; error: string }): T {
   if (result.status === "error") throw new Error(result.error);
@@ -27,4 +27,8 @@ export async function applyRulesToUncategorized(
   accountId: number | null = null,
 ): Promise<number> {
   return unwrap(await commands.applyRulesToUncategorized(accountId));
+}
+
+export async function calendarEvents(month: string): Promise<CalendarEvent[]> {
+  return unwrap(await commands.calendarEvents(month));
 }

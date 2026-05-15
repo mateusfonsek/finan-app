@@ -5,7 +5,12 @@
   type Props = {
     categories: Category[];
     initial?: Rule | null;
-    onSave: (data: { pattern: string; categoryId: number; priority: number }) => Promise<void>;
+    onSave: (data: {
+      pattern: string;
+      categoryId: number;
+      priority: number;
+      dueDay: number | null;
+    }) => Promise<void>;
     onCancel?: () => void;
     submitLabel?: string;
   };
@@ -15,6 +20,7 @@
   let pattern = $state("");
   let categoryId = $state<number | null>(null);
   let priority = $state(0);
+  let dueDayStr = $state("");
   let busy = $state(false);
   let error = $state<string | null>(null);
 
@@ -22,6 +28,7 @@
     pattern = initial?.pattern ?? "";
     categoryId = initial?.category_id ?? null;
     priority = initial?.priority ?? 0;
+    dueDayStr = initial?.due_day != null ? String(initial.due_day) : "";
   });
 
   async function submit(e: Event) {
@@ -35,13 +42,23 @@
       error = "Selecione uma categoria.";
       return;
     }
+    let dueDay: number | null = null;
+    if (dueDayStr.trim() !== "") {
+      const n = Number(dueDayStr);
+      if (!Number.isInteger(n) || n < 1 || n > 31) {
+        error = "Dia do vencimento deve estar entre 1 e 31 (ou vazio).";
+        return;
+      }
+      dueDay = n;
+    }
     busy = true;
     try {
-      await onSave({ pattern: pattern.trim(), categoryId, priority });
+      await onSave({ pattern: pattern.trim(), categoryId, priority, dueDay });
       if (!initial) {
         pattern = "";
         categoryId = null;
         priority = 0;
+        dueDayStr = "";
       }
     } catch (e) {
       error = e instanceof Error ? e.message : String(e);
@@ -56,7 +73,7 @@
     {initial ? "Editar regra" : "Nova regra"}
   </div>
 
-  <div class="grid grid-cols-[1fr_180px_100px_auto] gap-2 items-end">
+  <div class="grid grid-cols-[1fr_180px_90px_110px_auto] gap-2 items-end">
     <label class="flex flex-col gap-1">
       <span class="text-[11px] text-fg-muted">Pattern (descrição contém)</span>
       <input
@@ -88,6 +105,20 @@
       <input
         type="number"
         bind:value={priority}
+        class="rounded-md border border-border bg-surface-2 px-2 py-1 text-[12px] text-fg tabular focus:outline-none focus:border-accent"
+      />
+    </label>
+
+    <label class="flex flex-col gap-1">
+      <span class="text-[11px] text-fg-muted" title="Dia do mês em que a obrigação vence. Deixe vazio se a regra não tem prazo fixo.">
+        Vence dia
+      </span>
+      <input
+        type="number"
+        min="1"
+        max="31"
+        placeholder="—"
+        bind:value={dueDayStr}
         class="rounded-md border border-border bg-surface-2 px-2 py-1 text-[12px] text-fg tabular focus:outline-none focus:border-accent"
       />
     </label>
