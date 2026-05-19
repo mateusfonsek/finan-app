@@ -23,6 +23,10 @@ export async function deleteRule(ruleId: number): Promise<void> {
   if (r.status === "error") throw new Error(r.error);
 }
 
+export async function deleteRuleWithCleanup(ruleId: number): Promise<number> {
+  return unwrap(await commands.deleteRuleWithCleanup(ruleId));
+}
+
 export async function applyRulesToUncategorized(
   accountId: number | null = null,
 ): Promise<number> {

@@ -1,20 +1,26 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import MonthStepper from "$lib/components/shell/MonthStepper.svelte";
-  import CalendarGrid from "$lib/components/calendar/CalendarGrid.svelte";
+  import CalendarGrid, { type DayFlow } from "$lib/components/calendar/CalendarGrid.svelte";
+  import DayDetails from "$lib/components/calendar/DayDetails.svelte";
   import { formatMoney } from "$lib/format/money";
   import { filters } from "$lib/stores/filters.svelte";
   import { calendarEvents } from "$lib/api/rules";
-  import type { CalendarEvent } from "$lib/bindings";
+  import { listTransactions } from "$lib/api/transactions";
+  import { listCategories } from "$lib/api/categories";
+  import type { CalendarEvent, Category, Transaction } from "$lib/bindings";
 
   let events = $state<CalendarEvent[]>([]);
-  let loading = $state(true);
+  let transactions = $state<Transaction[]>([]);
+  let categories = $state<Category[]>([]);
+  let loading = $state(false);
   let error = $state<string | null>(null);
 
-  let today = new Date().toISOString().slice(0, 10);
+  /** Dia selecionado (1..31). null = nenhum. */
+  let selectedDay = $state<number | null>(null);
 
-  /** Resolve o mês a usar quando filters.month vier como "YYYY" (ano inteiro):
-   *  cai pro mês atual desse ano. Calendário não suporta visão de ano. */
+  const today = new Date().toISOString().slice(0, 10);
+
   function monthForCalendar(m: string | null): string {
     if (!m) {
       const d = new Date();
@@ -22,7 +28,6 @@
     }
     if (m.length === 7) return m;
     if (m.length === 4) {
-      // ano-only: usa mês atual
       const mm = String(new Date().getMonth() + 1).padStart(2, "0");
       return `${m}-${mm}`;
     }
@@ -31,11 +36,88 @@
 
   let viewMonth = $derived(monthForCalendar(filters.month));
 
-  async function refresh() {
+  let selectedDate = $derived(
+    selectedDay == null ? null : `${viewMonth}-${String(selectedDay).padStart(2, "0")}`,
+  );
+
+  /** Set de category_ids que são kind='transfer' (inclui Investimentos). Heatmap exclui esses. */
+  let transferCatIds = $derived.by(() => {
+    const set = new Set<number>();
+    for (const c of categories) if (c.kind === "transfer") set.add(c.id);
+    return set;
+  });
+
+  let dayFlows = $derived.by(() => {
+    const map = new Map<number, DayFlow>();
+    for (const t of transactions) {
+      if (!t.date.startsWith(viewMonth)) continue;
+      // Exclui transferências/investimentos — heatmap mostra apenas movimento "real".
+      if (t.category_id != null && transferCatIds.has(t.category_id)) continue;
+      const d = Number(t.date.slice(8, 10));
+      const n = Number(t.amount);
+      if (!Number.isFinite(n) || n === 0) continue;
+      const bucket = map.get(d) ?? { inflow: 0, outflow: 0 };
+      if (n > 0) bucket.inflow += n;
+      else bucket.outflow += -n;
+      map.set(d, bucket);
+    }
+    return map;
+  });
+
+  let maxOut = $derived.by(() => {
+    let m = 0;
+    for (const { outflow } of dayFlows.values()) if (outflow > m) m = outflow;
+    return m;
+  });
+
+  let maxIn = $derived.by(() => {
+    let m = 0;
+    for (const { inflow } of dayFlows.values()) if (inflow > m) m = inflow;
+    return m;
+  });
+
+  let monthTotals = $derived.by(() => {
+    let inflow = 0;
+    let outflow = 0;
+    for (const f of dayFlows.values()) {
+      inflow += f.inflow;
+      outflow += f.outflow;
+    }
+    return { inflow, outflow, net: inflow - outflow };
+  });
+
+  /**
+   * Carrega categorias UMA VEZ. Separado do fluxo mensal pra não fazer
+   * o $effect que carrega dados do mês rastrear `categories.length` e
+   * disparar de novo após a atribuição (era a causa do piscar do painel
+   * lateral ao clicar num dia).
+   */
+  async function loadCategoriesOnce(): Promise<void> {
+    if (categories.length > 0) return;
+    try {
+      categories = await listCategories();
+    } catch (e) {
+      console.error("[calendar] failed to load categories", e);
+    }
+  }
+
+  /** Função pura: recebe o mês como parâmetro, não lê state reativo. */
+  async function loadMonthData(month: string): Promise<void> {
     loading = true;
     error = null;
     try {
-      events = await calendarEvents(viewMonth);
+      const [evs, txs] = await Promise.all([
+        calendarEvents(month),
+        listTransactions({
+          account_id: null,
+          month,
+          category_id: null,
+          q: null,
+          limit: null,
+        }),
+      ]);
+      events = evs;
+      transactions = txs;
     } catch (e) {
       error = e instanceof Error ? e.message : String(e);
     } finally {
@@ -43,25 +125,22 @@
     }
   }
 
-  onMount(refresh);
+  onMount(() => {
+    void loadCategoriesOnce();
+  });
 
+  // Único efeito reativo: re-fetch e reset da seleção quando o mês muda.
   $effect(() => {
-    // re-fetch quando o mês muda
-    viewMonth;
-    void refresh();
+    const m = viewMonth;
+    const todayMonth = today.slice(0, 7);
+    selectedDay = todayMonth === m ? Number(today.slice(8, 10)) : null;
+    void loadMonthData(m);
   });
 
   function onMonthChange(m: string | null) {
     filters.month = m;
   }
 
-  // Agrupa pra a lista lateral.
-  let paidEvents = $derived(events.filter((e) => e.paid_day != null));
-  let pendingEvents = $derived(events.filter((e) => e.paid_day == null && e.due_day != null));
-
-  function tokenColor(t: string | null | undefined): string {
-    return t ? `var(${t})` : "var(--color-cat-outros)";
-  }
 </script>
 
 <section class="p-8 max-w-6xl mx-auto flex flex-col gap-5">
@@ -71,55 +150,56 @@
         Calendário
       </h2>
       <p class="text-xs text-fg-faint max-w-xl">
-        Vencimentos e pagamentos das regras com "Vence dia" definido. Pagamentos
-        identificados automaticamente cruzando o pattern com transações do mês.
+        Heatmap de entradas/saídas <strong>reais</strong> (sem transferências e investimentos).
+        Clique em um dia pra ver tudo que aconteceu nele, agrupado por tipo.
       </p>
     </div>
     <MonthStepper month={viewMonth} onChange={onMonthChange} />
   </header>
 
-  {#if loading && events.length === 0}
-    <div class="text-fg-faint text-sm">Carregando…</div>
-  {:else if error}
+  {#if error}
     <div class="rounded-lg border border-border bg-surface p-3 text-sm text-neg">{error}</div>
-  {:else}
-    <div class="grid grid-cols-[1fr_320px] gap-4">
-      <CalendarGrid month={viewMonth} {events} {today} />
-
-      <aside class="flex flex-col gap-4">
-        <div class="rounded-lg border border-border-subtle bg-surface p-4 flex flex-col gap-2.5">
-          <div class="text-[10.5px] uppercase tracking-wider font-semibold text-fg-faint">
-            Pagos no mês
-          </div>
-          {#each paidEvents as e (e.rule_id + ":paid")}
-            <div class="flex items-center gap-2 text-[12px]">
-              <span class="w-2 h-2 rounded-full shrink-0" style="background: {tokenColor(e.category_color_token)}"></span>
-              <span class="font-medium truncate flex-1">{e.pattern}</span>
-              <span class="tabular text-fg-muted text-[11px]">dia {e.paid_day}</span>
-              {#if e.paid_amount}
-                <span class="tabular text-pos text-[11px]">{formatMoney(e.paid_amount)}</span>
-              {/if}
-            </div>
-          {:else}
-            <div class="text-fg-faint italic text-[11.5px]">Nenhum pagamento identificado.</div>
-          {/each}
-        </div>
-
-        <div class="rounded-lg border border-border-subtle bg-surface p-4 flex flex-col gap-2.5">
-          <div class="text-[10.5px] uppercase tracking-wider font-semibold text-fg-faint">
-            Pendentes
-          </div>
-          {#each pendingEvents as e (e.rule_id + ":pending")}
-            <div class="flex items-center gap-2 text-[12px]">
-              <span class="w-2 h-2 rounded-full shrink-0" style="background: {tokenColor(e.category_color_token)}"></span>
-              <span class="font-medium truncate flex-1">{e.pattern}</span>
-              <span class="tabular text-fg-muted text-[11px]">vence dia {e.due_day}</span>
-            </div>
-          {:else}
-            <div class="text-fg-faint italic text-[11.5px]">Tudo em dia.</div>
-          {/each}
-        </div>
-      </aside>
-    </div>
   {/if}
+
+  <!-- Resumo do mês compacto (sempre visível, mesmo em mês vazio) -->
+  <div class="rounded-lg border border-border-subtle bg-surface px-4 py-2.5 flex items-center gap-6 text-[12px]">
+    <div class="flex items-center gap-2">
+      <span class="text-fg-faint text-[10.5px] uppercase tracking-wider">Entradas</span>
+      <span class="tabular text-pos font-medium">
+        {monthTotals.inflow > 0 ? formatMoney(String(monthTotals.inflow)) : "—"}
+      </span>
+    </div>
+    <div class="flex items-center gap-2">
+      <span class="text-fg-faint text-[10.5px] uppercase tracking-wider">Saídas</span>
+      <span class="tabular text-neg font-medium">
+        {monthTotals.outflow > 0 ? formatMoney(String(monthTotals.outflow)) : "—"}
+      </span>
+    </div>
+    <div class="flex items-center gap-2 ml-auto">
+      {#if loading}
+        <span class="text-fg-faint text-[11px]">carregando…</span>
+      {/if}
+      <span class="text-fg-faint text-[10.5px] uppercase tracking-wider">Líquido</span>
+      <span class="tabular font-semibold {monthTotals.net >= 0 ? 'text-pos' : 'text-neg'}">
+        {formatMoney(String(monthTotals.net))}
+      </span>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-[1fr_340px] gap-4 items-start">
+    <CalendarGrid
+      month={viewMonth}
+      {today}
+      {dayFlows}
+      {maxOut}
+      {maxIn}
+      {events}
+      {selectedDay}
+      onSelectDay={(d) => (selectedDay = d)}
+    />
+
+    <aside class="flex flex-col gap-4">
+      <DayDetails {selectedDate} {transactions} {categories} {events} {today} />
+    </aside>
+  </div>
 </section>

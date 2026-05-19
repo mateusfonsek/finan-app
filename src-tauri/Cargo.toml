@@ -25,6 +25,8 @@ specta-typescript = "0.0.7"
 tauri-specta = { version = "2.0.0-rc.20", features = ["derive", "typescript"] }
 tauri-plugin-dialog = "2"
 tauri-plugin-opener = "2"
+ureq = { version = "2", default-features = false, features = ["tls", "json"] }
+regex = "1"
 
 [profile.release]
 panic = "abort"

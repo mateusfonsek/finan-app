@@ -12,6 +12,34 @@ const MIGRATIONS: &[(&str, &str)] = &[
         "0003_rules_due_day",
         include_str!("../../migrations/0003_rules_due_day.sql"),
     ),
+    (
+        "0004_rules_display_name",
+        include_str!("../../migrations/0004_rules_display_name.sql"),
+    ),
+    (
+        "0005_compras_category",
+        include_str!("../../migrations/0005_compras_category.sql"),
+    ),
+    (
+        "0006_transfer_category",
+        include_str!("../../migrations/0006_transfer_category.sql"),
+    ),
+    (
+        "0007_investments",
+        include_str!("../../migrations/0007_investments.sql"),
+    ),
+    (
+        "0008_delete_renda_category",
+        include_str!("../../migrations/0008_delete_renda_category.sql"),
+    ),
+    (
+        "0009_investment_green_color",
+        include_str!("../../migrations/0009_investment_green_color.sql"),
+    ),
+    (
+        "0010_drop_income_cnpj_rules",
+        include_str!("../../migrations/0010_drop_income_cnpj_rules.sql"),
+    ),
 ];
 
 pub fn apply(conn: &Connection) -> AppResult<()> {
@@ -73,16 +101,17 @@ mod tests {
         let count: i64 = conn
             .query_row("SELECT COUNT(*) FROM categories", [], |row| row.get(0))
             .unwrap();
-        assert_eq!(count, 9);
+        assert_eq!(count, 11);
 
-        let renda_kind: String = conn
+        // 'Renda' foi removida em 0008. Garantir que não sobrou no final.
+        let renda_exists: i64 = conn
             .query_row(
-                "SELECT kind FROM categories WHERE name='Renda'",
+                "SELECT COUNT(*) FROM categories WHERE name = 'Renda'",
                 [],
                 |row| row.get(0),
             )
             .unwrap();
-        assert_eq!(renda_kind, "income");
+        assert_eq!(renda_exists, 0, "Renda foi removida pela migration 0008");
     }
 
     #[test]
@@ -94,7 +123,17 @@ mod tests {
         let count: i64 = conn
             .query_row("SELECT COUNT(*) FROM categories", [], |row| row.get(0))
             .unwrap();
-        assert_eq!(count, 9, "re-running migrations should not duplicate seeds");
+        assert_eq!(count, 11, "re-running migrations should not duplicate seeds");
+
+        let rule_count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM rules
+                 WHERE pattern IN ('Pagamento de fatura','Aplicação RDB','Resgate RDB')",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(rule_count, 3, "seed rules must not duplicate on re-run");
     }
 
     #[test]
@@ -118,6 +157,13 @@ mod tests {
                 "0001_init".to_string(),
                 "0002_rules".to_string(),
                 "0003_rules_due_day".to_string(),
+                "0004_rules_display_name".to_string(),
+                "0005_compras_category".to_string(),
+                "0006_transfer_category".to_string(),
+                "0007_investments".to_string(),
+                "0008_delete_renda_category".to_string(),
+                "0009_investment_green_color".to_string(),
+                "0010_drop_income_cnpj_rules".to_string(),
             ]
         );
     }

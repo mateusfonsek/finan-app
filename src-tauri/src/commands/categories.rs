@@ -10,7 +10,7 @@ use crate::error::{AppError, AppResult};
 pub fn list_categories(db: State<'_, Db>) -> AppResult<Vec<Category>> {
     let conn = db.conn.lock().expect("db mutex poisoned");
     let mut stmt = conn.prepare(
-        "SELECT id, name, color_token, kind, created_at FROM categories ORDER BY kind, name",
+        "SELECT id, name, color_token, kind, is_investment, created_at FROM categories ORDER BY kind, name",
     )?;
     let rows = stmt.query_map([], |row| {
         Ok(Category {
@@ -18,7 +18,8 @@ pub fn list_categories(db: State<'_, Db>) -> AppResult<Vec<Category>> {
             name: row.get(1)?,
             color_token: row.get(2)?,
             kind: row.get(3)?,
-            created_at: row.get(4)?,
+            is_investment: row.get::<_, i64>(4)? != 0,
+            created_at: row.get(5)?,
         })
     })?;
     rows.collect::<rusqlite::Result<Vec<_>>>()
@@ -41,7 +42,7 @@ pub fn create_category(db: State<'_, Db>, input: NewCategory) -> AppResult<Categ
     )?;
     let id = conn.last_insert_rowid();
     conn.query_row(
-        "SELECT id, name, color_token, kind, created_at FROM categories WHERE id = ?1",
+        "SELECT id, name, color_token, kind, is_investment, created_at FROM categories WHERE id = ?1",
         params![id],
         |row| {
             Ok(Category {
@@ -49,7 +50,8 @@ pub fn create_category(db: State<'_, Db>, input: NewCategory) -> AppResult<Categ
                 name: row.get(1)?,
                 color_token: row.get(2)?,
                 kind: row.get(3)?,
-                created_at: row.get(4)?,
+                is_investment: row.get::<_, i64>(4)? != 0,
+                created_at: row.get(5)?,
             })
         },
     )
@@ -106,7 +108,7 @@ pub fn update_category(
         )));
     }
     conn.query_row(
-        "SELECT id, name, color_token, kind, created_at FROM categories WHERE id = ?1",
+        "SELECT id, name, color_token, kind, is_investment, created_at FROM categories WHERE id = ?1",
         params![category_id],
         |row| {
             Ok(Category {
@@ -114,7 +116,8 @@ pub fn update_category(
                 name: row.get(1)?,
                 color_token: row.get(2)?,
                 kind: row.get(3)?,
-                created_at: row.get(4)?,
+                is_investment: row.get::<_, i64>(4)? != 0,
+                created_at: row.get(5)?,
             })
         },
     )
@@ -166,9 +169,15 @@ mod tests {
             .unwrap()
             .map(|r| r.unwrap())
             .collect();
-        assert_eq!(rows.len(), 9);
+        assert_eq!(rows.len(), 11);
         assert!(rows.iter().any(|(n, _)| n == "Mercado"));
-        assert!(rows.iter().any(|(n, k)| n == "Renda" && k == "income"));
+        assert!(rows.iter().any(|(n, _)| n == "Compras"));
+        assert!(rows.iter().any(|(n, k)| n == "Transferências" && k == "transfer"));
+        assert!(rows.iter().any(|(n, k)| n == "Investimentos" && k == "transfer"));
+        assert!(
+            !rows.iter().any(|(n, _)| n == "Renda"),
+            "Renda foi removida pela migration 0008"
+        );
     }
 
     #[test]
@@ -182,7 +191,7 @@ mod tests {
         let count: i64 = conn
             .query_row("SELECT COUNT(*) FROM categories", [], |r| r.get(0))
             .unwrap();
-        assert_eq!(count, 10);
+        assert_eq!(count, 12);
     }
 
     #[test]

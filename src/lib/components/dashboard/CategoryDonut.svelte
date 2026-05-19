@@ -44,16 +44,20 @@
     </div>
   </div>
 
-  <ul class="flex-1 flex flex-col gap-1 text-[11.5px]">
+  <ul class="flex-1 flex flex-col gap-2 text-[11.5px] min-w-0">
     {#each items.slice(0, 8) as it}
-      <li class="grid grid-cols-[10px_1fr_auto_44px] gap-2 items-center text-fg-muted">
+      <li class="flex items-start gap-2 min-w-0">
         <span
-          class="w-2.5 h-2.5 rounded-sm shrink-0"
+          class="w-2.5 h-2.5 rounded-sm shrink-0 mt-1"
           style="background: {it.color_token ? `var(${it.color_token})` : 'var(--color-cat-outros)'}"
         ></span>
-        <span class="text-fg truncate">{it.name}</span>
-        <span class="tabular">{formatMoney(it.total)}</span>
-        <span class="tabular text-fg-faint text-right">{it.percent.toFixed(1)}%</span>
+        <div class="flex-1 min-w-0 flex flex-col gap-px">
+          <div class="flex items-baseline gap-2">
+            <span class="text-fg font-medium truncate flex-1 min-w-0" title={it.name}>{it.name}</span>
+            <span class="text-[10.5px] tabular text-fg-faint shrink-0">{it.percent.toFixed(1)}%</span>
+          </div>
+          <span class="text-fg-muted tabular text-[11px]">{formatMoney(it.total)}</span>
+        </div>
       </li>
     {/each}
     {#if items.length === 0}

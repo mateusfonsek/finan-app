@@ -2,92 +2,132 @@
   import { formatMoney } from "$lib/format/money";
   import type { CalendarEvent } from "$lib/bindings";
 
+  /** Totais por dia, calculados em Calendar.svelte a partir das transações do mês. */
+  export type DayFlow = { inflow: number; outflow: number };
+
   type Props = {
     /** "YYYY-MM" do mês exibido */
     month: string;
-    events: CalendarEvent[];
     /** Hoje, no formato "YYYY-MM-DD" */
     today: string;
+    /** Totais por dia (chave = dia do mês, 1..31). */
+    dayFlows?: Map<number, DayFlow>;
+    maxOut?: number;
+    maxIn?: number;
+    /** Eventos de regras com due_day ou paid_day. Usados pra renderizar contas a pagar/pagas. */
+    events?: CalendarEvent[];
+    selectedDay?: number | null;
+    onSelectDay?: (day: number | null) => void;
   };
 
-  let { month, events, today }: Props = $props();
+  let {
+    month,
+    today,
+    dayFlows = new Map(),
+    maxOut = 0,
+    maxIn = 0,
+    events = [],
+    selectedDay = null,
+    onSelectDay,
+  }: Props = $props();
 
   const WEEKDAYS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 
   type DayCell = {
     day: number | null;
     isToday: boolean;
-    /** Eventos cujo due_day cai neste dia (pendentes/vencidos) */
+    /** Regras vencendo neste dia (com due_day == d) */
     due: CalendarEvent[];
-    /** Eventos cujo paid_day cai neste dia */
-    paid: CalendarEvent[];
   };
 
-  let cells = $derived(buildGrid(month, events, today));
+  let todayDayInMonth = $derived(
+    today.slice(0, 7) === month ? Number(today.slice(8, 10)) : -1,
+  );
+
+  let cells = $derived(buildGrid(month, today, events));
 
   function buildGrid(
     monthStr: string,
-    evs: CalendarEvent[],
     todayStr: string,
+    evs: CalendarEvent[],
   ): DayCell[] {
     const [yStr, mStr] = monthStr.split("-");
     const year = Number(yStr);
     const monthIdx = Number(mStr) - 1;
     const first = new Date(year, monthIdx, 1);
     const daysInMonth = new Date(year, monthIdx + 1, 0).getDate();
-    const startWeekday = first.getDay(); // 0 = Dom
+    const startWeekday = first.getDay();
 
     const todayPrefix = todayStr.slice(0, 7);
     const todayDay = todayPrefix === monthStr ? Number(todayStr.slice(8, 10)) : -1;
 
-    // Pre-bucket events by due_day and paid_day.
+    // Bucket de eventos por due_day (ancora dia 31 no último dia do mês).
     const dueByDay = new Map<number, CalendarEvent[]>();
-    const paidByDay = new Map<number, CalendarEvent[]>();
     for (const e of evs) {
-      if (e.due_day != null) {
-        // Se due_day > daysInMonth (ex: dia 31 num mês de 30), ancora no último dia.
-        const d = Math.min(e.due_day, daysInMonth);
-        const list = dueByDay.get(d) ?? [];
-        list.push(e);
-        dueByDay.set(d, list);
-      }
-      if (e.paid_day != null) {
-        const list = paidByDay.get(e.paid_day) ?? [];
-        list.push(e);
-        paidByDay.set(e.paid_day, list);
-      }
+      if (e.due_day == null) continue;
+      const d = Math.min(e.due_day, daysInMonth);
+      const list = dueByDay.get(d) ?? [];
+      list.push(e);
+      dueByDay.set(d, list);
     }
 
     const out: DayCell[] = [];
     for (let i = 0; i < startWeekday; i++) {
-      out.push({ day: null, isToday: false, due: [], paid: [] });
+      out.push({ day: null, isToday: false, due: [] });
     }
     for (let d = 1; d <= daysInMonth; d++) {
       out.push({
         day: d,
         isToday: d === todayDay,
         due: dueByDay.get(d) ?? [],
-        paid: paidByDay.get(d) ?? [],
       });
     }
     return out;
   }
 
-  function isPaidElsewhere(e: CalendarEvent): boolean {
-    return e.paid_day != null && e.due_day != null && e.paid_day !== e.due_day;
+  /** Estado visual de uma conta: pago / vencido / pendente (futuro). */
+  type BillState = "paid" | "overdue" | "pending";
+
+  function billState(e: CalendarEvent, todayDay: number): BillState {
+    if (e.paid_day != null) return "paid";
+    if (e.due_day != null && todayDay > 0 && e.due_day < todayDay) return "overdue";
+    return "pending";
   }
 
-  function isOverdue(e: CalendarEvent, todayDay: number): boolean {
-    return e.due_day != null && e.paid_day == null && e.due_day < todayDay;
+  function billStyle(state: BillState): string {
+    switch (state) {
+      case "paid":
+        return "background: color-mix(in oklch, var(--color-pos) 18%, transparent); border-color: color-mix(in oklch, var(--color-pos) 50%, transparent); color: var(--color-pos);";
+      case "overdue":
+        return "background: color-mix(in oklch, var(--color-neg) 14%, transparent); border-color: var(--color-neg); color: var(--color-neg);";
+      case "pending":
+        return "background: transparent; border-color: var(--color-cat-amarelo); color: var(--color-cat-amarelo);";
+    }
   }
 
-  function tokenStyle(t: string | null | undefined): string {
-    return t ? `var(${t})` : "var(--color-cat-outros)";
+  function billIcon(state: BillState): string {
+    return state === "paid" ? "✓" : state === "overdue" ? "!" : "○";
   }
 
-  let todayDayInMonth = $derived(
-    today.slice(0, 7) === month ? Number(today.slice(8, 10)) : -1,
-  );
+  function billLabel(e: CalendarEvent): string {
+    return e.pattern;
+  }
+
+  /** Mapeia intensidade [0,1] em opacidade visível [20%, 100%]. */
+  function intensityPct(value: number, max: number): number {
+    if (max <= 0 || value <= 0) return 0;
+    const ratio = Math.min(1, value / max);
+    return Math.round(20 + 80 * ratio);
+  }
+
+  function dotStyle(color: string, pct: number): string {
+    return `background: color-mix(in oklch, ${color} ${pct}%, transparent);`;
+  }
+
+  function handleClick(day: number) {
+    if (!onSelectDay) return;
+    onSelectDay(selectedDay === day ? null : day);
+  }
 </script>
 
 <div class="rounded-lg border border-border-subtle bg-surface overflow-hidden">
@@ -101,46 +141,105 @@
 
   <div class="grid grid-cols-7">
     {#each cells as cell, i}
-      <div
-        class="min-h-[88px] border-r border-b border-border-subtle p-1.5 flex flex-col gap-1
-               {cell.day === null ? 'bg-bg/40' : ''}
-               {cell.isToday ? 'bg-accent-soft/30' : ''}
+      {@const flow = cell.day !== null ? dayFlows.get(cell.day) : undefined}
+      {@const outPct = flow ? intensityPct(flow.outflow, maxOut) : 0}
+      {@const inPct = flow ? intensityPct(flow.inflow, maxIn) : 0}
+      {@const isSelected = cell.day !== null && cell.day === selectedDay}
+      <button
+        type="button"
+        disabled={cell.day === null}
+        onclick={() => cell.day !== null && handleClick(cell.day)}
+        class="text-left min-h-[88px] border-r border-b border-border-subtle p-1.5 flex flex-col gap-1 relative
+               transition-colors
+               {cell.day === null ? 'bg-bg/40 cursor-default' : 'hover:bg-hover cursor-pointer'}
+               {cell.isToday && !isSelected ? 'bg-accent-soft/30' : ''}
+               {isSelected ? 'ring-2 ring-accent ring-inset z-10' : ''}
                {i % 7 === 6 ? 'border-r-0' : ''}"
+        aria-label={cell.day === null
+          ? undefined
+          : `Dia ${cell.day}${flow ? ` — entradas ${flow.inflow}, saídas ${flow.outflow}` : ""}`}
       >
         {#if cell.day !== null}
-          <div class="flex items-center justify-between">
-            <span class="text-[10.5px] tabular {cell.isToday ? 'text-accent font-semibold' : 'text-fg-faint'}">
+          <div class="flex items-center justify-between gap-1 w-full">
+            <span class="text-[12px] tabular {cell.isToday ? 'text-accent font-semibold' : 'text-fg'}">
               {cell.day}
             </span>
+            <div class="flex items-center gap-1">
+              {#if outPct > 0}
+                <span
+                  class="w-2 h-2 rounded-full"
+                  style={dotStyle("var(--color-neg)", outPct)}
+                  title={`Saídas: ${formatMoney(String(flow?.outflow ?? 0))}`}
+                ></span>
+              {/if}
+              {#if inPct > 0}
+                <span
+                  class="w-2 h-2 rounded-full"
+                  style={dotStyle("var(--color-pos)", inPct)}
+                  title={`Entradas: ${formatMoney(String(flow?.inflow ?? 0))}`}
+                ></span>
+              {/if}
+            </div>
           </div>
 
-          <!-- Eventos PAGOS no dia (verde, contorno cheio) -->
-          {#each cell.paid as e}
+          <!-- Contas vencendo neste dia (até 2 visíveis, "+N" se passar). -->
+          {#each cell.due.slice(0, 2) as e (e.rule_id)}
+            {@const state = billState(e, todayDayInMonth)}
             <div
-              class="text-[10px] rounded px-1.5 py-0.5 truncate flex items-center gap-1"
-              style="background: color-mix(in oklch, {tokenStyle(e.category_color_token)} 22%, transparent); color: var(--color-fg)"
-              title={`${e.pattern} — pago${e.paid_amount ? ' ' + formatMoney(e.paid_amount) : ''}${isPaidElsewhere(e) ? ` (vence dia ${e.due_day})` : ''}`}
+              class="text-[9.5px] rounded px-1 py-0.5 truncate flex items-center gap-1 border"
+              style={billStyle(state)}
+              title={`${e.pattern}${state === "paid" ? ` — pago dia ${e.paid_day}${e.paid_amount ? " · " + formatMoney(e.paid_amount) : ""}` : state === "overdue" ? ` — vencida (dia ${e.due_day})` : ` — vence dia ${e.due_day}`}`}
             >
-              <span class="w-1.5 h-1.5 rounded-full shrink-0" style="background: {tokenStyle(e.category_color_token)}"></span>
-              <span class="truncate">✓ {e.pattern}</span>
+              <span class="shrink-0 font-bold">{billIcon(state)}</span>
+              <span class="truncate">{billLabel(e)}</span>
             </div>
           {/each}
-
-          <!-- Eventos com VENCIMENTO no dia (não pagos: outline; pagos noutro dia: ainda mostra como pendente futuro? não — se já foi pago, só aparece a marca de pago) -->
-          {#each cell.due as e}
-            {#if e.paid_day == null}
-              <div
-                class="text-[10px] rounded px-1.5 py-0.5 truncate flex items-center gap-1 border
-                       {isOverdue(e, todayDayInMonth) ? 'border-neg/60 text-neg' : 'border-fg-faint/40 text-fg-muted'}"
-                title={`${e.pattern} — vence dia ${e.due_day}${isOverdue(e, todayDayInMonth) ? ' (atrasado)' : ''}`}
-              >
-                <span class="w-1.5 h-1.5 rounded-full shrink-0" style="background: {tokenStyle(e.category_color_token)}"></span>
-                <span class="truncate">{e.pattern}</span>
-              </div>
-            {/if}
-          {/each}
+          {#if cell.due.length > 2}
+            <div class="text-[9px] text-fg-faint px-1">+{cell.due.length - 2} mais</div>
+          {/if}
         {/if}
-      </div>
+      </button>
     {/each}
   </div>
+
+  {#if maxOut > 0 || maxIn > 0 || events.some((e) => e.due_day != null)}
+    <div class="border-t border-border-subtle bg-surface-2 px-3 py-1.5 flex items-center gap-4 text-[10.5px] text-fg-muted flex-wrap">
+      {#if maxOut > 0}
+        <div class="flex items-center gap-1.5">
+          <span>Saída</span>
+          <div class="flex gap-0.5">
+            {#each [20, 40, 60, 80, 100] as p}
+              <span class="w-1.5 h-1.5 rounded-full" style={dotStyle("var(--color-neg)", p)}></span>
+            {/each}
+          </div>
+        </div>
+      {/if}
+      {#if maxIn > 0}
+        <div class="flex items-center gap-1.5">
+          <span>Entrada</span>
+          <div class="flex gap-0.5">
+            {#each [20, 40, 60, 80, 100] as p}
+              <span class="w-1.5 h-1.5 rounded-full" style={dotStyle("var(--color-pos)", p)}></span>
+            {/each}
+          </div>
+        </div>
+      {/if}
+      {#if events.some((e) => e.due_day != null)}
+        <div class="flex items-center gap-2">
+          <span class="inline-flex items-center gap-1">
+            <span class="inline-block w-2 h-2 rounded border" style="border-color: var(--color-cat-amarelo);"></span>
+            <span style="color: var(--color-cat-amarelo);">○ pendente</span>
+          </span>
+          <span class="inline-flex items-center gap-1">
+            <span class="inline-block w-2 h-2 rounded border" style="border-color: var(--color-neg);"></span>
+            <span style="color: var(--color-neg);">! vencida</span>
+          </span>
+          <span class="inline-flex items-center gap-1">
+            <span class="inline-block w-2 h-2 rounded" style="background: color-mix(in oklch, var(--color-pos) 30%, transparent);"></span>
+            <span style="color: var(--color-pos);">✓ paga</span>
+          </span>
+        </div>
+      {/if}
+    </div>
+  {/if}
 </div>

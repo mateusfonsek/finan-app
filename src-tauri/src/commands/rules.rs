@@ -21,7 +21,7 @@ fn validate_due_day(d: Option<i32>) -> AppResult<()> {
 pub fn list_rules(db: State<'_, Db>) -> AppResult<Vec<Rule>> {
     let conn = db.conn.lock().expect("db mutex poisoned");
     let mut stmt = conn.prepare(
-        "SELECT id, pattern, category_id, priority, due_day, created_at
+        "SELECT id, pattern, category_id, priority, due_day, display_name, created_at
          FROM rules
          ORDER BY priority DESC, created_at DESC",
     )?;
@@ -32,7 +32,8 @@ pub fn list_rules(db: State<'_, Db>) -> AppResult<Vec<Rule>> {
             category_id: row.get(2)?,
             priority: row.get(3)?,
             due_day: row.get(4)?,
-            created_at: row.get(5)?,
+            display_name: row.get(5)?,
+            created_at: row.get(6)?,
         })
     })?;
     rows.collect::<rusqlite::Result<Vec<_>>>()
@@ -46,17 +47,20 @@ pub fn create_rule(db: State<'_, Db>, input: NewRule) -> AppResult<Rule> {
         return Err(AppError::Invalid("pattern must not be empty".into()));
     }
     validate_due_day(input.due_day)?;
-    let conn = db.conn.lock().expect("db mutex poisoned");
+    let mut conn = db.conn.lock().expect("db mutex poisoned");
     conn.execute(
-        "INSERT INTO rules (pattern, category_id, priority, due_day) VALUES (?1, ?2, ?3, ?4)",
+        "INSERT INTO rules (pattern, category_id, priority, due_day, display_name)
+         VALUES (?1, ?2, ?3, ?4, ?5)",
         params![
             input.pattern.trim(),
             input.category_id,
             input.priority,
-            input.due_day
+            input.due_day,
+            input.display_name.as_deref().map(str::trim),
         ],
     )?;
     let id = conn.last_insert_rowid();
+    apply_rules_internal(&mut conn, None)?;
     fetch_rule(&conn, id)
 }
 
@@ -67,20 +71,24 @@ pub fn update_rule(db: State<'_, Db>, rule_id: i64, input: UpdateRule) -> AppRes
         return Err(AppError::Invalid("pattern must not be empty".into()));
     }
     validate_due_day(input.due_day)?;
-    let conn = db.conn.lock().expect("db mutex poisoned");
+    let mut conn = db.conn.lock().expect("db mutex poisoned");
     let changed = conn.execute(
-        "UPDATE rules SET pattern = ?1, category_id = ?2, priority = ?3, due_day = ?4 WHERE id = ?5",
+        "UPDATE rules
+         SET pattern = ?1, category_id = ?2, priority = ?3, due_day = ?4, display_name = ?5
+         WHERE id = ?6",
         params![
             input.pattern.trim(),
             input.category_id,
             input.priority,
             input.due_day,
+            input.display_name.as_deref().map(str::trim),
             rule_id
         ],
     )?;
     if changed == 0 {
         return Err(AppError::Invalid(format!("rule {rule_id} not found")));
     }
+    apply_rules_internal(&mut conn, None)?;
     fetch_rule(&conn, rule_id)
 }
 
@@ -93,6 +101,40 @@ pub fn delete_rule(db: State<'_, Db>, rule_id: i64) -> AppResult<()> {
         return Err(AppError::Invalid(format!("rule {rule_id} not found")));
     }
     Ok(())
+}
+
+/// Deletes a rule AND clears category_id from any transaction that was likely
+/// categorized BY this rule (description matches the pattern + category_id is
+/// this rule's category). Then re-applies remaining rules to pick alternatives.
+///
+/// Used by the import screen when the user wants to undo an auto-created rule.
+/// Returns the count of transactions whose category was cleared.
+#[tauri::command]
+#[specta::specta]
+pub fn delete_rule_with_cleanup(db: State<'_, Db>, rule_id: i64) -> AppResult<u32> {
+    let mut conn = db.conn.lock().expect("db mutex poisoned");
+    let (pattern, category_id): (String, i64) = conn
+        .query_row(
+            "SELECT pattern, category_id FROM rules WHERE id = ?1",
+            params![rule_id],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        )
+        .map_err(|_| AppError::Invalid(format!("rule {rule_id} not found")))?;
+
+    let tx = conn.transaction()?;
+    tx.execute("DELETE FROM rules WHERE id = ?1", params![rule_id])?;
+    let cleared = tx.execute(
+        "UPDATE transactions
+         SET category_id = NULL
+         WHERE category_id = ?1
+           AND LOWER(description) LIKE '%' || LOWER(?2) || '%'",
+        params![category_id, pattern],
+    )?;
+    tx.commit()?;
+
+    // Re-apply remaining rules — a previously-shadowed rule may now match.
+    apply_rules_internal(&mut conn, None)?;
+    Ok(cleared as u32)
 }
 
 /// Run all rules on transactions with `category_id IS NULL` (manual categorization
@@ -140,7 +182,8 @@ pub fn apply_rules_internal(
 
 fn fetch_rule(conn: &rusqlite::Connection, id: i64) -> AppResult<Rule> {
     conn.query_row(
-        "SELECT id, pattern, category_id, priority, due_day, created_at FROM rules WHERE id = ?1",
+        "SELECT id, pattern, category_id, priority, due_day, display_name, created_at
+         FROM rules WHERE id = ?1",
         params![id],
         |row| {
             Ok(Rule {
@@ -149,7 +192,8 @@ fn fetch_rule(conn: &rusqlite::Connection, id: i64) -> AppResult<Rule> {
                 category_id: row.get(2)?,
                 priority: row.get(3)?,
                 due_day: row.get(4)?,
-                created_at: row.get(5)?,
+                display_name: row.get(5)?,
+                created_at: row.get(6)?,
             })
         },
     )
@@ -417,6 +461,83 @@ mod tests {
             .unwrap();
         assert_eq!(a1_cat, Some(transporte));
         assert_eq!(a2_cat, None);
+    }
+
+    /// Simulates delete_rule_with_cleanup logic (the tauri command needs State,
+    /// so we replicate the SQL here against a raw connection).
+    fn cleanup_after_delete(conn: &mut Connection, rule_id: i64) -> u32 {
+        let (pattern, category_id): (String, i64) = conn
+            .query_row(
+                "SELECT pattern, category_id FROM rules WHERE id = ?1",
+                params![rule_id],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .unwrap();
+        let tx = conn.transaction().unwrap();
+        tx.execute("DELETE FROM rules WHERE id = ?1", params![rule_id])
+            .unwrap();
+        let cleared = tx
+            .execute(
+                "UPDATE transactions SET category_id = NULL
+                 WHERE category_id = ?1 AND LOWER(description) LIKE '%' || LOWER(?2) || '%'",
+                params![category_id, pattern],
+            )
+            .unwrap();
+        tx.commit().unwrap();
+        apply_rules_internal(conn, None).unwrap();
+        cleared as u32
+    }
+
+    #[test]
+    fn delete_with_cleanup_clears_matching_txs() {
+        let mut conn = fresh_conn();
+        let acc = insert_account(&conn);
+        let transporte = category_id(&conn, "Transporte");
+        let rule = insert_rule(&conn, "uber", transporte, 0);
+        let tx_id = insert_tx(&conn, acc, "UBER trip", None);
+        apply_rules_internal(&mut conn, None).unwrap();
+        let cat: Option<i64> = conn
+            .query_row(
+                "SELECT category_id FROM transactions WHERE id = ?1",
+                params![tx_id],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(cat, Some(transporte), "precondition: classified by rule");
+
+        let cleared = cleanup_after_delete(&mut conn, rule);
+        assert_eq!(cleared, 1);
+
+        let cat_after: Option<i64> = conn
+            .query_row(
+                "SELECT category_id FROM transactions WHERE id = ?1",
+                params![tx_id],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(cat_after, None, "category cleared after rule deletion");
+    }
+
+    #[test]
+    fn delete_with_cleanup_preserves_manual_overrides() {
+        let mut conn = fresh_conn();
+        let acc = insert_account(&conn);
+        let transporte = category_id(&conn, "Transporte");
+        let mercado = category_id(&conn, "Mercado");
+        let rule = insert_rule(&conn, "uber", transporte, 0);
+        // Manually categorized as Mercado (different from rule's category) — shouldn't be cleared.
+        let tx_id = insert_tx(&conn, acc, "UBER trip", Some(mercado));
+
+        cleanup_after_delete(&mut conn, rule);
+
+        let cat: Option<i64> = conn
+            .query_row(
+                "SELECT category_id FROM transactions WHERE id = ?1",
+                params![tx_id],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(cat, Some(mercado), "manual category Mercado preserved");
     }
 
     #[test]

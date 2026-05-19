@@ -23,6 +23,7 @@
     "--color-cat-amarelo",
     "--color-cat-indigo",
     "--color-cat-marrom",
+    "--color-cat-investimento",
   ];
 
   let name = $state("");

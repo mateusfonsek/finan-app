@@ -5,6 +5,7 @@ import Transactions from "./Transactions.svelte";
 import Import from "./Import.svelte";
 import Categories from "./Categories.svelte";
 import Rules from "./Rules.svelte";
+import Suggestions from "./Suggestions.svelte";
 import Calendar from "./Calendar.svelte";
 import Settings from "./Settings.svelte";
 
@@ -16,6 +17,7 @@ export const routes = {
   "/import": Import,
   "/categories": Categories,
   "/rules": Rules,
+  "/suggestions": Suggestions,
   "/calendar": Calendar,
   "/settings": Settings,
 };

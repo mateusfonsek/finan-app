@@ -10,6 +10,9 @@ pub struct Rule {
     /// Dia do mês (1-31) em que a obrigação vence. NULL = sem prazo —
     /// a regra só aparece no calendário quando casa com uma transação.
     pub due_day: Option<i32>,
+    /// Rótulo amigável da regra (ex: razão social vinda do CNPJ). NULL
+    /// = nenhum rótulo definido; a UI cai pra `pattern`.
+    pub display_name: Option<String>,
     pub created_at: String,
 }
 
@@ -19,6 +22,8 @@ pub struct NewRule {
     pub category_id: i64,
     pub priority: i32,
     pub due_day: Option<i32>,
+    #[serde(default)]
+    pub display_name: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
@@ -27,6 +32,8 @@ pub struct UpdateRule {
     pub category_id: i64,
     pub priority: i32,
     pub due_day: Option<i32>,
+    #[serde(default)]
+    pub display_name: Option<String>,
 }
 
 /// Evento que aparece no calendário: combinação de uma regra

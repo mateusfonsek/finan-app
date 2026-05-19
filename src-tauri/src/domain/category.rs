@@ -7,6 +7,7 @@ pub struct Category {
     pub name: String,
     pub color_token: Option<String>,
     pub kind: String,
+    pub is_investment: bool,
     pub created_at: String,
 }
 

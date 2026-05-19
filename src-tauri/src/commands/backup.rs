@@ -130,7 +130,7 @@ mod tests {
         let count: i64 = dst_conn
             .query_row("SELECT COUNT(*) FROM categories", [], |r| r.get(0))
             .unwrap();
-        assert_eq!(count, 9);
+        assert_eq!(count, 11);
 
         let _ = fs::remove_file(&src);
         let _ = fs::remove_file(&dst);

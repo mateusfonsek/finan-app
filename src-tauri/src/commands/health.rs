@@ -51,6 +51,6 @@ mod tests {
         let count: u32 = conn
             .query_row("SELECT COUNT(*) FROM categories", [], |row| row.get(0))
             .unwrap();
-        assert_eq!(count, 9);
+        assert_eq!(count, 11);
     }
 }

@@ -32,7 +32,14 @@
     <tbody>
       {#each rules as r (r.id)}
         <tr class="border-t border-border-subtle hover:bg-hover">
-          <td class="px-4 py-2.5 font-mono text-[11.5px]">{r.pattern}</td>
+          <td class="px-4 py-2.5">
+            {#if r.display_name}
+              <div class="text-[12px] text-fg font-medium">{r.display_name}</div>
+              <div class="text-[10.5px] text-fg-faint font-mono">{r.pattern}</div>
+            {:else}
+              <div class="font-mono text-[11.5px]">{r.pattern}</div>
+            {/if}
+          </td>
           <td class="px-4 py-2.5">
             <span class="inline-flex items-center gap-1.5">
               <span class="w-2 h-2 rounded-full" style="background: var({categoryToken(r.category_id)})"></span>

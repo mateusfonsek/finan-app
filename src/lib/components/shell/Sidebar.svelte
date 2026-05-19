@@ -11,6 +11,7 @@
     { section: "Importar", href: "/import", label: "Importar OFX" },
     { section: "Organizar", href: "/categories", label: "Categorias" },
     { section: "Organizar", href: "/rules", label: "Regras" },
+    { section: "Organizar", href: "/suggestions", label: "Sugestões" },
   ];
 
   const sections = ["Visão geral", "Importar", "Organizar"];
