@@ -21,15 +21,19 @@ Um app de finanças pessoais **100% local** pro macOS. Importe extratos OFX do s
 
 1. Baixe o `.dmg` mais recente na aba **[Releases](../../releases)**.
 2. Abra o `.dmg` e arraste o **finan app** pra pasta **Aplicativos**.
-3. **Primeira abertura** — o app **não é assinado** (não tenho conta no Apple Developer Program). Como ele foi **baixado da web**, o macOS pode recusar abri-lo ("danificado" ou "não foi possível verificar o desenvolvedor"). Se isso acontecer, rode uma vez no Terminal:
+3. **Primeira abertura** — o app **não é assinado** com conta paga da Apple. Como ele foi **baixado da web**, na primeira vez o macOS bloqueia com um aviso do tipo *"A Apple não pôde verificar se o 'finan app' está livre de malware…"* (só com os botões **Mover para o Lixo** e **OK** — clique em **OK**, não no lixo).
+
+   **Jeito garantido (1 comando no Terminal):**
 
    ```sh
    xattr -dr com.apple.quarantine "/Applications/finan app.app"
    ```
 
-   Depois é só abrir normalmente. (Alternativa: tente abrir, vá em **Ajustes do Sistema → Privacidade e Segurança** e clique em **"Abrir mesmo assim"**.)
+   Depois é só abrir o app normalmente.
 
-> Por que isso? O navegador marca arquivos baixados com uma flag de "quarentena"; sem notarização da Apple, o Gatekeeper bloqueia. O comando acima remove a flag. **Se você buildar o app você mesmo** (instruções abaixo), isso não se aplica — apps gerados localmente não recebem a quarentena.
+   **Alternativa sem terminal:** abra **Ajustes do Sistema → Privacidade e Segurança**, role até a seção **Segurança** e clique em **"Abrir Mesmo Assim"** ao lado do aviso sobre o "finan app". ⚠️ Esse botão só aparece **logo após** você tentar abrir o app (dê duplo-clique nele primeiro); se não aparecer, tente abrir o app de novo e volte aqui em seguida — ou use o comando acima.
+
+> Por que isso? O navegador marca arquivos baixados com uma flag de "quarentena"; sem notarização da Apple, o Gatekeeper exige essa confirmação manual na primeira abertura. **Se você buildar o app você mesmo** (instruções abaixo), isso não se aplica — apps gerados localmente não recebem a quarentena.
 
 ## Buildar do código
 
