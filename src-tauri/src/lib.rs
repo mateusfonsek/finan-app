@@ -70,6 +70,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_window_state::Builder::default().build())
         .menu(|handle| {
             // App menu (finan): "Sobre" abre nosso modal; "Configurações" sem
             // atalho (decisão do produto). Hide/Quit são os padrões do macOS.
