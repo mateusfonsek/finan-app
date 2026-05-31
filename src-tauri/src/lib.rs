@@ -42,6 +42,7 @@ pub fn run() {
         commands::summary::transfer_summary,
         commands::summary::income_sources,
         commands::backup::db_path,
+        commands::backup::read_file_bytes,
         commands::backup::export_backup,
         commands::backup::restore_backup,
     ]);

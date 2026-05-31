@@ -1,6 +1,6 @@
 @import "tailwindcss";
 
-@theme inline {
+@theme {
   /* surfaces */
   --color-bg: oklch(19% 0.005 240);
   --color-bg-translucent: oklch(19% 0.005 240 / 0.72);
@@ -59,7 +59,7 @@
 }
 
 html {
-  color-scheme: dark;
+  color-scheme: light dark;
 }
 
 body {
@@ -89,4 +89,64 @@ body {
 a[href],
 summary {
   cursor: default;
+}
+
+/* Light mode: respeita o tema do sistema. Sobrescreve apenas surfaces, bordas e
+   texto; cores categóricas/semânticas (mid-lightness) funcionam nos dois temas.
+   accent escurece um pouco pra manter contraste sobre fundo claro. */
+@media (prefers-color-scheme: light) {
+  :root {
+    --color-bg: oklch(97% 0.003 240);
+    --color-bg-translucent: oklch(97% 0.003 240 / 0.72);
+    --color-surface: oklch(99.5% 0.001 240);
+    --color-surface-2: oklch(96.5% 0.004 240);
+    --color-surface-3: oklch(93.5% 0.005 240);
+    --color-hover: oklch(92% 0.006 240);
+
+    --color-border: oklch(86% 0.008 240);
+    --color-border-subtle: oklch(91% 0.006 240);
+
+    --color-fg: oklch(24% 0.012 240);
+    --color-fg-muted: oklch(44% 0.012 240);
+    --color-fg-subtle: oklch(56% 0.012 240);
+    --color-fg-faint: oklch(66% 0.010 240);
+
+    --color-accent: oklch(54% 0.15 145);
+    --color-accent-hi: oklch(47% 0.16 145);
+    /* No light, o botão primário é verde com texto branco (no dark o texto é escuro). */
+    --color-accent-on: oklch(100% 0 0);
+  }
+}
+
+/* Respeita "Reduzir movimento" do sistema. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Respeita "Aumentar contraste" do sistema: bordas e texto mais fortes. */
+@media (prefers-contrast: more) and (prefers-color-scheme: dark) {
+  :root {
+    --color-border: oklch(46% 0.01 240);
+    --color-border-subtle: oklch(38% 0.009 240);
+    --color-fg-muted: oklch(82% 0.008 240);
+    --color-fg-subtle: oklch(70% 0.01 240);
+    --color-fg-faint: oklch(60% 0.01 240);
+  }
+}
+
+@media (prefers-contrast: more) and (prefers-color-scheme: light) {
+  :root {
+    --color-border: oklch(72% 0.01 240);
+    --color-border-subtle: oklch(80% 0.008 240);
+    --color-fg-muted: oklch(34% 0.012 240);
+    --color-fg-subtle: oklch(44% 0.012 240);
+    --color-fg-faint: oklch(52% 0.01 240);
+  }
 }

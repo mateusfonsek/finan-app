@@ -15,6 +15,14 @@ pub fn db_path(db: State<'_, Db>) -> AppResult<String> {
     Ok(db.path.display().to_string())
 }
 
+/// Lê os bytes crus de um arquivo do disco. Usado pelo drag-and-drop de OFX:
+/// o evento de drop do Tauri entrega só o caminho, não o conteúdo do arquivo.
+#[tauri::command]
+#[specta::specta]
+pub fn read_file_bytes(path: String) -> AppResult<Vec<u8>> {
+    Ok(fs::read(&path)?)
+}
+
 /// Copy the active DB file to `destination`. Issues a WAL checkpoint first
 /// so the .db file is consistent on disk before copying.
 #[tauri::command]

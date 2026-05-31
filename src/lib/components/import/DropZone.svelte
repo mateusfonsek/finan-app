@@ -1,6 +1,9 @@
 <script lang="ts">
+  import { onMount } from "svelte";
+  import { getCurrentWebview } from "@tauri-apps/api/webview";
   import { decodeOfxFile } from "$lib/ofx/normalize";
   import { parseOfx } from "$lib/ofx/parse";
+  import { readFileBytes } from "$lib/api/files";
   import type { ParsedOfx } from "$lib/ofx/types";
 
   type Props = {
@@ -13,6 +16,39 @@
   let active = $state(false);
   let busy = $state(false);
   let fileInput: HTMLInputElement | undefined = $state();
+
+  // Drag-and-drop nativo: o Tauri intercepta o drop do Finder e entrega só o
+  // caminho (não um File), via evento da webview. Lemos os bytes e reusamos o
+  // mesmo pipeline do file picker construindo um File a partir deles.
+  async function handlePath(path: string) {
+    try {
+      const bytes = await readFileBytes(path);
+      const name = path.split(/[\\/]/).pop() || "extrato.ofx";
+      await handleFile(new File([bytes as BlobPart], name));
+    } catch (e) {
+      onerror?.(e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  onMount(() => {
+    let unlisten: (() => void) | undefined;
+    getCurrentWebview()
+      .onDragDropEvent((event) => {
+        const p = event.payload;
+        if (p.type === "enter" || p.type === "over") {
+          active = true;
+        } else if (p.type === "leave") {
+          active = false;
+        } else if (p.type === "drop") {
+          active = false;
+          const ofx = p.paths.find((path) => path.toLowerCase().endsWith(".ofx"));
+          if (ofx) void handlePath(ofx);
+          else if (p.paths.length > 0) onerror?.("Solte um arquivo .ofx.");
+        }
+      })
+      .then((un) => (unlisten = un));
+    return () => unlisten?.();
+  });
 
   async function handleFile(file: File) {
     busy = true;
