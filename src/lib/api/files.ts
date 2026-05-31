@@ -9,3 +9,8 @@ function unwrap<T>(result: { status: "ok"; data: T } | { status: "error"; error:
 export async function readFileBytes(path: string): Promise<Uint8Array> {
   return new Uint8Array(unwrap(await commands.readFileBytes(path)));
 }
+
+/** Drena os caminhos de .ofx abertos via Finder ("Abrir com finan"). */
+export async function takePendingOfx(): Promise<string[]> {
+  return commands.takePendingOfx();
+}

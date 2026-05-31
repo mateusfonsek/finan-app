@@ -31,7 +31,7 @@
     info = null;
     error = null;
     const target = await saveDialog({
-      title: "Salvar backup do finan",
+      title: "Salvar backup do finan app",
       defaultPath: `finan-backup-${new Date().toISOString().slice(0, 10)}.db`,
       filters: [{ name: "SQLite DB", extensions: ["db"] }],
     });
@@ -52,7 +52,7 @@
     info = null;
     error = null;
     const picked = await openDialog({
-      title: "Restaurar backup do finan",
+      title: "Restaurar backup do finan app",
       multiple: false,
       filters: [{ name: "SQLite DB", extensions: ["db"] }],
     });
@@ -67,7 +67,7 @@
     try {
       await restoreBackup(picked);
       await message(
-        "Backup restaurado. Feche e abra o finan de novo (Cmd+Q então abra) pra ver as transações restauradas.",
+        "Backup restaurado. Feche e abra o finan app de novo (Cmd+Q então abra) pra ver as transações restauradas.",
         { title: "Restauração concluída", kind: "info" },
       );
     } catch (e) {
@@ -127,7 +127,7 @@
       Sobre
     </div>
     <div class="text-[12px] text-fg-muted">
-      <strong class="text-fg">finan</strong> v0.1.0 — finanças pessoais 100% locais no Mac.
+      <strong class="text-fg">finan app</strong> v0.1.0 — finanças pessoais 100% locais no Mac.
     </div>
     <div class="text-[11px] text-fg-faint">
       Atalhos: <span class="font-mono">⌘1</span> Dashboard ·

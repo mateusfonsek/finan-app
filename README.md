@@ -1,44 +1,64 @@
-# finan-app
+# finan app
 
-App de organização financeira pessoal pra macOS.
+**O dinheiro é seu. Os dados também.**
 
-## Sobre o projeto
+Um app de finanças pessoais **100% local** pro macOS. Importe extratos OFX do seu banco, categorize com regras e acompanhe tudo num só lugar — sem nuvem, sem conta, sem rastreamento. Seus dados ficam num único arquivo no seu Mac e nunca saem dele.
 
-A ideia é ter um app simples e rápido pra acompanhar minhas finanças sem depender de serviço em nuvem nem pagar nada. Tudo roda local no meu Mac — os dados ficam num arquivo SQLite na minha própria máquina, sem login, sem conta, sem internet.
+> Só macOS (Apple Silicon e Intel). Software livre, sem garantias.
 
-O fluxo é direto: exporto o extrato mensal do meu banco (formato OFX), arrasto pra dentro do app, e ele importa as transações pro banco local. A partir daí dá pra categorizar os gastos, filtrar por mês, e ver onde o dinheiro está indo.
+<!-- Screenshots: adicione imagens em docs/screenshots e referencie aqui.
+![Dashboard](docs/screenshots/dashboard.png) -->
 
-### Princípios
+## Funcionalidades
 
-- **100% local** — nenhum dado sai do meu Mac
-- **100% gratuito** — sem assinaturas, sem APIs pagas
-- **Leve** — binário pequeno, abre rápido, consome pouca memória
-- **Clean** — interface minimalista, só o que importa
+- **Importar OFX** — arraste o extrato (ou abra com o finan app) e revise antes de salvar; deduplica transações e detecta estornos.
+- **Categorias e regras** — categorize manualmente ou crie regras (por trecho da descrição) que se aplicam sozinhas; sugestões automáticas pra recorrências.
+- **Dashboard** — KPIs do mês, gastos por categoria, fontes de renda (com marcação de recorrentes), investimentos e tendência dos últimos 12 meses.
+- **Calendário** — vencimentos e pagamentos derivados das suas regras.
+- **Backup** — exporte/restaure o banco a qualquer momento.
 
-### O que o app faz (MVP)
+## Instalação
 
-- Importa extratos OFX de qualquer banco (drag-and-drop)
-- Guarda as transações num SQLite local
-- Categoriza gastos (manual e por regras automáticas)
-- Mostra dashboard com gastos por categoria e por mês
-- Filtra e busca transações
+1. Baixe o `.dmg` mais recente na aba **[Releases](../../releases)**.
+2. Abra o `.dmg` e arraste o **finan app** pra pasta **Aplicativos**.
+3. **Primeira abertura** — o app **não é assinado** (não tenho conta no Apple Developer Program). Como ele foi **baixado da web**, o macOS pode recusar abri-lo ("danificado" ou "não foi possível verificar o desenvolvedor"). Se isso acontecer, rode uma vez no Terminal:
 
-## Status
+   ```sh
+   xattr -dr com.apple.quarantine "/Applications/finan app.app"
+   ```
 
-- ✅ Fase 0 — Scaffold (Tauri + Svelte + DB + sidebar + IPC tipado)
-- ✅ Fase 1 — Importar OFX (parser TS + dedup por FITID + listagem)
-- ✅ Fase 2 — Categorização manual inline + filtros + notes
-- ✅ Fase 3 — Regras automáticas (description-contains + auto-apply no import + apply-existing)
-- ✅ Fase 4 — Dashboard (KPIs + donut + barras 12m + top + recent)
-- ✅ Fase 5 — Polish (search ⌘F + settings + backup/restore + atalhos)
+   Depois é só abrir normalmente. (Alternativa: tente abrir, vá em **Ajustes do Sistema → Privacidade e Segurança** e clique em **"Abrir mesmo assim"**.)
 
-**MVP completo. 🎉**
+> Por que isso? O navegador marca arquivos baixados com uma flag de "quarentena"; sem notarização da Apple, o Gatekeeper bloqueia. O comando acima remove a flag. **Se você buildar o app você mesmo** (instruções abaixo), isso não se aplica — apps gerados localmente não recebem a quarentena.
+
+## Buildar do código
+
+Pré-requisitos: [Rust](https://rustup.rs), [Node 20+](https://nodejs.org) e [pnpm](https://pnpm.io).
+
+```sh
+pnpm install
+
+# rodar em desenvolvimento
+pnpm tauri dev
+
+# build local (arquitetura da sua máquina)
+pnpm tauri build
+
+# build universal (Apple Silicon + Intel) — recomendado pra distribuir
+rustup target add aarch64-apple-darwin x86_64-apple-darwin
+pnpm tauri build --target universal-apple-darwin
+```
+
+O `.app` e o `.dmg` saem em `src-tauri/target/**/release/bundle/`.
 
 ## Stack
 
-- **[Tauri 2](https://v2.tauri.app/)** — framework pra app desktop nativo
-- **[Svelte 5](https://svelte.dev/)** + **[Vite](https://vite.dev/)** — frontend
-- **[shadcn-svelte](https://www.shadcn-svelte.com/)** — componentes de UI
-- **[SQLite](https://www.sqlite.org/)** (via `@tauri-apps/plugin-sql`) — banco de dados local
-- **[Drizzle ORM](https://orm.drizzle.team/)** — type-safety nas queries
-- **[LayerChart](https://layerchart.com/)** — gráficos
+[Tauri 2](https://tauri.app) (Rust) · [Svelte 5](https://svelte.dev) · SQLite (rusqlite). Sem backend, sem telemetria.
+
+## Privacidade
+
+Nenhum dado é enviado pra servidores. A única requisição de rede é, opcionalmente, à [BrasilAPI](https://brasilapi.com.br) para resolver o nome de um CNPJ ao categorizar — feita sob demanda e sem enviar seus dados financeiros.
+
+## Licença
+
+[MIT](LICENSE) © 2026 Mateus Fonseca

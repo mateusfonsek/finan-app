@@ -24,7 +24,7 @@
     </h1>
     <p class="text-fg-muted text-sm max-w-md mx-auto leading-relaxed">
       Sem nuvem, sem login, sem assinatura. Você arrasta o extrato OFX
-      do seu banco e o finan organiza tudo num arquivo SQLite local.
+      do seu banco e o finan app organiza tudo num arquivo SQLite local.
     </p>
   </header>
 

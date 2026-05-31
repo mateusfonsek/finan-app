@@ -43,6 +43,7 @@ pub fn run() {
         commands::summary::income_sources,
         commands::backup::db_path,
         commands::backup::read_file_bytes,
+        commands::openfile::take_pending_ofx,
         commands::backup::export_backup,
         commands::backup::restore_backup,
     ]);
@@ -75,8 +76,8 @@ pub fn run() {
         .menu(|handle| {
             // App menu (finan): "Sobre" abre nosso modal; "Configurações" sem
             // atalho (decisão do produto). Hide/Quit são os padrões do macOS.
-            let app_menu = SubmenuBuilder::new(handle, "finan")
-                .text("about", "Sobre o finan")
+            let app_menu = SubmenuBuilder::new(handle, "finan app")
+                .text("about", "Sobre o finan app")
                 .separator()
                 .text("settings", "Configurações…")
                 .separator()
@@ -111,7 +112,7 @@ pub fn run() {
                 .build()?;
 
             let help_menu = SubmenuBuilder::new(handle, "Ajuda")
-                .text("github", "finan no GitHub")
+                .text("github", "finan app no GitHub")
                 .build()?;
 
             MenuBuilder::new(handle)
@@ -133,8 +134,30 @@ pub fn run() {
             let database = db::init(app.handle()).expect("failed to initialize database");
             eprintln!("[finan] db at {}", database.path.display());
             app.manage(database);
+            app.manage(commands::openfile::PendingOpen::default());
             Ok(())
         })
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|app_handle, event| {
+            // Arquivo .ofx aberto via Finder ("Abrir com finan"). Pode chegar no
+            // cold start (antes do frontend); guardamos na fila e avisamos o front.
+            if let tauri::RunEvent::Opened { urls } = event {
+                let paths: Vec<String> = urls
+                    .iter()
+                    .filter_map(|u| u.to_file_path().ok())
+                    .map(|p| p.to_string_lossy().into_owned())
+                    .collect();
+                if !paths.is_empty() {
+                    if let Some(pending) = app_handle.try_state::<commands::openfile::PendingOpen>() {
+                        pending
+                            .0
+                            .lock()
+                            .expect("pending mutex poisoned")
+                            .extend(paths);
+                    }
+                    let _ = app_handle.emit("open-ofx", ());
+                }
+            }
+        });
 }

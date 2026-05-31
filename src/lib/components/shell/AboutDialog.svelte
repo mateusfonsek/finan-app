@@ -48,7 +48,7 @@
 <div
   role="dialog"
   aria-modal="true"
-  aria-label="Sobre o finan"
+  aria-label="Sobre o finan app"
   class="fixed left-1/2 top-1/2 z-50 w-[min(400px,calc(100vw-2rem))] max-h-[calc(100vh-3rem)] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-2xl border border-border bg-surface"
   style="box-shadow: 0 24px 64px -16px rgba(0,0,0,.65), 0 0 0 1px var(--color-border)"
 >
@@ -74,7 +74,7 @@
       />
       <div class="flex flex-col items-center gap-1.5">
         <h2 class="text-[22px] font-semibold tracking-tight leading-none" style="font-family: var(--font-display)">
-          finan
+          finan app
         </h2>
         <p class="text-[12.5px] text-fg-muted">O dinheiro é seu. Os dados também.</p>
       </div>

@@ -28,18 +28,18 @@
   <button
     type="button"
     onclick={onAbout}
-    title="Sobre o finan"
-    aria-label="Sobre o finan"
+    title="Sobre o finan app"
+    aria-label="Sobre o finan app"
     class="flex items-center gap-2.5 px-2 py-1.5 mb-2 rounded-lg text-left hover:bg-hover transition-colors"
   >
     <img
       src={logoUrl}
-      alt="finan"
+      alt="finan app"
       class="w-7 h-7 rounded-md shrink-0"
       draggable="false"
     />
     <div>
-      <div class="text-[13.5px] font-semibold tracking-tight" style="font-family: var(--font-display)">finan</div>
+      <div class="text-[13.5px] font-semibold tracking-tight" style="font-family: var(--font-display)">finan app</div>
       <div class="text-[10px] text-fg-faint mt-px">100% local</div>
     </div>
   </button>

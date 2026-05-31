@@ -3,6 +3,7 @@ pub mod backup;
 pub mod categories;
 pub mod cnpj;
 pub mod health;
+pub mod openfile;
 pub mod rules;
 pub mod suggestions;
 pub mod summary;

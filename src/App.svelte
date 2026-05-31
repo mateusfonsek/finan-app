@@ -5,11 +5,34 @@
   import { openUrl } from "@tauri-apps/plugin-opener";
   import Sidebar from "$lib/components/shell/Sidebar.svelte";
   import AboutDialog from "$lib/components/shell/AboutDialog.svelte";
+  import { loadOfxFromPath } from "$lib/ofx/load";
+  import { takePendingOfx } from "$lib/api/files";
+  import type { ParsedOfx } from "$lib/ofx/types";
   import { routes } from "./routes/routes";
 
   const GITHUB_URL = "https://github.com/MateusFonseK/finan-app";
 
   let aboutOpen = $state(false);
+
+  // "Abrir com finan": drena os .ofx abertos via Finder, carrega e entrega pra
+  // tela de Importar via o mesmo stash que ela já lê no onMount.
+  async function handleOpenedOfx() {
+    let paths: string[] = [];
+    try {
+      paths = await takePendingOfx();
+    } catch {
+      return;
+    }
+    if (paths.length === 0) return;
+    try {
+      const result = await loadOfxFromPath(paths[0]);
+      (window as unknown as { __finanPending?: { file: File; parsed: ParsedOfx } }).__finanPending =
+        result;
+    } catch {
+      // arquivo inválido — abre a tela de Importar pro usuário tentar de novo
+    }
+    push("/import");
+  }
 
   const SHORTCUTS: Record<string, () => void> = {
     "1": () => push("/dashboard"),
@@ -68,6 +91,9 @@
     listen("menu:about", () => (aboutOpen = true)).then((u) => unlisten.push(u));
     listen<string>("menu:navigate", (e) => push(e.payload)).then((u) => unlisten.push(u));
     listen("menu:github", () => void openUrl(GITHUB_URL)).then((u) => unlisten.push(u));
+    listen("open-ofx", () => void handleOpenedOfx()).then((u) => unlisten.push(u));
+    // Cold start: o arquivo pode já estar na fila antes deste listener existir.
+    void handleOpenedOfx();
     return () => unlisten.forEach((u) => u());
   });
 </script>

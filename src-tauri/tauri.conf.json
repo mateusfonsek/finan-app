@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "finan",
+  "productName": "finan app",
   "version": "0.1.0",
   "identifier": "app.finan",
   "build": {
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "finan",
+        "title": "finan app",
         "width": 1180,
         "height": 760,
         "minWidth": 880,
@@ -30,6 +30,20 @@
   "bundle": {
     "active": true,
     "targets": ["app", "dmg"],
+    "category": "Finance",
+    "copyright": "© 2026 Mateus Fonseca",
+    "publisher": "Mateus Fonseca",
+    "homepage": "https://github.com/MateusFonseK/finan-app",
+    "shortDescription": "Suas finanças, só no seu Mac.",
+    "longDescription": "Organize suas finanças pessoais de forma 100% local: importe extratos OFX, categorize com regras e acompanhe tudo num app que não envia seus dados pra lugar nenhum.",
+    "fileAssociations": [
+      {
+        "ext": ["ofx"],
+        "name": "Extrato OFX",
+        "description": "Extrato bancário OFX",
+        "role": "Viewer"
+      }
+    ],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
