@@ -132,10 +132,11 @@
     <div class="text-[11px] text-fg-faint">
       Atalhos: <span class="font-mono">⌘1</span> Dashboard ·
       <span class="font-mono">⌘2</span> Transações ·
-      <span class="font-mono">⌘3</span> Importar ·
-      <span class="font-mono">⌘4</span> Categorias ·
-      <span class="font-mono">⌘5</span> Regras ·
-      <span class="font-mono">⌘,</span> Configurações ·
+      <span class="font-mono">⌘3</span> Calendário ·
+      <span class="font-mono">⌘4</span> Importar ·
+      <span class="font-mono">⌘5</span> Categorias ·
+      <span class="font-mono">⌘6</span> Regras ·
+      <span class="font-mono">⌘7</span> Sugestões ·
       <span class="font-mono">⌘F</span> Buscar ·
       <span class="font-mono">⌘O</span> Abrir OFX
     </div>

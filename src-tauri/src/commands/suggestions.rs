@@ -197,6 +197,15 @@ pub fn suggest_rules(db: State<'_, Db>, min_count: u32) -> AppResult<Vec<RuleSug
     Ok(out)
 }
 
+/// Pattern sugerido (LIKE substring) pra uma única descrição — mesma lógica
+/// da aba de Sugestões, exposta pra criar uma regra direto do painel de detalhe
+/// de uma transação.
+#[tauri::command]
+#[specta::specta]
+pub fn suggest_pattern_for(description: String) -> String {
+    normalize(&description).2
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 pub struct AutoClassifyReport {
     pub created_rules: Vec<Rule>,

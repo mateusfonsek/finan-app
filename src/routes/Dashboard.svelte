@@ -17,21 +17,21 @@
     summaryKpis,
     transferSummary,
   } from "$lib/api/summary";
-  import { listTransactions } from "$lib/api/transactions";
+  import { topExpenses } from "$lib/api/transactions";
   import type {
     CategorySpend,
+    ExpenseRow,
     IncomeSource,
     InvestmentSummary,
     KpiSummary,
     MonthSummary,
-    Transaction,
     TransferSummary,
   } from "$lib/bindings";
 
   let kpis = $state<KpiSummary | null>(null);
   let byCategory = $state<CategorySpend[]>([]);
   let byMonth = $state<MonthSummary[]>([]);
-  let recent = $state<Transaction[]>([]);
+  let topSpends = $state<ExpenseRow[]>([]);
   let investments = $state<InvestmentSummary | null>(null);
   let transfers = $state<TransferSummary | null>(null);
   let sources = $state<IncomeSource[]>([]);
@@ -40,23 +40,17 @@
 
   async function refresh() {
     try {
-      const [k, c, recentTx, inv, tr, src] = await Promise.all([
+      const [k, c, topTx, inv, tr, src] = await Promise.all([
         summaryKpis(filters.month),
         summaryByCategory(filters.month),
-        listTransactions({
-          account_id: null,
-          month: filters.month,
-          category_id: null,
-          q: null,
-          limit: 8,
-        }),
+        topExpenses(filters.month, 8),
         investmentSummary(filters.month),
         transferSummary(filters.month),
         incomeSources(filters.month),
       ]);
       kpis = k;
       byCategory = c;
-      recent = recentTx;
+      topSpends = topTx;
       investments = inv;
       transfers = tr;
       sources = src;
@@ -143,7 +137,7 @@
            cada uma com seu próprio fluxo bruto → exclusões → resultado real. -->
       {#if (transfers && transfers.count > 0) || (investments && (investments.aplicacoes_count + investments.resgates_count) > 0)}
         <details class="rounded-lg border border-border-subtle bg-surface px-4 py-2.5">
-          <summary class="text-[11.5px] text-fg-muted cursor-pointer flex items-center gap-2">
+          <summary class="text-[11.5px] text-fg-muted flex items-center gap-2">
             <span class="text-fg-faint">↻</span>
             <span>Como esses números são calculados? <span class="text-fg-faint">(clique pra expandir)</span></span>
           </summary>
@@ -297,13 +291,18 @@
           </div>
           <span class="text-[10px] text-fg-faint">por valor</span>
         </div>
-        <TopCategoriesList items={byCategory} />
+        <div class="h-[260px] overflow-y-auto pr-1">
+          <TopCategoriesList items={byCategory} />
+        </div>
       </div>
       <div class="rounded-xl bg-surface border border-border-subtle flex flex-col">
-        <div class="text-[10.5px] uppercase tracking-wider font-semibold text-fg-faint px-4 pt-4 pb-2">
-          Últimas transações
+        <div class="text-[10.5px] uppercase tracking-wider font-semibold text-fg-faint px-4 pt-4 pb-2 flex items-baseline justify-between">
+          <span>Maiores gastos do mês</span>
+          <span class="text-[10px] normal-case tracking-normal text-fg-faint font-normal">sem transf./invest.</span>
         </div>
-        <RecentList transactions={recent} />
+        <div class="h-[260px] overflow-y-auto">
+          <RecentList transactions={topSpends} />
+        </div>
       </div>
     </div>
   {/if}

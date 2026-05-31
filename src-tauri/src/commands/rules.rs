@@ -356,8 +356,8 @@ mod tests {
         let mut conn = fresh_conn();
         let acc = insert_account(&conn);
         let transporte = category_id(&conn, "Transporte");
-        insert_rule(&conn, "uber", transporte, 0);
-        let tx_id = insert_tx(&conn, acc, "UBER * TRIP 12345", None);
+        insert_rule(&conn, "testmerchant", transporte, 0);
+        let tx_id = insert_tx(&conn, acc, "TESTMERCHANT * TRIP 12345", None);
 
         let n = apply_rules_internal(&mut conn, None).unwrap();
         assert_eq!(n, 1);
@@ -379,8 +379,8 @@ mod tests {
         let transporte = category_id(&conn, "Transporte");
         let outros = category_id(&conn, "Outros");
 
-        insert_rule(&conn, "uber", outros, 0);
-        insert_rule(&conn, "uber trip", transporte, 10);
+        insert_rule(&conn, "testmerchant", outros, 0);
+        insert_rule(&conn, "testmerchant trip", transporte, 10);
 
         let tx_id = insert_tx(&conn, acc, "uber trip via app", None);
         apply_rules_internal(&mut conn, None).unwrap();
@@ -402,8 +402,8 @@ mod tests {
         let mercado = category_id(&conn, "Mercado");
         let transporte = category_id(&conn, "Transporte");
 
-        insert_rule(&conn, "uber", transporte, 0);
-        let tx_id = insert_tx(&conn, acc, "UBER trip", Some(mercado));
+        insert_rule(&conn, "testmerchant", transporte, 0);
+        let tx_id = insert_tx(&conn, acc, "TESTMERCHANT trip", Some(mercado));
 
         let n = apply_rules_internal(&mut conn, None).unwrap();
         assert_eq!(n, 0, "manual category preserved");
@@ -438,9 +438,9 @@ mod tests {
             })
             .unwrap();
         let transporte = category_id(&conn, "Transporte");
-        insert_rule(&conn, "uber", transporte, 0);
-        insert_tx(&conn, a1, "uber a1", None);
-        insert_tx(&conn, a2, "uber a2", None);
+        insert_rule(&conn, "testmerchant", transporte, 0);
+        insert_tx(&conn, a1, "testmerchant a1", None);
+        insert_tx(&conn, a2, "testmerchant a2", None);
 
         let n = apply_rules_internal(&mut conn, Some(a1)).unwrap();
         assert_eq!(n, 1, "scope must limit to account a1");
@@ -493,8 +493,8 @@ mod tests {
         let mut conn = fresh_conn();
         let acc = insert_account(&conn);
         let transporte = category_id(&conn, "Transporte");
-        let rule = insert_rule(&conn, "uber", transporte, 0);
-        let tx_id = insert_tx(&conn, acc, "UBER trip", None);
+        let rule = insert_rule(&conn, "testmerchant", transporte, 0);
+        let tx_id = insert_tx(&conn, acc, "TESTMERCHANT trip", None);
         apply_rules_internal(&mut conn, None).unwrap();
         let cat: Option<i64> = conn
             .query_row(
@@ -524,9 +524,9 @@ mod tests {
         let acc = insert_account(&conn);
         let transporte = category_id(&conn, "Transporte");
         let mercado = category_id(&conn, "Mercado");
-        let rule = insert_rule(&conn, "uber", transporte, 0);
+        let rule = insert_rule(&conn, "testmerchant", transporte, 0);
         // Manually categorized as Mercado (different from rule's category) — shouldn't be cleared.
-        let tx_id = insert_tx(&conn, acc, "UBER trip", Some(mercado));
+        let tx_id = insert_tx(&conn, acc, "TESTMERCHANT trip", Some(mercado));
 
         cleanup_after_delete(&mut conn, rule);
 
@@ -545,7 +545,7 @@ mod tests {
         let mut conn = fresh_conn();
         let acc = insert_account(&conn);
         let transporte = category_id(&conn, "Transporte");
-        insert_rule(&conn, "uber", transporte, 0);
+        insert_rule(&conn, "testmerchant", transporte, 0);
         insert_tx(&conn, acc, "padaria do bairro", None);
 
         let n = apply_rules_internal(&mut conn, None).unwrap();

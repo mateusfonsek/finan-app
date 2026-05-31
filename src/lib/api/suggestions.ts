@@ -10,6 +10,10 @@ export async function suggestRules(minCount: number): Promise<RuleSuggestion[]> 
   return unwrap(await commands.suggestRules(minCount));
 }
 
+export async function suggestPatternFor(description: string): Promise<string> {
+  return commands.suggestPatternFor(description);
+}
+
 export async function autoClassifyWithCnpj(
   accountId: number | null = null,
 ): Promise<AutoClassifyReport> {

@@ -2,19 +2,58 @@
   import { tick } from "svelte";
   import { Button } from "$lib/components/ui/button";
   import { formatMoney } from "$lib/format/money";
-  import type { Transaction } from "$lib/bindings";
+  import { suggestPatternFor } from "$lib/api/suggestions";
+  import type { Category, Transaction } from "$lib/bindings";
 
   type Props = {
     transaction: Transaction;
+    categories: Category[];
     onClose: () => void;
     onSave: (transactionId: number, notes: string | null) => Promise<void>;
+    onCreateRule: (data: { pattern: string; categoryId: number }) => Promise<void>;
   };
 
-  let { transaction, onClose, onSave }: Props = $props();
+  let { transaction, categories, onClose, onSave, onCreateRule }: Props = $props();
 
   let draft = $state("");
   let busy = $state(false);
   let textarea: HTMLTextAreaElement | undefined = $state();
+
+  // Mini-form de criação de regra (expansível).
+  let ruleOpen = $state(false);
+  let rulePattern = $state("");
+  let ruleCategoryId = $state<number | null>(null);
+  let ruleBusy = $state(false);
+  let ruleError = $state<string | null>(null);
+
+  async function openRuleForm() {
+    ruleError = null;
+    ruleCategoryId = transaction.category_id ?? null;
+    rulePattern = await suggestPatternFor(transaction.description);
+    ruleOpen = true;
+  }
+
+  async function createRule() {
+    ruleError = null;
+    const pattern = rulePattern.trim();
+    if (!pattern) {
+      ruleError = "Pattern não pode ser vazio.";
+      return;
+    }
+    if (ruleCategoryId === null) {
+      ruleError = "Selecione uma categoria.";
+      return;
+    }
+    ruleBusy = true;
+    try {
+      await onCreateRule({ pattern, categoryId: ruleCategoryId });
+      onClose();
+    } catch (e) {
+      ruleError = e instanceof Error ? e.message : String(e);
+    } finally {
+      ruleBusy = false;
+    }
+  }
 
   $effect(() => {
     draft = transaction.notes ?? "";
@@ -82,7 +121,52 @@
     {/if}
   </div>
 
-  <div class="px-4 pb-2">
+  <div class="px-4 pb-3 border-b border-border-subtle">
+    {#if !ruleOpen}
+      <Button variant="ghost" onclick={openRuleForm} class="w-full justify-center">
+        + Criar regra desta transação
+      </Button>
+    {:else}
+      <div class="flex flex-col gap-2 rounded-md border border-border-subtle bg-surface-2/50 p-3">
+        <span class="text-[10.5px] uppercase tracking-wider font-semibold text-fg-faint">Nova regra</span>
+        <label class="flex flex-col gap-1">
+          <span class="text-[11px] text-fg-muted">Pattern (descrição contém)</span>
+          <input
+            bind:value={rulePattern}
+            class="rounded-md border border-border bg-surface px-2 py-1 text-[12px] text-fg font-mono focus:outline-none focus:border-accent"
+            title="LIKE substring que será gravado na regra"
+          />
+        </label>
+        <label class="flex flex-col gap-1">
+          <span class="text-[11px] text-fg-muted">Categoria</span>
+          <select
+            value={ruleCategoryId === null ? "" : String(ruleCategoryId)}
+            onchange={(e) => {
+              const v = (e.currentTarget as HTMLSelectElement).value;
+              ruleCategoryId = v === "" ? null : Number(v);
+            }}
+            class="rounded-md border border-border bg-surface px-2 py-1 text-[12px] text-fg"
+          >
+            <option value="">— selecione —</option>
+            {#each categories as c}
+              <option value={String(c.id)}>{c.name}</option>
+            {/each}
+          </select>
+        </label>
+        {#if ruleError}
+          <div class="text-[11px] text-neg">{ruleError}</div>
+        {/if}
+        <div class="flex justify-end gap-2">
+          <Button variant="ghost" onclick={() => (ruleOpen = false)} disabled={ruleBusy}>Cancelar</Button>
+          <Button onclick={createRule} disabled={ruleBusy}>
+            {ruleBusy ? "Criando…" : "Criar e aplicar"}
+          </Button>
+        </div>
+      </div>
+    {/if}
+  </div>
+
+  <div class="px-4 pb-2 pt-3">
     <label class="text-[10.5px] uppercase tracking-wider font-semibold text-fg-faint mb-1 block" for="tx-notes">
       Notes
     </label>

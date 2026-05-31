@@ -37,10 +37,10 @@
         <tr
           class="border-t border-border-subtle hover:bg-hover {selectedId === t.id ? 'bg-accent-soft' : ''}"
         >
-          <td class="px-4 py-2.5 text-fg-muted tabular cursor-pointer" onclick={() => onRowClick?.(t)}>
+          <td class="px-4 py-2.5 text-fg-muted tabular" onclick={() => onRowClick?.(t)}>
             {t.date}
           </td>
-          <td class="px-4 py-2.5 cursor-pointer" onclick={() => onRowClick?.(t)}>
+          <td class="px-4 py-2.5" onclick={() => onRowClick?.(t)}>
             {t.description}
           </td>
           <td class="px-4 py-2.5">
@@ -52,7 +52,7 @@
             />
           </td>
           <td
-            class="px-4 py-2.5 text-right tabular font-medium cursor-pointer {Number(t.amount) >= 0 ? 'text-pos' : 'text-fg'}"
+            class="px-4 py-2.5 text-right tabular font-medium {Number(t.amount) >= 0 ? 'text-pos' : 'text-fg'}"
             onclick={() => onRowClick?.(t)}
           >
             {formatMoney(t.amount)}

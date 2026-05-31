@@ -83,3 +83,10 @@ body {
 .tabular {
   font-variant-numeric: tabular-nums;
 }
+
+/* macOS nativo: o cursor não vira mãozinha em links/controles — só a seta.
+   Anchors e <summary> são os que o navegador transforma em pointer por padrão. */
+a[href],
+summary {
+  cursor: default;
+}

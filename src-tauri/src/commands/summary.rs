@@ -276,8 +276,8 @@ pub fn transfer_summary(
 }
 
 /// Agrega entradas (`amount > 0`, kind != 'transfer') do mês por contraparte.
-/// Marca como recorrente quando a mesma fonte aparece em ≥2 meses distintos
-/// (considerando todo o histórico da DB, não só o mês filtrado).
+/// Marca como recorrente quando a fonte também apareceu nos DOIS meses
+/// imediatamente anteriores ao mês exibido (ver `is_recurring`).
 #[tauri::command]
 #[specta::specta]
 pub fn income_sources(
@@ -345,7 +345,9 @@ pub fn income_sources(
     let mut sources: Vec<IncomeSource> = current
         .into_iter()
         .map(|(key, agg)| {
-            let recurring_months = months_seen.get(&key).map(|s| s.len()).unwrap_or(0) as u32;
+            let seen = months_seen.get(&key);
+            let recurring_months = seen.map(|s| s.len()).unwrap_or(0) as u32;
+            let recurring = seen.is_some_and(|s| is_recurring(s, month.as_deref()));
             let percent = if total_income.is_zero() {
                 0.0
             } else {
@@ -358,7 +360,7 @@ pub fn income_sources(
                 total: agg.total.to_string(),
                 count: agg.count,
                 percent,
-                is_recurring: recurring_months >= 2,
+                is_recurring: recurring,
                 recurring_months,
             }
         })
@@ -379,6 +381,40 @@ fn compute_cutoff(months_back: u32) -> String {
     let y = target.div_euclid(12);
     let m = target.rem_euclid(12) + 1;
     format!("{:04}-{:02}-01", y, m)
+}
+
+/// Desloca um ano/mês por `delta` meses, normalizando virada de ano. Devolve "YYYY-MM".
+fn shift_month(year: i32, month: u32, delta: i32) -> String {
+    let zero_based = year * 12 + (month as i32 - 1) + delta;
+    let y = zero_based.div_euclid(12);
+    let m = zero_based.rem_euclid(12) + 1;
+    format!("{:04}-{:02}", y, m)
+}
+
+/// Para um mês "YYYY-MM", devolve (M-1, M-2) como "YYYY-MM". `None` se a string
+/// não for um mês válido (ex.: filtro por ano "YYYY" ou vazio).
+fn prev_two_months(month: &str) -> Option<(String, String)> {
+    let (y, m) = month.split_once('-')?;
+    if m.len() != 2 {
+        return None;
+    }
+    let year: i32 = y.parse().ok()?;
+    let mon: u32 = m.parse().ok()?;
+    if !(1..=12).contains(&mon) {
+        return None;
+    }
+    Some((shift_month(year, mon, -1), shift_month(year, mon, -2)))
+}
+
+/// Decide recorrência relativa ao mês exibido `anchor`: a fonte só é recorrente
+/// se apareceu nos DOIS meses imediatamente anteriores (M-1 e M-2). Um gap em
+/// qualquer um deles quebra a recorrência. Sem âncora mensal (filtro por ano ou
+/// "tudo"), usa o sinal grosso: ≥2 meses distintos no histórico.
+fn is_recurring(months_seen: &HashSet<String>, anchor: Option<&str>) -> bool {
+    match anchor.and_then(prev_two_months) {
+        Some((m1, m2)) => months_seen.contains(&m1) && months_seen.contains(&m2),
+        None => months_seen.len() >= 2,
+    }
 }
 
 #[cfg(test)]
@@ -545,6 +581,40 @@ mod tests {
         assert_eq!(expense, Decimal::from_str("100.00").unwrap(),
             "Transferências (-732.52 -1000.00) devem ser ignoradas");
         assert_eq!(rows.len(), 2);
+    }
+
+    fn seen(months: &[&str]) -> HashSet<String> {
+        months.iter().map(|m| m.to_string()).collect()
+    }
+
+    #[test]
+    fn recurring_requires_both_preceding_months() {
+        // Waldimayre: pix em jan, fev e mar. Em março → recorrente (jan+fev presentes).
+        let s = seen(&["2026-01", "2026-02", "2026-03"]);
+        assert!(is_recurring(&s, Some("2026-03")));
+    }
+
+    #[test]
+    fn recurring_breaks_on_gap() {
+        // Pix em mar e mai, pulou abr. Em maio → NÃO recorrente (falta abr).
+        let s = seen(&["2026-03", "2026-05"]);
+        assert!(!is_recurring(&s, Some("2026-05")));
+    }
+
+    #[test]
+    fn recurring_handles_year_boundary() {
+        // Nov/dez 2025 + jan 2026. Em jan/2026 → recorrente (dez+nov presentes).
+        let s = seen(&["2025-11", "2025-12", "2026-01"]);
+        assert!(is_recurring(&s, Some("2026-01")));
+    }
+
+    #[test]
+    fn recurring_fallback_without_month_anchor() {
+        // Sem âncora mensal (tudo) ou filtro por ano: ≥2 meses distintos.
+        let s = seen(&["2026-01", "2026-06"]);
+        assert!(is_recurring(&s, None));
+        assert!(is_recurring(&s, Some("2026")));
+        assert!(!is_recurring(&seen(&["2026-01"]), None));
     }
 
     #[test]

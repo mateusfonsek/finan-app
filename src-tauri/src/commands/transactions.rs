@@ -2,7 +2,7 @@ use rusqlite::params;
 use tauri::State;
 
 use crate::db::Db;
-use crate::domain::transaction::{InsertResult, NewTransaction, Transaction};
+use crate::domain::transaction::{ExpenseRow, InsertResult, NewTransaction, Transaction, TxKey};
 use crate::error::{AppError, AppResult};
 
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize, specta::Type)]
@@ -83,7 +83,10 @@ pub fn list_transactions(
 }
 
 /// Insert a batch of new transactions. Returns counts of inserted vs skipped (duplicates).
-/// Dedup happens via UNIQUE(account_id, ofx_fitid) + INSERT OR IGNORE.
+/// Dedup happens via UNIQUE(account_id, ofx_fitid, date, amount) + INSERT OR IGNORE.
+/// A tripla casa transações realmente idênticas — mesmo FITID com valor ou data
+/// diferentes (caso típico do Nubank: compra original + estorno) entra como tx
+/// distinta.
 #[tauri::command]
 #[specta::specta]
 pub fn insert_transactions(
@@ -135,38 +138,83 @@ pub fn insert_transactions(
     })
 }
 
-/// Given a list of FITIDs, return the subset that already exists for this account.
+/// Maiores gastos do mês (ou de todo o histórico, se `month` for None).
+/// Filtros: amount < 0 (saídas), categoria com `kind != 'transfer'` (exclui
+/// pagamento de fatura, transferências internas, aplicações em investimento).
+/// Ordem: do mais caro pro mais barato (CAST AS REAL ASC porque amounts são
+/// negativos — quanto menor o número, maior o gasto).
 #[tauri::command]
 #[specta::specta]
-pub fn check_existing_fitids(
+pub fn top_expenses(
+    db: State<'_, Db>,
+    month: Option<String>,
+    limit: Option<u32>,
+) -> AppResult<Vec<ExpenseRow>> {
+    let conn = db.conn.lock().expect("db mutex poisoned");
+    let pattern: Option<String> = month.as_ref().map(|m| format!("{m}-%"));
+    let lim = limit.unwrap_or(8);
+
+    let mut stmt = conn.prepare(
+        "SELECT t.id, t.date, t.amount, t.description,
+                t.category_id, c.name, c.color_token
+         FROM transactions t
+         LEFT JOIN categories c ON c.id = t.category_id
+         WHERE (?1 IS NULL OR t.date LIKE ?1)
+           AND CAST(t.amount AS REAL) < 0
+           AND COALESCE(c.kind, '') != 'transfer'
+         ORDER BY CAST(t.amount AS REAL) ASC
+         LIMIT ?2",
+    )?;
+    let pat_ref: Option<&str> = pattern.as_deref();
+    let rows = stmt.query_map(params![pat_ref, lim], |row| {
+        Ok(ExpenseRow {
+            id: row.get(0)?,
+            date: row.get(1)?,
+            amount: row.get(2)?,
+            description: row.get(3)?,
+            category_id: row.get(4)?,
+            category_name: row.get(5)?,
+            category_color_token: row.get(6)?,
+        })
+    })?;
+    rows.collect::<rusqlite::Result<Vec<_>>>()
+        .map_err(AppError::from)
+}
+
+/// Dado uma lista de triplas `(fitid, date, amount)`, devolve o subconjunto que
+/// já existe nessa conta. O FE usa a tripla como chave de "duplicada" porque a
+/// UNIQUE da tabela é composta — mesmo FITID com valor/data diferentes é uma
+/// transação distinta (e.g., compra original vs estorno).
+#[tauri::command]
+#[specta::specta]
+pub fn check_existing_tx_keys(
     db: State<'_, Db>,
     account_id: i64,
-    fitids: Vec<String>,
-) -> AppResult<Vec<String>> {
-    if fitids.is_empty() {
+    keys: Vec<TxKey>,
+) -> AppResult<Vec<TxKey>> {
+    if keys.is_empty() {
         return Ok(Vec::new());
     }
     let conn = db.conn.lock().expect("db mutex poisoned");
 
-    let placeholders = (1..=fitids.len())
-        .map(|i| format!("?{}", i + 1))
-        .collect::<Vec<_>>()
-        .join(",");
-    let sql = format!(
-        "SELECT ofx_fitid FROM transactions
-         WHERE account_id = ?1 AND ofx_fitid IN ({placeholders})",
-    );
+    let mut stmt = conn.prepare(
+        "SELECT 1 FROM transactions
+         WHERE account_id = ?1 AND ofx_fitid = ?2 AND date = ?3 AND amount = ?4
+         LIMIT 1",
+    )?;
 
-    let mut stmt = conn.prepare(&sql)?;
-
-    let mut params_vec: Vec<&dyn rusqlite::ToSql> = Vec::with_capacity(fitids.len() + 1);
-    params_vec.push(&account_id);
-    for f in &fitids {
-        params_vec.push(f);
+    let mut existing: Vec<TxKey> = Vec::new();
+    for k in keys {
+        let found: bool = stmt
+            .query_row(
+                params![account_id, k.ofx_fitid, k.date, k.amount],
+                |_| Ok(true),
+            )
+            .unwrap_or(false);
+        if found {
+            existing.push(k);
+        }
     }
-
-    let rows = stmt.query_map(params_vec.as_slice(), |row| row.get::<_, Option<String>>(0))?;
-    let existing: Vec<String> = rows.filter_map(|r| r.ok().flatten()).collect();
 
     Ok(existing)
 }
@@ -327,21 +375,115 @@ mod tests {
     }
 
     #[test]
-    fn check_existing_fitids_returns_subset() {
+    fn check_existing_tx_keys_matches_triple() {
         let mut conn = fresh_conn();
         let acc = insert_account(&conn, "test", Some("ACC1"));
         let txs = vec![mk("F1", "10"), mk("F2", "20"), mk("F3", "30")];
         raw_insert_batch(&mut conn, acc, &txs);
 
+        // Match exata pela tripla (fitid, date, amount). F4 não existe; F1 com
+        // amount errado não casa; F1 com a tripla certa casa.
         let mut stmt = conn
-            .prepare("SELECT ofx_fitid FROM transactions WHERE account_id = ?1 AND ofx_fitid IN (?2, ?3)")
+            .prepare(
+                "SELECT 1 FROM transactions
+                 WHERE account_id = ?1 AND ofx_fitid = ?2 AND date = ?3 AND amount = ?4
+                 LIMIT 1",
+            )
             .unwrap();
-        let rows = stmt
-            .query_map(params![acc, "F1", "F4"], |r| r.get::<_, Option<String>>(0))
-            .unwrap();
-        let existing: Vec<String> = rows.filter_map(|r| r.ok().flatten()).collect();
+        let probes: &[(&str, &str, &str, bool)] = &[
+            ("F1", "2026-04-12", "10", true),
+            ("F1", "2026-04-12", "99", false),
+            ("F4", "2026-04-12", "10", false),
+        ];
+        for (fitid, date, amount, expected) in probes {
+            let found: bool = stmt
+                .query_row(params![acc, fitid, date, amount], |_| Ok(true))
+                .unwrap_or(false);
+            assert_eq!(found, *expected, "probe {fitid}/{date}/{amount}");
+        }
+    }
 
-        assert_eq!(existing, vec!["F1".to_string()]);
+    #[test]
+    fn same_fitid_different_amount_is_not_duplicate() {
+        // Caso real Nubank: compra original (DEBIT -108.14) e estorno dela
+        // (CREDIT +108.14) compartilham o FITID mas têm sinais opostos. Com a
+        // UNIQUE composta `(account_id, ofx_fitid, date, amount)`, ambos devem
+        // entrar — não são duplicatas.
+        let mut conn = fresh_conn();
+        let acc = insert_account(&conn, "test", Some("ACC1"));
+        let mut original = mk("SHARED", "-108.14");
+        original.date = "2026-03-17".into();
+        let mut estorno = mk("SHARED", "108.14");
+        estorno.date = "2026-04-18".into();
+        let (ins, skip) = raw_insert_batch(&mut conn, acc, &[original, estorno]);
+        assert_eq!(ins, 2, "compra original e estorno coexistem");
+        assert_eq!(skip, 0);
+    }
+
+    #[test]
+    fn top_expenses_filters_orders_and_limits() {
+        // 4 saídas + 1 entrada + 1 transferência. Top 2 deve trazer só as duas
+        // maiores saídas (em valor absoluto), em ordem decrescente; exclui a
+        // entrada e a transferência.
+        let mut conn = fresh_conn();
+        let acc = insert_account(&conn, "test", Some("ACC1"));
+        let mut e1 = mk("F1", "-50.00");
+        e1.date = "2026-04-10".into();
+        let mut e2 = mk("F2", "-200.00");
+        e2.date = "2026-04-12".into();
+        let mut e3 = mk("F3", "-30.00");
+        e3.date = "2026-04-15".into();
+        let mut e4 = mk("F4", "-150.00");
+        e4.date = "2026-04-20".into();
+        let mut inc = mk("F5", "1000.00");
+        inc.date = "2026-04-22".into();
+        let mut transfer = mk("F6", "-300.00");
+        transfer.date = "2026-04-22".into();
+        raw_insert_batch(&mut conn, acc, &[e1, e2, e3, e4, inc, transfer]);
+
+        // Marca F6 como kind='transfer' (pagamento de fatura).
+        conn.execute(
+            "UPDATE transactions SET category_id = (
+                SELECT id FROM categories WHERE name = 'Transferências'
+             ) WHERE ofx_fitid = 'F6'",
+            [],
+        )
+        .unwrap();
+
+        let mut stmt = conn
+            .prepare(
+                "SELECT t.ofx_fitid FROM transactions t
+                 LEFT JOIN categories c ON c.id = t.category_id
+                 WHERE t.date LIKE ?1
+                   AND CAST(t.amount AS REAL) < 0
+                   AND COALESCE(c.kind, '') != 'transfer'
+                 ORDER BY CAST(t.amount AS REAL) ASC
+                 LIMIT ?2",
+            )
+            .unwrap();
+        let hits: Vec<String> = stmt
+            .query_map(params!["2026-04-%", 2i64], |r| r.get::<_, Option<String>>(0))
+            .unwrap()
+            .filter_map(|r| r.ok().flatten())
+            .collect();
+
+        assert_eq!(
+            hits,
+            vec!["F2".to_string(), "F4".to_string()],
+            "deve trazer F2 (-200) e F4 (-150), nessa ordem; sem F5 (entrada) e sem F6 (transfer)"
+        );
+    }
+
+    #[test]
+    fn same_fitid_same_amount_same_date_is_duplicate() {
+        // Duas linhas idênticas em (fitid, date, amount) continuam batendo como
+        // duplicata — INSERT OR IGNORE descarta a segunda.
+        let mut conn = fresh_conn();
+        let acc = insert_account(&conn, "test", Some("ACC1"));
+        let txs = vec![mk("F1", "10.00"), mk("F1", "10.00")];
+        let (ins, skip) = raw_insert_batch(&mut conn, acc, &txs);
+        assert_eq!(ins, 1);
+        assert_eq!(skip, 1);
     }
 
     #[test]

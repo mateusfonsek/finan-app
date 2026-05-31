@@ -60,7 +60,7 @@
   ondrop={onDrop}
   onclick={() => fileInput?.click()}
   onkeydown={(e) => (e.key === "Enter" || e.key === " ") && fileInput?.click()}
-  class="rounded-xl border border-dashed p-9 flex flex-col items-center gap-3 cursor-pointer transition-colors text-center
+  class="rounded-xl border border-dashed p-9 flex flex-col items-center gap-3 transition-colors text-center
          {active ? 'border-accent bg-accent-soft' : 'border-border bg-surface hover:bg-surface-2'}"
 >
   <div class="w-14 h-14 rounded-2xl grid place-items-center"

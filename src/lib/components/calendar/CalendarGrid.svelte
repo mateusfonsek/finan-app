@@ -151,7 +151,7 @@
         onclick={() => cell.day !== null && handleClick(cell.day)}
         class="text-left min-h-[88px] border-r border-b border-border-subtle p-1.5 flex flex-col gap-1 relative
                transition-colors
-               {cell.day === null ? 'bg-bg/40 cursor-default' : 'hover:bg-hover cursor-pointer'}
+               {cell.day === null ? 'bg-bg/40' : 'hover:bg-hover'}
                {cell.isToday && !isSelected ? 'bg-accent-soft/30' : ''}
                {isSelected ? 'ring-2 ring-accent ring-inset z-10' : ''}
                {i % 7 === 6 ? 'border-r-0' : ''}"

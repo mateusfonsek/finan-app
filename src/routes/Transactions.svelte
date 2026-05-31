@@ -5,6 +5,7 @@
   import TxNotesPanel from "$lib/components/transactions/TxNotesPanel.svelte";
   import { filters } from "$lib/stores/filters.svelte";
   import { listCategories, createCategory } from "$lib/api/categories";
+  import { createRule, applyRulesToUncategorized } from "$lib/api/rules";
   import {
     listTransactions,
     updateTransactionCategory,
@@ -95,6 +96,16 @@
       t.id === transactionId ? { ...t, notes } : t,
     );
   }
+  async function onCreateRule(data: { pattern: string; categoryId: number }) {
+    await createRule({
+      pattern: data.pattern,
+      category_id: data.categoryId,
+      priority: 5,
+      due_day: null,
+    });
+    await applyRulesToUncategorized(null);
+    await refresh();
+  }
 </script>
 
 <section class="p-8 max-w-5xl mx-auto flex flex-col gap-5">
@@ -135,5 +146,11 @@
 </section>
 
 {#if selectedTx}
-  <TxNotesPanel transaction={selectedTx} onClose={closePanel} onSave={onSaveNotes} />
+  <TxNotesPanel
+    transaction={selectedTx}
+    {categories}
+    onClose={closePanel}
+    onSave={onSaveNotes}
+    {onCreateRule}
+  />
 {/if}

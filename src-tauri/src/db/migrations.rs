@@ -40,6 +40,18 @@ const MIGRATIONS: &[(&str, &str)] = &[
         "0010_drop_income_cnpj_rules",
         include_str!("../../migrations/0010_drop_income_cnpj_rules.sql"),
     ),
+    (
+        "0011_account_kind",
+        include_str!("../../migrations/0011_account_kind.sql"),
+    ),
+    (
+        "0012_cc_seed",
+        include_str!("../../migrations/0012_cc_seed.sql"),
+    ),
+    (
+        "0013_composite_fitid_unique",
+        include_str!("../../migrations/0013_composite_fitid_unique.sql"),
+    ),
 ];
 
 pub fn apply(conn: &Connection) -> AppResult<()> {
@@ -164,6 +176,9 @@ mod tests {
                 "0008_delete_renda_category".to_string(),
                 "0009_investment_green_color".to_string(),
                 "0010_drop_income_cnpj_rules".to_string(),
+                "0011_account_kind".to_string(),
+                "0012_cc_seed".to_string(),
+                "0013_composite_fitid_unique".to_string(),
             ]
         );
     }

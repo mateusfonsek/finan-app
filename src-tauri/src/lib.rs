@@ -3,7 +3,8 @@ mod db;
 mod domain;
 mod error;
 
-use tauri::Manager;
+use tauri::menu::{MenuBuilder, SubmenuBuilder};
+use tauri::{Emitter, Manager};
 use tauri_specta::{collect_commands, Builder};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -19,7 +20,8 @@ pub fn run() {
         commands::categories::delete_category,
         commands::transactions::list_transactions,
         commands::transactions::insert_transactions,
-        commands::transactions::check_existing_fitids,
+        commands::transactions::check_existing_tx_keys,
+        commands::transactions::top_expenses,
         commands::transactions::update_transaction_category,
         commands::transactions::update_transaction_notes,
         commands::rules::list_rules,
@@ -31,6 +33,7 @@ pub fn run() {
         commands::rules::calendar_events,
         commands::cnpj::resolve_cnpj,
         commands::suggestions::suggest_rules,
+        commands::suggestions::suggest_pattern_for,
         commands::suggestions::auto_classify_with_cnpj,
         commands::summary::summary_kpis,
         commands::summary::summary_by_category,
@@ -67,6 +70,62 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
+        .menu(|handle| {
+            // App menu (finan): "Sobre" abre nosso modal; "Configurações" sem
+            // atalho (decisão do produto). Hide/Quit são os padrões do macOS.
+            let app_menu = SubmenuBuilder::new(handle, "finan")
+                .text("about", "Sobre o finan")
+                .separator()
+                .text("settings", "Configurações…")
+                .separator()
+                .services()
+                .separator()
+                .hide()
+                .hide_others()
+                .show_all()
+                .separator()
+                .quit()
+                .build()?;
+
+            // Editar: itens padrão fazem os campos de texto da webview se
+            // comportarem nativamente (desfazer/recortar/copiar/colar/⌘A).
+            let edit_menu = SubmenuBuilder::new(handle, "Editar")
+                .undo()
+                .redo()
+                .separator()
+                .cut()
+                .copy()
+                .paste()
+                .select_all()
+                .build()?;
+
+            let window_menu = SubmenuBuilder::new(handle, "Janela")
+                .minimize()
+                .maximize()
+                .separator()
+                .fullscreen()
+                .separator()
+                .close_window()
+                .build()?;
+
+            let help_menu = SubmenuBuilder::new(handle, "Ajuda")
+                .text("github", "finan no GitHub")
+                .build()?;
+
+            MenuBuilder::new(handle)
+                .items(&[&app_menu, &edit_menu, &window_menu, &help_menu])
+                .build()
+        })
+        .on_menu_event(|app, event| {
+            let id = event.id();
+            if id == "about" {
+                let _ = app.emit("menu:about", ());
+            } else if id == "settings" {
+                let _ = app.emit("menu:navigate", "/settings");
+            } else if id == "github" {
+                let _ = app.emit("menu:github", ());
+            }
+        })
         .invoke_handler(specta_builder.invoke_handler())
         .setup(|app| {
             let database = db::init(app.handle()).expect("failed to initialize database");

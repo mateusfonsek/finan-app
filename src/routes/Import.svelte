@@ -6,7 +6,7 @@
   import ImportPreview from "$lib/components/import/ImportPreview.svelte";
   import { formatMoney } from "$lib/format/money";
   import { createOrGetAccount } from "$lib/api/accounts";
-  import { checkExistingFitids, insertTransactions } from "$lib/api/transactions";
+  import { checkExistingTxKeys, insertTransactions, txKeyString } from "$lib/api/transactions";
   import { listCategories } from "$lib/api/categories";
   import { createRule, deleteRuleWithCleanup, updateRule } from "$lib/api/rules";
   import { autoClassifyWithCnpj } from "$lib/api/suggestions";
@@ -25,7 +25,8 @@
 
   let pending = $state<PendingImport | null>(null);
   let account = $state<Account | null>(null);
-  let duplicateFitids = $state<Set<string>>(new Set());
+  /** Set de chaves compostas `fitid|date|amount` — não confundir com FITID puro. */
+  let duplicateKeys = $state<Set<string>>(new Set());
   let selected = $state<Set<string>>(new Set());
   let reversalMap = $state<Map<string, ReversalInfo>>(new Map());
   let busy = $state(false);
@@ -58,18 +59,23 @@
         name: parsed.account.displayName,
         bank: parsed.account.bank === "unknown" ? null : parsed.account.bank,
         ofx_acctid: parsed.account.ofxAcctid,
+        kind: parsed.account.type,
       });
-      const fitids = parsed.transactions
-        .map((t) => t.fitid)
-        .filter((f): f is string => !!f);
-      const existing = await checkExistingFitids(account.id, fitids);
-      duplicateFitids = new Set(existing);
+      const candidates = parsed.transactions
+        .filter((t): t is typeof t & { fitid: string } => !!t.fitid)
+        .map((t) => ({ ofx_fitid: t.fitid, date: t.date, amount: t.amount }));
+      duplicateKeys = await checkExistingTxKeys(account.id, candidates);
       reversalMap = detectReversalPairs(parsed.transactions);
       // Default: importar tudo MENOS duplicadas e MENOS estornos+revertidos.
+      // Duplicata é por tripla composta (fitid, date, amount); reversal é por fitid.
       selected = new Set(
-        fitids.filter(
-          (f) => !duplicateFitids.has(f) && !reversalMap.has(f),
-        ),
+        parsed.transactions
+          .filter((t) => {
+            if (!t.fitid) return false;
+            const key = txKeyString({ ofx_fitid: t.fitid, date: t.date, amount: t.amount });
+            return !duplicateKeys.has(key) && !reversalMap.has(t.fitid);
+          })
+          .map((t) => t.fitid as string),
       );
     } catch (e) {
       error = e instanceof Error ? e.message : String(e);
@@ -230,7 +236,7 @@
     pending = null;
     account = null;
     selected = new Set();
-    duplicateFitids = new Set();
+    duplicateKeys = new Set();
     reversalMap = new Map();
     importResult = null;
     autoReport = null;
@@ -391,6 +397,17 @@
           <div class="text-[10.5px] uppercase tracking-wider font-semibold text-accent-hi bg-accent-soft border border-accent/30 rounded-full px-2 py-0.5">
             {p.account.bank === "unknown" ? "Desconhecido" : p.account.bank}
           </div>
+          <div
+            class="text-[10.5px] uppercase tracking-wider font-semibold rounded-full px-2 py-0.5 border"
+            style={p.account.type === "credit_card"
+              ? "color: var(--color-cat-amarelo); border-color: var(--color-cat-amarelo); background: color-mix(in oklch, var(--color-cat-amarelo) 14%, transparent);"
+              : "color: var(--color-fg-muted); border-color: var(--color-border); background: var(--color-surface-2);"}
+            title={p.account.type === "credit_card"
+              ? "Fatura de cartão de crédito"
+              : "Extrato de conta corrente"}
+          >
+            {p.account.type === "credit_card" ? "Cartão de crédito" : "Conta corrente"}
+          </div>
           <div class="text-sm font-medium">{p.account.displayName}</div>
           <div class="ml-auto text-xs text-fg-faint tabular">
             {p.transactions.length} transações ·
@@ -400,7 +417,7 @@
 
         <ImportPreview
           transactions={p.transactions}
-          {duplicateFitids}
+          {duplicateKeys}
           {reversalMap}
           {selected}
           ontoggle={toggle}
@@ -414,7 +431,7 @@
         <div class="flex justify-between"><span class="text-fg-muted">Saídas</span><span class="tabular">{formatMoney(p.summary.totalOut)}</span></div>
         <div class="flex justify-between border-t border-border-subtle pt-2 mt-1"><span class="text-fg-muted">Líquido</span><span class="tabular font-semibold">{formatMoney(p.summary.net)}</span></div>
         <div class="flex justify-between mt-2"><span class="text-fg-muted">Selecionadas</span><span class="tabular">{selected.size}</span></div>
-        <div class="flex justify-between"><span class="text-fg-muted">Duplicadas</span><span class="tabular text-fg-faint">{duplicateFitids.size}</span></div>
+        <div class="flex justify-between"><span class="text-fg-muted">Duplicadas</span><span class="tabular text-fg-faint">{duplicateKeys.size}</span></div>
         {#if reversalMap.size > 0}
           <div class="flex justify-between" title="Pares estorno/reembolso ↔ transação revertida (desmarcados por padrão)">
             <span class="text-fg-muted">Pares neutralizados</span>

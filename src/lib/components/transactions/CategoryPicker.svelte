@@ -13,6 +13,7 @@
   let { categories, currentId, onselect, oncreate }: Props = $props();
 
   let open = $state(false);
+  let dropUp = $state(false);
   let query = $state("");
   let highlighted = $state(0);
   let triggerEl: HTMLButtonElement | undefined = $state();
@@ -43,6 +44,14 @@
   }
 
   async function openPicker() {
+    // Decide direção antes de abrir: se não cabe abaixo do trigger mas cabe
+    // acima, abre pra cima. Evita o menu sumir fora da tela nas últimas linhas.
+    if (triggerEl) {
+      const rect = triggerEl.getBoundingClientRect();
+      const menuH = Math.min(options.length * 30, 240) + 48; // ul + input
+      const spaceBelow = window.innerHeight - rect.bottom;
+      dropUp = spaceBelow < menuH && rect.top > spaceBelow;
+    }
     open = true;
     query = "";
     highlighted = 0;
@@ -124,7 +133,7 @@
 
   {#if open}
     <div
-      class="absolute z-30 mt-1 w-56 rounded-lg border border-border bg-surface overflow-hidden"
+      class="absolute z-30 w-56 rounded-lg border border-border bg-surface overflow-hidden {dropUp ? 'bottom-full mb-1' : 'top-full mt-1'}"
       style="box-shadow: 0 12px 32px -8px rgba(0,0,0,.55), 0 0 0 1px var(--color-border)"
     >
       <div class="border-b border-border-subtle p-1.5">

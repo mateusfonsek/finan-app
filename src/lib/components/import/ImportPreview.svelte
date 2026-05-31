@@ -1,11 +1,13 @@
 <script lang="ts">
   import { formatMoney } from "$lib/format/money";
+  import { txKeyString } from "$lib/api/transactions";
   import type { ParsedTransaction } from "$lib/ofx/types";
   import type { ReversalInfo, ReversalRole } from "$lib/ofx/reversals";
 
   type Props = {
     transactions: ParsedTransaction[];
-    duplicateFitids: Set<string>;
+    /** Chaves compostas `fitid|date|amount` que já existem na DB. */
+    duplicateKeys: Set<string>;
     reversalMap?: Map<string, ReversalInfo>;
     selected: Set<string>;
     ontoggle: (fitid: string) => void;
@@ -14,7 +16,7 @@
 
   let {
     transactions,
-    duplicateFitids,
+    duplicateKeys,
     reversalMap = new Map(),
     selected,
     ontoggle,
@@ -61,7 +63,7 @@
     </thead>
     <tbody>
       {#each transactions as t (t.fitid ?? `${t.date}-${t.amount}-${t.description}`)}
-        {@const isDup = !!(t.fitid && duplicateFitids.has(t.fitid))}
+        {@const isDup = !!(t.fitid && duplicateKeys.has(txKeyString({ ofx_fitid: t.fitid, date: t.date, amount: t.amount })))}
         {@const isSel = !!(t.fitid && selected.has(t.fitid))}
         {@const rev = t.fitid ? reversalMap.get(t.fitid) : undefined}
         <tr

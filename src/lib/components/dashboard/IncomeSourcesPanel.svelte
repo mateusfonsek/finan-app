@@ -60,7 +60,7 @@
     </div>
   </div>
 
-  <ul class="flex-1 flex flex-col gap-2 text-[11.5px] min-w-0 max-h-[200px] overflow-y-auto pr-1">
+  <ul class="flex-1 flex flex-col gap-2 text-[11.5px] min-w-0 max-h-[156px] overflow-y-auto pr-1">
     {#each items as it, idx (it.key)}
       <li class="flex items-start gap-2 min-w-0">
         <span

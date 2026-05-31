@@ -9,31 +9,64 @@ import type {
 /**
  * Parse raw OFX text into our normalized shape. Throws on malformed input.
  *
- * Actual lib API (ofx-data-extractor@1.5.0):
- *   new Ofx(data: string)  — constructor accepts string content
- *   .getContent()          — returns OfxStructure { OFX: { SIGNONMSGSRSV1, BANKMSGSRSV1, ... } }
- *   .getBankTransferList() — returns StatementTransaction[]
+ * Suporta dois layouts:
+ *   - Conta corrente: BANKMSGSRSV1 / STMTTRNRS / STMTRS / BANKACCTFROM
+ *   - Cartão de crédito: CREDITCARDMSGSRSV1 / CCSTMTTRNRS / CCSTMTRS / CCACCTFROM
+ *
+ * Lib `ofx-data-extractor@1.5.0`:
+ *   - `.getBankTransferList()`        — tx do BANK (conta corrente)
+ *   - `.getCreditCardTransferList()`  — tx do CC (cartão)
  */
 export function parseOfx(content: string): ParsedOfx {
   const ofx = new Ofx(content);
   const structure = ofx.getContent();
-  const rawTxs = ofx.getBankTransferList();
 
   const ofxNode = structure?.OFX ?? {};
   const signon = ofxNode?.SIGNONMSGSRSV1?.SONRS ?? {};
-  const bankNode = ofxNode?.BANKMSGSRSV1?.STMTTRNRS?.STMTRS ?? {};
-  const bankAcct = bankNode?.BANKACCTFROM ?? {};
-
   const fi = (signon?.FI ?? {}) as Record<string, unknown>;
-  const branchid = (bankAcct?.BRANCHID as string | undefined) ?? null;
-
-  const bankid = (bankAcct?.BANKID as string | undefined) ?? null;
-  const acctid = (bankAcct?.ACCTID as string | undefined) ?? null;
   const fid = (fi["FID"] as string | undefined) ?? null;
   const org = (fi["ORG"] as string | undefined) ?? null;
 
+  // Detecta CC pela presença do nó CREDITCARDMSGSRSV1.
+  // Quando ambos existirem por algum motivo, BANK tem prioridade
+  // (caso esperado: OFXs do Nubank vêm com APENAS um dos dois).
+  const ccNode =
+    (ofxNode as Record<string, unknown>)?.CREDITCARDMSGSRSV1 as
+      | Record<string, unknown>
+      | undefined;
+  const bankNode = ofxNode?.BANKMSGSRSV1?.STMTTRNRS?.STMTRS ?? {};
+  const hasBank = !!bankNode?.BANKACCTFROM;
+  const isCreditCard = !hasBank && !!ccNode;
+
+  let acctid: string | null = null;
+  let branchid: string | null = null;
+  let bankid: string | null = null;
+  let rawTxs: Array<Record<string, unknown>> = [];
+
+  if (isCreditCard) {
+    const ccStmt =
+      ((ccNode as { CCSTMTTRNRS?: { CCSTMTRS?: Record<string, unknown> } })
+        ?.CCSTMTTRNRS?.CCSTMTRS as Record<string, unknown> | undefined) ?? {};
+    const ccAcct =
+      (ccStmt?.CCACCTFROM as Record<string, unknown> | undefined) ?? {};
+    acctid = (ccAcct["ACCTID"] as string | undefined) ?? null;
+    // CC não tem branchid nem bankid em CCACCTFROM.
+    try {
+      rawTxs = ofx.getCreditCardTransferList() as Array<Record<string, unknown>>;
+    } catch {
+      rawTxs = [];
+    }
+  } else {
+    const bankAcct = (bankNode?.BANKACCTFROM ?? {}) as Record<string, unknown>;
+    branchid = (bankAcct["BRANCHID"] as string | undefined) ?? null;
+    bankid = (bankAcct["BANKID"] as string | undefined) ?? null;
+    acctid = (bankAcct["ACCTID"] as string | undefined) ?? null;
+    rawTxs = ofx.getBankTransferList() as Array<Record<string, unknown>>;
+  }
+
   const bank = detectBank({ fid, org, bankid });
-  const displayName = formatDisplayName(bank, branchid, acctid);
+  const type: "checking" | "credit_card" = isCreditCard ? "credit_card" : "checking";
+  const displayName = formatDisplayName(bank, branchid, acctid, type);
 
   const account: ParsedAccount = {
     bank,
@@ -41,18 +74,32 @@ export function parseOfx(content: string): ParsedOfx {
     ofxBankid: bankid,
     ofxFid: fid,
     displayName,
+    type,
   };
 
+  // Nubank (e outros bancos BR) reusa o mesmo FITID em transações distintas
+  // do mesmo extrato — caso real: IOF + compra principal compartilham FITID,
+  // idem pro par estorno-IOF + estorno-compra. Mantemos o FITID original na
+  // primeira ocorrência e adicionamos sufixo "#2", "#3", ... nas seguintes
+  // pra: (a) não quebrar o `{#each ... (fitid)}` keyed na UI, (b) não violar
+  // a UNIQUE(account_id, ofx_fitid) do banco, (c) permitir seleção individual.
+  // A ordenação é a do arquivo OFX, estável entre re-imports do mesmo extrato.
+  const seenFitid = new Map<string, number>();
   const transactions: ParsedTransaction[] = rawTxs.map((t) => {
     const rawDate = (t.DTPOSTED as string | undefined) ?? "";
-    // The lib may return an already-formatted ISO date (YYYY-MM-DD) or raw OFX
-    // timestamp (YYYYMMDDHHmmss[tz]). Normalise both.
     const date = isIsoDate(rawDate) ? rawDate : parseOfxDate(rawDate);
+    const rawFitid = (t.FITID as string | undefined) ?? null;
+    let fitid = rawFitid;
+    if (rawFitid) {
+      const count = seenFitid.get(rawFitid) ?? 0;
+      if (count > 0) fitid = `${rawFitid}#${count + 1}`;
+      seenFitid.set(rawFitid, count + 1);
+    }
     return {
-      fitid: (t.FITID as string | undefined) ?? null,
+      fitid,
       date,
       amount: String(t.TRNAMT ?? "0"),
-      description: String(t.MEMO ?? (t as Record<string, unknown>).NAME ?? ""),
+      description: String(t.MEMO ?? t.NAME ?? ""),
     };
   });
 
@@ -95,8 +142,16 @@ function formatDisplayName(
   bank: string,
   branchid: string | null,
   acctid: string | null,
+  type: "checking" | "credit_card",
 ): string {
   const bankLabel = bank === "unknown" ? "Conta" : capitalize(bank);
+  if (type === "credit_card") {
+    // CC só tem ACCTID (UUID longo). Mostra "Banco · cartão · final XXXX".
+    const tail = acctid ? acctid.slice(-4) : null;
+    const parts = [bankLabel, "cartão"];
+    if (tail) parts.push(`final ${tail}`);
+    return parts.join(" · ");
+  }
   const parts = [bankLabel];
   if (branchid) parts.push(`ag ${branchid}`);
   if (acctid) parts.push(`cc ${acctid}`);

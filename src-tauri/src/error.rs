@@ -13,7 +13,6 @@ pub enum AppError {
     Path(String),
 
     #[error("invalid data: {0}")]
-    #[allow(dead_code)]
     Invalid(String),
 }
 

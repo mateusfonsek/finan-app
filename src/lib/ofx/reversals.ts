@@ -16,6 +16,14 @@ export interface ReversalInfo {
 const ESTORNO_PREFIX_RE = /^Estorno\s*-\s*/i;
 const REEMBOLSO_PREFIX_RE = /^Reembolso recebido pelo Pix\s*-\s*/i;
 const PIX_ENVIADO_PREFIX_RE = /^Transferência enviada pelo Pix\s*-\s*/i;
+/** Estorno do cartão de crédito Nubank: `Estorno de "Merchant" (Merchant)`. */
+const ESTORNO_CC_RE = /^Estorno\s+de\s+"([^"]+)"\s*(?:\([^)]+\))?\s*$/i;
+
+/** Extrai o merchant entre aspas do formato `Estorno de "Merchant" (Merchant)`. */
+function extractEstornoCcMerchant(description: string): string | null {
+  const m = description.match(ESTORNO_CC_RE);
+  return m ? m[1].trim() : null;
+}
 
 /** Distância em dias entre duas datas ISO YYYY-MM-DD. */
 function daysBetween(a: string, b: string): number {
@@ -50,17 +58,21 @@ function pixCounterpartySignature(description: string): string | null {
 
 /**
  * Encontra pares (estorno↔revertida e reembolso↔revertida) numa lista de
- * transações OFX.
+ * transações OFX. Três fases:
  *
- * **Estornos**: a description do estorno começa com "Estorno - " e o resto é
- * IGUAL à description da transação original (depois de `trim`). Janela: ±7 dias.
+ * **Fase 1 — Estornos (CA)**: description "Estorno - X". Casa com tx cuja
+ * description é X exato. Janela: ±7 dias.
  *
- * **Reembolsos**: a description começa com "Reembolso recebido pelo Pix - ".
- * O par é encontrado por **assinatura da contraparte** (CNPJ + dados bancários),
- * não pelo nome — porque a Amazon manda "AMAZON.COM.BR" no Pix saindo e
- * "AMAZON SERVICOS DE VAREJO DO BRASIL LTDA." no reembolso. Janela: ±30 dias.
+ * **Fase 2 — Reembolsos (Pix)**: description "Reembolso recebido pelo Pix - ".
+ * Par via **assinatura da contraparte** (CNPJ + dados bancários), não pelo nome
+ * — Amazon manda "AMAZON.COM.BR" no Pix saindo e "AMAZON SERVICOS DE VAREJO..."
+ * no reembolso. Janela: ±30 dias.
  *
- * Em ambos os casos, valores precisam ser opostos em sinal e iguais em magnitude.
+ * **Fase 3 — Estornos (CC Nubank)**: description `Estorno de "Merchant" (Merchant)`.
+ * Casa com a compra original cujo MEMO == "Merchant" (case-insensitive, trim).
+ * Janela: ±30 dias.
+ *
+ * Em todas as fases, valores precisam ser opostos em sinal e iguais em magnitude.
  * Pareamento FIFO quando há múltiplos candidatos.
  */
 export function detectReversalPairs(
@@ -121,6 +133,36 @@ export function detectReversalPairs(
       result.set(r.fitid, { role: "reembolso", pairFitid: candidate.fitid });
       result.set(candidate.fitid, { role: "reembolsada", pairFitid: r.fitid });
       used.add(r.fitid);
+      used.add(candidate.fitid);
+    }
+  }
+
+  // Fase 3: estornos de cartão de crédito (Nubank).
+  // Formato: `Estorno de "Merchant" (Merchant)` (CREDIT, positivo).
+  // Casamento: tx anterior cuja description normalizada (lowercase, trim) é
+  // igual ao merchant entre aspas, mesmo amount em magnitude oposta, ±30 dias.
+  for (const e of txs) {
+    if (!e.fitid || used.has(e.fitid)) continue;
+    const merchant = extractEstornoCcMerchant(e.description);
+    if (!merchant) continue;
+    const merchantLower = merchant.toLowerCase();
+    const estornoAmt = Number(e.amount);
+    if (!Number.isFinite(estornoAmt)) continue;
+
+    const candidate = txs.find((t) => {
+      if (!t.fitid || used.has(t.fitid) || t.fitid === e.fitid) return false;
+      // Compra original do CC: description == merchant (case-insensitive trim).
+      if (t.description.trim().toLowerCase() !== merchantLower) return false;
+      const amt = Number(t.amount);
+      if (!Number.isFinite(amt)) return false;
+      if (Math.abs(amt + estornoAmt) > 0.01) return false;
+      return daysBetween(t.date, e.date) <= 30;
+    });
+
+    if (candidate?.fitid) {
+      result.set(e.fitid, { role: "estorno", pairFitid: candidate.fitid });
+      result.set(candidate.fitid, { role: "estornada", pairFitid: e.fitid });
+      used.add(e.fitid);
       used.add(candidate.fitid);
     }
   }

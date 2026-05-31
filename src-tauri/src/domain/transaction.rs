@@ -32,6 +32,28 @@ pub struct InsertResult {
     pub auto_categorized: u32,
 }
 
+/// Tripla usada pra dedup contra a UNIQUE composta
+/// `(account_id, ofx_fitid, date, amount)` da tabela `transactions`.
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+pub struct TxKey {
+    pub ofx_fitid: String,
+    pub date: String,
+    pub amount: String,
+}
+
+/// Linha do widget "Maiores gastos do mês" — transação com categoria
+/// resolvida inline (nome + token de cor) pra evitar segundo round-trip.
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+pub struct ExpenseRow {
+    pub id: i64,
+    pub date: String,
+    pub amount: String,
+    pub description: String,
+    pub category_id: Option<i64>,
+    pub category_name: Option<String>,
+    pub category_color_token: Option<String>,
+}
+
 impl NewTransaction {
     pub fn parse_amount(&self) -> Result<Decimal, rust_decimal::Error> {
         self.amount.parse::<Decimal>()

@@ -11,6 +11,8 @@ export interface ParsedAccount {
   ofxBankid: string | null;
   ofxFid: string | null;
   displayName: string;
+  /** `checking` = conta corrente (BANKMSGSRSV1) · `credit_card` = fatura (CREDITCARDMSGSRSV1) */
+  type: "checking" | "credit_card";
 }
 
 export interface ParsedTransaction {

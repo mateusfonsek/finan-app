@@ -141,3 +141,33 @@ describe("detectReversalPairs — combined", () => {
     expect(map.get("RO")?.role).toBe("reembolsada");
   });
 });
+
+describe("detectReversalPairs — estornos CC (Nubank)", () => {
+  it("pairs CC estorno with original CC purchase (same merchant in quotes)", () => {
+    const purchase = tx("P", "2026-03-15", "-108.14", "Myclaw.Ai");
+    const estorno = tx("E", "2026-03-18", "108.14", `Estorno de "Myclaw.Ai" (Myclaw.Ai)`);
+    const map = detectReversalPairs([purchase, estorno]);
+    expect(map.size).toBe(2);
+    expect(map.get("E")?.role).toBe("estorno");
+    expect(map.get("P")?.role).toBe("estornada");
+  });
+
+  it("does not pair CC estorno with different merchant", () => {
+    const purchase = tx("P", "2026-03-15", "-50", "Mana Poke");
+    const estorno = tx("E", "2026-03-18", "50", `Estorno de "Myclaw.Ai" (Myclaw.Ai)`);
+    expect(detectReversalPairs([purchase, estorno]).size).toBe(0);
+  });
+
+  it("does not pair CC estorno when window > 30 days", () => {
+    const purchase = tx("P", "2026-01-01", "-108.14", "Myclaw.Ai");
+    const estorno = tx("E", "2026-03-15", "108.14", `Estorno de "Myclaw.Ai" (Myclaw.Ai)`);
+    expect(detectReversalPairs([purchase, estorno]).size).toBe(0);
+  });
+
+  it("matches case-insensitively (merchant casing varies)", () => {
+    const purchase = tx("P", "2026-03-15", "-50", "MYCLAW.AI");
+    const estorno = tx("E", "2026-03-16", "50", `Estorno de "myclaw.ai" (myclaw.ai)`);
+    const map = detectReversalPairs([purchase, estorno]);
+    expect(map.size).toBe(2);
+  });
+});

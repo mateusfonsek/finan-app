@@ -2,6 +2,8 @@
   import { link, router } from "svelte-spa-router";
   import logoUrl from "$lib/assets/logo.png";
 
+  let { onAbout }: { onAbout: () => void } = $props();
+
   type NavItem = { href: string; label: string; section?: string };
 
   const navItems: NavItem[] = [
@@ -23,7 +25,13 @@
 </script>
 
 <aside class="bg-surface border-r border-border-subtle flex flex-col py-3 px-2.5 select-none">
-  <div class="flex items-center gap-2.5 px-2 pb-3.5">
+  <button
+    type="button"
+    onclick={onAbout}
+    title="Sobre o finan"
+    aria-label="Sobre o finan"
+    class="flex items-center gap-2.5 px-2 py-1.5 mb-2 rounded-lg text-left hover:bg-hover transition-colors"
+  >
     <img
       src={logoUrl}
       alt="finan"
@@ -34,7 +42,7 @@
       <div class="text-[13.5px] font-semibold tracking-tight" style="font-family: var(--font-display)">finan</div>
       <div class="text-[10px] text-fg-faint mt-px">100% local</div>
     </div>
-  </div>
+  </button>
 
   {#each sections as section}
     <div class="mt-2.5 flex flex-col gap-px">

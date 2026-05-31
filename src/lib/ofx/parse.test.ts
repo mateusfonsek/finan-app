@@ -52,3 +52,92 @@ describe("parseOfx — Itaú minimal fixture", () => {
     expect(result.summary.latest).toBe("2026-03-15");
   });
 });
+
+describe("parseOfx — FITID duplicado dentro do mesmo arquivo (Nubank CC)", () => {
+  const ofx = `OFXHEADER:100
+DATA:OFXSGML
+VERSION:102
+SECURITY:NONE
+ENCODING:USASCII
+CHARSET:1252
+COMPRESSION:NONE
+OLDFILEUID:NONE
+NEWFILEUID:NONE
+<OFX>
+<SIGNONMSGSRSV1>
+<SONRS>
+<STATUS>
+<CODE>0</CODE>
+<SEVERITY>INFO</SEVERITY>
+</STATUS>
+<DTSERVER>20260518132022[0:GMT]</DTSERVER>
+<LANGUAGE>POR</LANGUAGE>
+<FI>
+<ORG>NU PAGAMENTOS S.A.</ORG>
+<FID>260</FID>
+</FI>
+</SONRS>
+</SIGNONMSGSRSV1>
+<CREDITCARDMSGSRSV1>
+<CCSTMTTRNRS>
+<TRNUID>1001</TRNUID>
+<STATUS>
+<CODE>0</CODE>
+<SEVERITY>INFO</SEVERITY>
+</STATUS>
+<CCSTMTRS>
+<CURDEF>BRL</CURDEF>
+<CCACCTFROM>
+<ACCTID>625c3a3e-2d92-4924-a81e-7d53ee5f511f</ACCTID>
+</CCACCTFROM>
+<BANKTRANLIST>
+<DTSTART>20260318000000[-3:BRT]</DTSTART>
+<DTEND>20260418000000[-3:BRT]</DTEND>
+<STMTTRN>
+<TRNTYPE>CREDIT</TRNTYPE>
+<DTPOSTED>20260318000000[-3:BRT]</DTPOSTED>
+<TRNAMT>3.75</TRNAMT>
+<FITID>SHARED-FITID</FITID>
+<MEMO>IOF de "Myclaw.Ai"</MEMO>
+</STMTTRN>
+<STMTTRN>
+<TRNTYPE>CREDIT</TRNTYPE>
+<DTPOSTED>20260318000000[-3:BRT]</DTPOSTED>
+<TRNAMT>108.14</TRNAMT>
+<FITID>SHARED-FITID</FITID>
+<MEMO>Estorno de "Myclaw.Ai" (Myclaw.Ai)</MEMO>
+</STMTTRN>
+<STMTTRN>
+<TRNTYPE>DEBIT</TRNTYPE>
+<DTPOSTED>20260318000000[-3:BRT]</DTPOSTED>
+<TRNAMT>-47.45</TRNAMT>
+<FITID>UNIQUE-FITID</FITID>
+<MEMO>Hubla Parcela 3/12</MEMO>
+</STMTTRN>
+</BANKTRANLIST>
+<LEDGERBAL>
+<BALAMT>0.00</BALAMT>
+<DTASOF>20260418000000[-3:BRT]</DTASOF>
+</LEDGERBAL>
+</CCSTMTRS>
+</CCSTMTTRNRS>
+</CREDITCARDMSGSRSV1>
+</OFX>`;
+
+  const r = parseOfx(ofx);
+
+  it("preserva todas as N transações com FITID duplicado", () => {
+    expect(r.transactions).toHaveLength(3);
+  });
+
+  it("primeira ocorrência mantém o FITID original; seguintes recebem sufixo #N", () => {
+    expect(r.transactions[0].fitid).toBe("SHARED-FITID");
+    expect(r.transactions[1].fitid).toBe("SHARED-FITID#2");
+    expect(r.transactions[2].fitid).toBe("UNIQUE-FITID");
+  });
+
+  it("após dedup, todos os FITIDs são únicos (requisito do {#each} keyed e do UNIQUE no DB)", () => {
+    const ids = r.transactions.map((t) => t.fitid);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+});
