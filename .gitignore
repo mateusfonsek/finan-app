@@ -17,9 +17,6 @@ src-tauri/icons/android/
 src-tauri/icons/Square*.png
 src-tauri/icons/StoreLogo.png
 
-# Tauri-specta generated bindings
-src/lib/bindings.ts
-
 # Editor / local
 .vscode/
 .idea/
