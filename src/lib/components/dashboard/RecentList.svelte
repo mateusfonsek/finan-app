@@ -1,4 +1,7 @@
 <script lang="ts">
+  import { locale } from "$lib/i18n/locale.svelte";
+
+  const tr = locale.t;
   import { formatMoney } from "$lib/format/money";
   import type { ExpenseRow } from "$lib/bindings";
 
@@ -40,7 +43,7 @@
           </span>
         {:else}
           <span class="self-start text-[9.5px] uppercase tracking-wider font-semibold text-fg-faint italic">
-            sem categoria
+            {tr("dashboard.no_category")}
           </span>
         {/if}
       </div>
@@ -49,6 +52,6 @@
       </span>
     </li>
   {:else}
-    <li class="text-fg-faint italic text-[12px] px-3 py-4">Nenhuma transação ainda.</li>
+    <li class="text-fg-faint italic text-[12px] px-3 py-4">{tr("dashboard.empty_tx")}</li>
   {/each}
 </ul>

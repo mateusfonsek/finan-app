@@ -1,4 +1,7 @@
 <script lang="ts">
+  import { locale } from "$lib/i18n/locale.svelte";
+
+  const t = locale.t;
   import { onMount } from "svelte";
   import { Button } from "$lib/components/ui/button";
   import { listCategories } from "$lib/api/categories";
@@ -43,12 +46,12 @@
   async function createRuleFor(s: RuleSuggestion) {
     const categoryId = chosen[s.key];
     if (categoryId == null) {
-      error = "Escolha uma categoria antes de criar a regra.";
+      error = t("import.choose_category_first");
       return;
     }
     const finalPattern = (patternOverride[s.key] ?? s.suggested_pattern).trim();
     if (!finalPattern) {
-      error = "Pattern não pode ser vazio.";
+      error = t("rule_form.pattern_required");
       return;
     }
     busyKey = s.key;
@@ -76,14 +79,14 @@
 
   /** Tipo do agrupamento, derivado da chave estável vinda do backend. */
   function badgeFor(key: string): { text: string; tone: string } {
-    if (key.startsWith("cnpj:")) return { text: "CNPJ", tone: "indigo" };
-    if (key.startsWith("debito:")) return { text: "DÉBITO", tone: "neutral" };
-    if (key.startsWith("pix_out:")) return { text: "PIX →", tone: "amarelo" };
-    if (key.startsWith("pix_in:")) return { text: "PIX ←", tone: "mercado" };
-    if (key.startsWith("ted_in:")) return { text: "TRANSF. ←", tone: "mercado" };
-    if (key.startsWith("boleto:")) return { text: "BOLETO", tone: "marrom" };
-    if (key.startsWith("system:")) return { text: "SISTEMA", tone: "neutral" };
-    return { text: "OUTRO", tone: "neutral" };
+    if (key.startsWith("cnpj:")) return { text: t("suggestions.badge_cnpj"), tone: "indigo" };
+    if (key.startsWith("debito:")) return { text: t("suggestions.badge_debito"), tone: "neutral" };
+    if (key.startsWith("pix_out:")) return { text: t("suggestions.badge_pix_out"), tone: "amarelo" };
+    if (key.startsWith("pix_in:")) return { text: t("suggestions.badge_pix_in"), tone: "mercado" };
+    if (key.startsWith("ted_in:")) return { text: t("suggestions.badge_ted_in"), tone: "mercado" };
+    if (key.startsWith("boleto:")) return { text: t("suggestions.badge_boleto"), tone: "marrom" };
+    if (key.startsWith("system:")) return { text: t("suggestions.badge_system"), tone: "neutral" };
+    return { text: t("suggestions.badge_other"), tone: "neutral" };
   }
 
   function toneColor(tone: string): string {
@@ -100,18 +103,15 @@
 <section class="p-8 max-w-5xl mx-auto flex flex-col gap-5">
   <header class="flex flex-col gap-1">
     <h2 class="text-xl font-semibold tracking-tight" style="font-family: var(--font-display)">
-      Sugestões de regras
+      {t("suggestions.title")}
     </h2>
     <p class="text-xs text-fg-faint max-w-xl">
-      <strong>Gastos</strong> recorrentes sem CNPJ (débito de cartão, Pix entre
-      pessoas, boletos) que se repetem. CNPJs já são resolvidos automaticamente
-      na tela de importação. Entradas não aparecem aqui — renda é rastreada por
-      contraparte no Dashboard (Fontes de Renda).
+      <strong>{t("suggestions.desc_strong")}</strong>{t("suggestions.desc")}
     </p>
   </header>
 
   {#if loading}
-    <div class="text-fg-faint text-sm">Carregando…</div>
+    <div class="text-fg-faint text-sm">{t("common.loading")}</div>
   {:else}
     {#if error}
       <div class="rounded-lg border border-border bg-surface p-3 text-sm text-neg">{error}</div>
@@ -120,10 +120,10 @@
     <div class="rounded-xl bg-surface border border-border-subtle p-4 flex flex-col gap-3">
       <div class="flex items-baseline justify-between">
         <div class="text-[10.5px] uppercase tracking-wider font-semibold text-fg-faint">
-          Recorrências sem categoria
+          {t("suggestions.recurring_no_category")}
         </div>
         <label class="flex items-center gap-2 text-[11px] text-fg-muted">
-          mín. ocorrências
+          {t("suggestions.min_occurrences")}
           <input
             type="number"
             min="1"
@@ -137,8 +137,7 @@
 
       {#if suggestions.length === 0}
         <div class="text-[12px] text-fg-faint py-4">
-          Nada por aqui — todas as contrapartes recorrentes já têm categoria, ou
-          aumente o filtro de ocorrências.
+          {t("suggestions.empty")}
         </div>
       {:else}
         <div class="flex flex-col gap-2">
@@ -173,14 +172,14 @@
               <!-- Footer: pattern + categoria + ação -->
               <div class="flex gap-2 items-center min-w-0">
                 <label class="flex-1 min-w-0 flex items-center gap-1.5">
-                  <span class="text-[10px] uppercase tracking-wider text-fg-faint shrink-0">Pattern</span>
+                  <span class="text-[10px] uppercase tracking-wider text-fg-faint shrink-0">{t("suggestions.pattern_label")}</span>
                   <input
                     value={patternOverride[s.key] ?? s.suggested_pattern}
                     oninput={(e) => {
                       patternOverride[s.key] = (e.currentTarget as HTMLInputElement).value;
                     }}
                     class="flex-1 min-w-0 rounded-md border border-border bg-surface px-2 py-1 text-[12px] text-fg font-mono focus:outline-none focus:border-accent"
-                    title="LIKE substring que será gravado na regra"
+                    title={t("tx_notes.pattern_title")}
                   />
                 </label>
                 <select
@@ -191,7 +190,7 @@
                   }}
                   class="w-36 shrink-0 rounded-md border border-border bg-surface px-2 py-1 text-[12px] text-fg"
                 >
-                  <option value="">— categoria —</option>
+                  <option value="">{t("import.category_placeholder")}</option>
                   {#each categories as c}
                     <option value={String(c.id)}>{c.name}</option>
                   {/each}
@@ -200,7 +199,7 @@
                   onclick={() => createRuleFor(s)}
                   disabled={busyKey === s.key || chosen[s.key] == null}
                 >
-                  {busyKey === s.key ? "…" : "Criar"}
+                  {busyKey === s.key ? "…" : t("suggestions.create")}
                 </Button>
               </div>
             </article>

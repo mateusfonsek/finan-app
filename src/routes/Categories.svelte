@@ -1,4 +1,7 @@
 <script lang="ts">
+  import { locale } from "$lib/i18n/locale.svelte";
+
+  const t = locale.t;
   import { onMount } from "svelte";
   import CategoryForm from "$lib/components/categories/CategoryForm.svelte";
   import CategoriesList from "$lib/components/categories/CategoriesList.svelte";
@@ -47,8 +50,10 @@
 
   async function onDelete(c: CategoryWithCount) {
     const msg = c.transaction_count > 0
-      ? `Apagar "${c.name}"? ${c.transaction_count} ${c.transaction_count === 1 ? "transação ficará" : "transações ficarão"} sem categoria.`
-      : `Apagar "${c.name}"?`;
+      ? (c.transaction_count === 1
+          ? t("categories_page.delete_confirm_one", { name: c.name, n: c.transaction_count })
+          : t("categories_page.delete_confirm_many", { name: c.name, n: c.transaction_count }))
+      : t("categories_page.delete_confirm", { name: c.name });
     if (!confirm(msg)) return;
     try {
       await deleteCategory(c.id);
@@ -62,17 +67,15 @@
 <section class="p-8 max-w-4xl mx-auto flex flex-col gap-5">
   <header>
     <h2 class="text-xl font-semibold tracking-tight" style="font-family: var(--font-display)">
-      Categorias
+      {t("nav.categories")}
     </h2>
     <p class="text-xs text-fg-faint max-w-xl mt-1">
-      Crie, edite ou apague qualquer categoria. As 9 categorias iniciais vêm
-      pré-criadas mas podem ser modificadas ou removidas livremente — apagar
-      deixa as transações vinculadas sem categoria.
+      {t("categories_page.desc")}
     </p>
   </header>
 
   {#if loading}
-    <div class="text-fg-faint text-sm">Carregando…</div>
+    <div class="text-fg-faint text-sm">{t("common.loading")}</div>
   {:else}
     {#if error}
       <div class="rounded-lg border border-border bg-surface p-3 text-sm text-neg">{error}</div>

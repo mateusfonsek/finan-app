@@ -169,7 +169,7 @@ mod tests {
             .unwrap()
             .map(|r| r.unwrap())
             .collect();
-        assert_eq!(rows.len(), 11);
+        assert_eq!(rows.len(), 13);
         assert!(rows.iter().any(|(n, _)| n == "Mercado"));
         assert!(rows.iter().any(|(n, _)| n == "Compras"));
         assert!(rows.iter().any(|(n, k)| n == "Transferências" && k == "transfer"));
@@ -185,13 +185,13 @@ mod tests {
         let conn = fresh_conn();
         conn.execute(
             "INSERT INTO categories (name, color_token, kind) VALUES (?1, ?2, ?3)",
-            params!["Pets", "--color-cat-outros", "expense"],
+            params!["Viagem", "--color-cat-outros", "expense"],
         )
         .unwrap();
         let count: i64 = conn
             .query_row("SELECT COUNT(*) FROM categories", [], |r| r.get(0))
             .unwrap();
-        assert_eq!(count, 12);
+        assert_eq!(count, 14);
     }
 
     #[test]
@@ -209,7 +209,7 @@ mod tests {
         let conn = fresh_conn();
         // create a custom category to delete
         conn.execute(
-            "INSERT INTO categories (name, color_token, kind) VALUES ('Pets', '--color-cat-outros', 'expense')",
+            "INSERT INTO categories (name, color_token, kind) VALUES ('Viagem', '--color-cat-outros', 'expense')",
             [],
         )
         .unwrap();

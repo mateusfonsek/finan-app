@@ -1,9 +1,7 @@
-use regex::Regex;
 use rusqlite::params;
 use serde::{Deserialize, Serialize};
 use specta::Type;
 use std::collections::{HashMap, HashSet};
-use std::sync::OnceLock;
 use std::thread;
 use std::time::Duration;
 use tauri::State;
@@ -13,92 +11,79 @@ use crate::commands::rules::apply_rules_internal;
 use crate::db::Db;
 use crate::domain::rule::Rule;
 use crate::error::AppResult;
+use crate::locale::{LocalePack, LocaleState};
 
-/// CPF parcial como aparece em descrições OFX do Nubank: `•••.NNN.NNN-••`.
-fn cpf_mask_re() -> &'static Regex {
-    static R: OnceLock<Regex> = OnceLock::new();
-    R.get_or_init(|| Regex::new(r"•••\.\d{3}\.\d{3}-••").unwrap())
-}
-
-/// Reduz uma descrição livre a (chave de agrupamento, label legível, padrão sugerido).
+/// Reduz uma descrição livre a (chave de agrupamento, label legível, padrão sugerido),
+/// usando as regras de normalização do locale ativo (`rules.normalization`).
 ///
 /// A chave precisa ser estável entre repetições da mesma contraparte.
 /// O padrão é o que vai virar `rules.pattern` (LIKE substring).
 ///
 /// Pública pra ser reusada por `income_sources` (mesmo modelo de agrupamento
 /// por contraparte, mas pra entradas em vez de regras).
-pub fn normalize(description: &str) -> (String, String, String) {
-    if let Some(cnpj) = extract_cnpj(description) {
-        // Label = tudo depois do primeiro " - " (mesma regra do RecentList no
-        // dashboard). Mostra o nome da contraparte em vez de "CNPJ XX.XXX...".
-        // Truncate na UI corta visualmente; o tooltip preserva o texto completo.
+pub fn normalize(description: &str, pack: &LocalePack) -> (String, String, String) {
+    let norm = &pack.rules.normalization;
+    let sep = if norm.field_separator.is_empty() {
+        " - "
+    } else {
+        norm.field_separator.as_str()
+    };
+
+    // 1. Tax id (CNPJ) tem precedência: label = texto depois do 1º separador.
+    if let Some(cnpj) = extract_cnpj(pack, description) {
         let label = description
-            .split_once(" - ")
+            .split_once(sep)
             .map(|(_, after)| after.trim())
             .filter(|s| !s.is_empty())
             .map(String::from)
             .unwrap_or_else(|| description.to_string());
-        return (format!("cnpj:{cnpj}"), label, cnpj);
+        let kp = if norm.cnpj_key_prefix.is_empty() {
+            "cnpj"
+        } else {
+            norm.cnpj_key_prefix.as_str()
+        };
+        return (format!("{kp}:{cnpj}"), label, cnpj);
     }
-    if let Some(merchant) = description.strip_prefix("Compra no débito - ") {
-        let m = merchant.trim();
-        return (
-            format!("debito:{m}"),
-            format!("Débito · {m}"),
-            m.to_string(),
-        );
-    }
-    if description.starts_with("Transferência enviada pelo Pix") {
-        if let Some(mask) = cpf_mask_re().find(description) {
-            let name = pix_name(description).unwrap_or_else(|| mask.as_str().to_string());
-            return (
-                format!("pix_out:{}", mask.as_str()),
-                format!("Pix → {name}"),
-                mask.as_str().to_string(),
-            );
+
+    // 2. Regras ordenadas do pack (strip / masked / system).
+    for rule in &norm.rules {
+        match rule.kind.as_str() {
+            "strip" => {
+                if let Some(rest) = description.strip_prefix(&rule.prefix) {
+                    let v = rest.trim();
+                    return (
+                        format!("{}:{v}", rule.key_prefix),
+                        rule.label.replace("{v}", v),
+                        v.to_string(),
+                    );
+                }
+            }
+            "masked" => {
+                if description.starts_with(&rule.prefix) {
+                    if let Some(re) = pack.cpf_mask_re.as_ref() {
+                        if let Some(mask) = re.find(description) {
+                            let mask_s = mask.as_str();
+                            let name =
+                                pix_name(description, sep).unwrap_or_else(|| mask_s.to_string());
+                            return (
+                                format!("{}:{mask_s}", rule.key_prefix),
+                                rule.label.replace("{name}", &name),
+                                mask_s.to_string(),
+                            );
+                        }
+                    }
+                }
+            }
+            "system" => {
+                if description.starts_with(&rule.prefix) {
+                    return (rule.key.clone(), rule.label.clone(), rule.prefix.clone());
+                }
+            }
+            _ => {}
         }
     }
-    if description.starts_with("Transferência recebida pelo Pix") {
-        if let Some(mask) = cpf_mask_re().find(description) {
-            let name = pix_name(description).unwrap_or_else(|| mask.as_str().to_string());
-            return (
-                format!("pix_in:{}", mask.as_str()),
-                format!("Pix ← {name}"),
-                mask.as_str().to_string(),
-            );
-        }
-    }
-    if description.starts_with("Transferência Recebida - ") {
-        if let Some(mask) = cpf_mask_re().find(description) {
-            let name = pix_name(description).unwrap_or_else(|| mask.as_str().to_string());
-            return (
-                format!("ted_in:{}", mask.as_str()),
-                format!("Transf. ← {name}"),
-                mask.as_str().to_string(),
-            );
-        }
-    }
-    if let Some(rest) = description.strip_prefix("Pagamento de boleto efetuado - ") {
-        let r = rest.trim();
-        return (
-            format!("boleto:{r}"),
-            format!("Boleto · {r}"),
-            r.to_string(),
-        );
-    }
-    // Padrões de transferência interna — chave única, padrão direto.
-    for (prefix, key, label) in &[
-        ("Aplicação RDB", "system:rdb_apl", "Aplicação RDB"),
-        ("Resgate RDB", "system:rdb_res", "Resgate RDB"),
-        ("Pagamento de fatura", "system:fatura", "Pagamento de fatura"),
-        ("Estorno -", "system:estorno", "Estorno"),
-        ("Recarga de celular", "system:recarga", "Recarga de celular"),
-    ] {
-        if description.starts_with(prefix) {
-            return ((*key).into(), (*label).into(), (*prefix).into());
-        }
-    }
-    // Fallback: descrição inteira (cada tx vira seu próprio grupo).
+
+    // 3. Fallback: descrição inteira (cada tx vira seu próprio grupo).
     (
         format!("raw:{description}"),
         description.to_string(),
@@ -108,12 +93,8 @@ pub fn normalize(description: &str) -> (String, String, String) {
 
 /// Extrai o nome da contraparte de descrições Pix do Nubank.
 /// Formato: `Transferência (enviada|recebida) pelo Pix - NOME - CPF_MASK - BANCO ...`
-fn pix_name(description: &str) -> Option<String> {
-    let after_prefix = description
-        .splitn(2, " - ")
-        .nth(1)?
-        .splitn(2, " - ")
-        .next()?;
+fn pix_name(description: &str, sep: &str) -> Option<String> {
+    let after_prefix = description.splitn(2, sep).nth(1)?.splitn(2, sep).next()?;
     Some(after_prefix.trim().to_string())
 }
 
@@ -136,8 +117,13 @@ pub struct RuleSuggestion {
 /// "Fontes de Renda" do Dashboard.
 #[tauri::command]
 #[specta::specta]
-pub fn suggest_rules(db: State<'_, Db>, min_count: u32) -> AppResult<Vec<RuleSuggestion>> {
+pub fn suggest_rules(
+    db: State<'_, Db>,
+    locale: State<'_, LocaleState>,
+    min_count: u32,
+) -> AppResult<Vec<RuleSuggestion>> {
     let conn = db.conn.lock().expect("db mutex poisoned");
+    let pack = locale.pack.lock().expect("locale mutex poisoned");
     let mut stmt = conn.prepare(
         "SELECT id, description, amount FROM transactions
          WHERE category_id IS NULL
@@ -163,7 +149,7 @@ pub fn suggest_rules(db: State<'_, Db>, min_count: u32) -> AppResult<Vec<RuleSug
     }
     let mut buckets: HashMap<String, Bucket> = HashMap::new();
     for (id, desc, amt) in rows {
-        let (key, label, pattern) = normalize(&desc);
+        let (key, label, pattern) = normalize(&desc, &pack);
         let d: rust_decimal::Decimal = amt.parse().unwrap_or(rust_decimal::Decimal::ZERO);
         let entry = buckets.entry(key).or_insert_with(|| Bucket {
             label: label.clone(),
@@ -202,8 +188,9 @@ pub fn suggest_rules(db: State<'_, Db>, min_count: u32) -> AppResult<Vec<RuleSug
 /// de uma transação.
 #[tauri::command]
 #[specta::specta]
-pub fn suggest_pattern_for(description: String) -> String {
-    normalize(&description).2
+pub fn suggest_pattern_for(locale: State<'_, LocaleState>, description: String) -> String {
+    let pack = locale.pack.lock().expect("locale mutex poisoned");
+    normalize(&description, &pack).2
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
@@ -226,8 +213,10 @@ pub struct AutoClassifyReport {
 #[specta::specta]
 pub fn auto_classify_with_cnpj(
     db: State<'_, Db>,
+    locale: State<'_, LocaleState>,
     account_id: Option<i64>,
 ) -> AppResult<AutoClassifyReport> {
+    let pack = locale.pack.lock().expect("locale mutex poisoned");
     let unique_cnpjs: Vec<String> = {
         let conn = db.conn.lock().expect("db mutex poisoned");
         let (sql, has_account) = match account_id {
@@ -255,7 +244,7 @@ pub fn auto_classify_with_cnpj(
         };
         let mut seen: HashSet<String> = HashSet::new();
         for d in descs {
-            if let Some(c) = extract_cnpj(&d) {
+            if let Some(c) = extract_cnpj(&pack, &d) {
                 seen.insert(c);
             }
         }
@@ -287,7 +276,7 @@ pub fn auto_classify_with_cnpj(
 
         let resolution = {
             let conn = db.conn.lock().expect("db mutex poisoned");
-            match resolve_cnpj_with_conn(&conn, cnpj) {
+            match resolve_cnpj_with_conn(&conn, cnpj, &pack) {
                 Ok(r) => r,
                 Err(_) => continue, // network/parse error — try later
             }
@@ -343,21 +332,28 @@ pub fn auto_classify_with_cnpj(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::locale::LocalePack;
+
+    fn pack() -> LocalePack {
+        LocalePack::embedded_pt_br()
+    }
 
     #[test]
     fn normalize_debito_groups_by_merchant() {
-        let (k1, _, p1) = normalize("Compra no débito - MISTER SUSHI");
-        let (k2, _, p2) = normalize("Compra no débito - MISTER SUSHI");
+        let p = pack();
+        let (k1, _, p1) = normalize("Compra no débito - MISTER SUSHI", &p);
+        let (k2, _, _p2) = normalize("Compra no débito - MISTER SUSHI", &p);
         assert_eq!(k1, k2);
         assert_eq!(p1, "MISTER SUSHI");
     }
 
     #[test]
     fn normalize_pix_out_groups_by_cpf_mask() {
+        let p = pack();
         let a = "Transferência enviada pelo Pix - Mateus Fonseca (CAIXA) - •••.982.424-•• - CAIXA";
         let b = "Transferência enviada pelo Pix - Mateus Fonseca (Caixa) - •••.982.424-•• - CAIXA outro";
-        let (k1, _, p1) = normalize(a);
-        let (k2, _, _) = normalize(b);
+        let (k1, _, p1) = normalize(a, &p);
+        let (k2, _, _) = normalize(b, &p);
         assert_eq!(k1, k2, "same CPF mask = same key, even with name variation");
         assert_eq!(p1, "•••.982.424-••");
     }
@@ -365,21 +361,21 @@ mod tests {
     #[test]
     fn normalize_cnpj_wins_over_pix_prefix() {
         let d = "Transferência enviada pelo Pix - ENERGISA - 09.095.183/0001-40 - ITAU";
-        let (k, _, p) = normalize(d);
+        let (k, _, p) = normalize(d, &pack());
         assert!(k.starts_with("cnpj:"), "CNPJ should take precedence");
         assert_eq!(p, "09.095.183/0001-40");
     }
 
     #[test]
     fn normalize_aplicacao_rdb_is_system_key() {
-        let (k, _, p) = normalize("Aplicação RDB");
+        let (k, _, p) = normalize("Aplicação RDB", &pack());
         assert_eq!(k, "system:rdb_apl");
         assert_eq!(p, "Aplicação RDB");
     }
 
     #[test]
     fn normalize_fallback_uses_full_description() {
-        let (k, _, _) = normalize("Algo bem estranho aqui");
+        let (k, _, _) = normalize("Algo bem estranho aqui", &pack());
         assert!(k.starts_with("raw:"));
     }
 }

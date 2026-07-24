@@ -1,6 +1,9 @@
 <script lang="ts">
   import { Button } from "$lib/components/ui/button";
+  import { locale } from "$lib/i18n/locale.svelte";
   import type { Category, Rule } from "$lib/bindings";
+
+  const t = locale.t;
 
   type Props = {
     categories: Category[];
@@ -36,17 +39,17 @@
     e.preventDefault();
     error = null;
     if (pattern.trim().length === 0) {
-      error = "Pattern não pode ser vazio.";
+      error = t("rule_form.pattern_required");
       return;
     }
     if (categoryId === null) {
-      error = "Selecione uma categoria.";
+      error = t("rule_form.category_required");
       return;
     }
     let dueDay: number | null = null;
     if (dueDayValue != null) {
       if (!Number.isInteger(dueDayValue) || dueDayValue < 1 || dueDayValue > 31) {
-        error = "Dia do vencimento deve estar entre 1 e 31 (ou vazio).";
+        error = t("rule_form.due_day_invalid");
         return;
       }
       dueDay = dueDayValue;
@@ -70,21 +73,21 @@
 
 <form onsubmit={submit} class="rounded-lg border border-border-subtle bg-surface p-4 flex flex-col gap-3">
   <div class="text-[10.5px] uppercase tracking-wider font-semibold text-fg-faint">
-    {initial ? "Editar regra" : "Nova regra"}
+    {initial ? t("rule_form.form_edit") : t("rule_form.form_new")}
   </div>
 
   <div class="grid grid-cols-[1fr_180px_90px_110px_auto] gap-2 items-end">
     <label class="flex flex-col gap-1">
-      <span class="text-[11px] text-fg-muted">Pattern (descrição contém)</span>
+      <span class="text-[11px] text-fg-muted">{t("rule_form.pattern_label")}</span>
       <input
         bind:value={pattern}
-        placeholder="ex: uber"
+        placeholder={t("rule_form.pattern_placeholder")}
         class="rounded-md border border-border bg-surface-2 px-2 py-1 text-[12px] text-fg focus:outline-none focus:border-accent"
       />
     </label>
 
     <label class="flex flex-col gap-1">
-      <span class="text-[11px] text-fg-muted">Categoria</span>
+      <span class="text-[11px] text-fg-muted">{t("rule_form.category")}</span>
       <select
         value={categoryId === null ? "" : String(categoryId)}
         onchange={(e) => {
@@ -93,7 +96,7 @@
         }}
         class="rounded-md border border-border bg-surface-2 px-2 py-1 text-[12px] text-fg"
       >
-        <option value="">— selecione —</option>
+        <option value="">{t("rule_form.select_placeholder")}</option>
         {#each categories as c}
           <option value={String(c.id)}>{c.name}</option>
         {/each}
@@ -101,7 +104,7 @@
     </label>
 
     <label class="flex flex-col gap-1">
-      <span class="text-[11px] text-fg-muted">Prioridade</span>
+      <span class="text-[11px] text-fg-muted">{t("rule_form.priority")}</span>
       <input
         type="number"
         bind:value={priority}
@@ -110,8 +113,8 @@
     </label>
 
     <label class="flex flex-col gap-1">
-      <span class="text-[11px] text-fg-muted" title="Dia do mês em que a obrigação vence. Deixe vazio se a regra não tem prazo fixo.">
-        Vence dia
+      <span class="text-[11px] text-fg-muted" title={t("rule_form.due_day_title")}>
+        {t("rule_form.due_day")}
       </span>
       <input
         type="number"
@@ -125,10 +128,10 @@
 
     <div class="flex gap-2">
       {#if onCancel}
-        <Button variant="ghost" onclick={onCancel} type="button">Cancelar</Button>
+        <Button variant="ghost" onclick={onCancel} type="button">{t("common.cancel")}</Button>
       {/if}
       <Button type="submit" disabled={busy}>
-        {busy ? "Salvando…" : (submitLabel ?? (initial ? "Salvar" : "Adicionar"))}
+        {busy ? t("rule_form.saving") : (submitLabel ?? (initial ? t("rule_form.save") : t("rule_form.add")))}
       </Button>
     </div>
   </div>

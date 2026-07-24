@@ -1,8 +1,11 @@
 <script lang="ts">
   import { formatMoney } from "$lib/format/money";
   import { txKeyString } from "$lib/api/transactions";
+  import { locale } from "$lib/i18n/locale.svelte";
   import type { ParsedTransaction } from "$lib/ofx/types";
   import type { ReversalInfo, ReversalRole } from "$lib/ofx/reversals";
+
+  const tr = locale.t;
 
   type Props = {
     transactions: ParsedTransaction[];
@@ -28,20 +31,11 @@
   );
 
   function reversalLabel(role: ReversalRole): string {
-    return role;
+    return tr("import.role_" + role);
   }
 
   function reversalTooltip(role: ReversalRole): string {
-    switch (role) {
-      case "estorno":
-        return "Esta transação é um estorno — reverte outra. Somadas dão zero. Desmarcada por padrão pra não inflar gastos/renda.";
-      case "estornada":
-        return "Esta transação foi estornada (revertida pelo banco). Somadas com o estorno dão zero. Desmarcada por padrão.";
-      case "reembolso":
-        return "Esta transação é um reembolso — devolução de um Pix enviado. Somadas dão zero. Desmarcada por padrão.";
-      case "reembolsada":
-        return "Esta transação foi reembolsada. Somadas com o reembolso dão zero. Desmarcada por padrão.";
-    }
+    return tr("import.reversal_" + role);
   }
 </script>
 
@@ -56,9 +50,9 @@
             onchange={(e) => ontoggleAll((e.currentTarget as HTMLInputElement).checked)}
           />
         </th>
-        <th class="text-left px-3 py-2 font-medium text-fg-faint uppercase tracking-wider text-[10.5px]">Data</th>
-        <th class="text-left px-3 py-2 font-medium text-fg-faint uppercase tracking-wider text-[10.5px]">Descrição</th>
-        <th class="text-right px-3 py-2 font-medium text-fg-faint uppercase tracking-wider text-[10.5px]">Valor</th>
+        <th class="text-left px-3 py-2 font-medium text-fg-faint uppercase tracking-wider text-[10.5px]">{tr("tx_table.date")}</th>
+        <th class="text-left px-3 py-2 font-medium text-fg-faint uppercase tracking-wider text-[10.5px]">{tr("tx_table.description")}</th>
+        <th class="text-right px-3 py-2 font-medium text-fg-faint uppercase tracking-wider text-[10.5px]">{tr("tx_table.amount")}</th>
       </tr>
     </thead>
     <tbody>
@@ -91,7 +85,7 @@
               </span>
             {/if}
             {#if isDup}
-              <span class="ml-2 text-[10px] text-fg-faint uppercase tracking-wider">duplicada</span>
+              <span class="ml-2 text-[10px] text-fg-faint uppercase tracking-wider">{tr("import.duplicate")}</span>
             {/if}
           </td>
           <td class="px-3 py-2 text-right tabular font-medium {Number(t.amount) >= 0 ? 'text-pos' : 'text-fg'}">
@@ -106,10 +100,9 @@
     <div class="px-3 py-2 border-t border-border-subtle bg-surface-2 text-[11px] text-fg-muted flex items-center gap-2">
       <span class="inline-block w-2 h-2 rounded" style="background: var(--color-cat-amarelo);"></span>
       <span>
-        <strong class="text-fg">{reversalMap.size / 2}</strong>
-        par{reversalMap.size / 2 === 1 ? "" : "es"} estorno/reembolso ↔ original detectado{reversalMap.size / 2 === 1 ? "" : "s"} —
-        desmarcado{reversalMap.size / 2 === 1 ? "" : "s"} por padrão porque a soma é zero (não é gasto nem renda real). Marque
-        manualmente se quiser importar mesmo assim.
+        {reversalMap.size / 2 === 1
+          ? tr("import.reversal_legend_one", { n: reversalMap.size / 2 })
+          : tr("import.reversal_legend_many", { n: reversalMap.size / 2 })}
       </span>
     </div>
   {/if}

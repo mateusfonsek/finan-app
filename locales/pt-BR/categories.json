@@ -1,0 +1,17 @@
+{
+  "categories": [
+    { "key": "market",       "name": "Mercado",        "color_token": "--color-cat-mercado",       "kind": "expense",  "is_investment": false },
+    { "key": "restaurant",   "name": "Restaurante",    "color_token": "--color-cat-restaurante",   "kind": "expense",  "is_investment": false },
+    { "key": "transport",    "name": "Transporte",     "color_token": "--color-cat-transporte",    "kind": "expense",  "is_investment": false },
+    { "key": "home",         "name": "Casa",           "color_token": "--color-cat-casa",          "kind": "expense",  "is_investment": false },
+    { "key": "health",       "name": "Saúde",          "color_token": "--color-cat-saude",         "kind": "expense",  "is_investment": false },
+    { "key": "leisure",      "name": "Lazer",          "color_token": "--color-cat-lazer",         "kind": "expense",  "is_investment": false },
+    { "key": "subscription", "name": "Assinatura",     "color_token": "--color-cat-assinatura",    "kind": "expense",  "is_investment": false },
+    { "key": "shopping",     "name": "Compras",        "color_token": "--color-cat-amarelo",       "kind": "expense",  "is_investment": false },
+    { "key": "education",    "name": "Educação",       "color_token": "--color-cat-indigo",        "kind": "expense",  "is_investment": false },
+    { "key": "pets",         "name": "Pets",           "color_token": "--color-cat-marrom",        "kind": "expense",  "is_investment": false },
+    { "key": "other",        "name": "Outros",         "color_token": "--color-cat-outros",        "kind": "expense",  "is_investment": false },
+    { "key": "transfer",     "name": "Transferências", "color_token": "--color-cat-outros",        "kind": "transfer", "is_investment": false },
+    { "key": "investment",   "name": "Investimentos",  "color_token": "--color-cat-investimento",  "kind": "transfer", "is_investment": true }
+  ]
+}

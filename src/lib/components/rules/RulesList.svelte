@@ -1,5 +1,8 @@
 <script lang="ts">
+  import { locale } from "$lib/i18n/locale.svelte";
   import type { Category, Rule } from "$lib/bindings";
+
+  const t = locale.t;
 
   type Props = {
     rules: Rule[];
@@ -22,10 +25,10 @@
   <table class="w-full text-[12px]">
     <thead class="bg-surface-2">
       <tr>
-        <th class="text-left px-4 py-2 font-medium text-fg-faint uppercase tracking-wider text-[10.5px]">Pattern</th>
-        <th class="text-left px-4 py-2 font-medium text-fg-faint uppercase tracking-wider text-[10.5px] w-[180px]">Categoria</th>
-        <th class="text-right px-4 py-2 font-medium text-fg-faint uppercase tracking-wider text-[10.5px] w-[90px]">Vence</th>
-        <th class="text-right px-4 py-2 font-medium text-fg-faint uppercase tracking-wider text-[10.5px] w-[90px]">Prio</th>
+        <th class="text-left px-4 py-2 font-medium text-fg-faint uppercase tracking-wider text-[10.5px]">{t("rules.col_pattern")}</th>
+        <th class="text-left px-4 py-2 font-medium text-fg-faint uppercase tracking-wider text-[10.5px] w-[180px]">{t("rules.col_category")}</th>
+        <th class="text-right px-4 py-2 font-medium text-fg-faint uppercase tracking-wider text-[10.5px] w-[90px]">{t("rules.col_due")}</th>
+        <th class="text-right px-4 py-2 font-medium text-fg-faint uppercase tracking-wider text-[10.5px] w-[90px]">{t("rules.col_priority")}</th>
         <th class="px-4 py-2 w-[120px]"></th>
       </tr>
     </thead>
@@ -47,7 +50,7 @@
             </span>
           </td>
           <td class="px-4 py-2.5 text-right tabular text-fg-muted">
-            {r.due_day ? `dia ${r.due_day}` : "—"}
+            {r.due_day ? t("rules.due_day", { day: r.due_day }) : "—"}
           </td>
           <td class="px-4 py-2.5 text-right tabular">{r.priority}</td>
           <td class="px-4 py-2.5 text-right flex gap-2 justify-end">
@@ -56,21 +59,21 @@
               onclick={() => onEdit(r)}
               class="text-[11px] text-fg-muted hover:text-fg underline-offset-2 hover:underline"
             >
-              Editar
+              {t("rules.edit")}
             </button>
             <button
               type="button"
               onclick={() => onDelete(r)}
               class="text-[11px] text-neg hover:underline underline-offset-2"
             >
-              Apagar
+              {t("rules.delete")}
             </button>
           </td>
         </tr>
       {:else}
         <tr>
           <td colspan="5" class="px-4 py-10 text-center text-fg-faint">
-            Nenhuma regra ainda. Crie uma acima — ex. pattern "uber" → Transporte.
+            {t("rules.empty")}
           </td>
         </tr>
       {/each}

@@ -1,4 +1,7 @@
 <script lang="ts">
+  import { locale } from "$lib/i18n/locale.svelte";
+
+  const t = locale.t;
   import { onMount } from "svelte";
   import { Button } from "$lib/components/ui/button";
   import RuleForm from "$lib/components/rules/RuleForm.svelte";
@@ -68,7 +71,7 @@
   }
 
   async function onDelete(rule: Rule) {
-    const ok = confirm(`Apagar regra "${rule.pattern}"?`);
+    const ok = confirm(t("rules_page.delete_confirm", { pattern: rule.pattern }));
     if (!ok) return;
     await deleteRule(rule.id);
     await refresh();
@@ -80,8 +83,10 @@
     try {
       const n = await applyRulesToUncategorized(null);
       applyMsg = n === 0
-        ? "Nenhuma transação foi categorizada (nenhum pattern bateu)."
-        : `${n} ${n === 1 ? "transação" : "transações"} categorizada${n === 1 ? "" : "s"} automaticamente.`;
+        ? t("rules_page.applied_none")
+        : (n === 1
+            ? t("rules_page.applied_one", { n })
+            : t("rules_page.applied_many", { n }));
     } catch (e) {
       error = e instanceof Error ? e.message : String(e);
     } finally {
@@ -94,11 +99,10 @@
   <header class="flex items-baseline justify-between gap-4 flex-wrap">
     <div class="flex flex-col gap-1">
       <h2 class="text-xl font-semibold tracking-tight" style="font-family: var(--font-display)">
-        Regras
+        {t("nav.rules")}
       </h2>
       <p class="text-xs text-fg-faint max-w-xl">
-        Regras "se descrição contém X, categoria Y" são aplicadas automaticamente em cada import.
-        Categorização manual nunca é sobrescrita.
+        {t("rules_page.desc")}
       </p>
     </div>
     <div class="flex items-center gap-2">
@@ -106,13 +110,13 @@
         <span class="text-[11px] text-fg-faint">{applyMsg}</span>
       {/if}
       <Button onclick={onApply} disabled={applying || rules.length === 0}>
-        {applying ? "Aplicando…" : "Aplicar a existentes"}
+        {applying ? t("rules_page.applying") : t("rules_page.apply")}
       </Button>
     </div>
   </header>
 
   {#if loading}
-    <div class="text-fg-faint text-sm">Carregando…</div>
+    <div class="text-fg-faint text-sm">{t("common.loading")}</div>
   {:else}
     {#if error}
       <div class="rounded-lg border border-border bg-surface p-3 text-sm text-neg">{error}</div>
@@ -124,7 +128,7 @@
         initial={editing}
         onSave={onUpdate}
         onCancel={() => (editing = null)}
-        submitLabel="Salvar alterações"
+        submitLabel={t("rules_page.save_changes")}
       />
     {:else}
       <RuleForm {categories} onSave={onCreate} />

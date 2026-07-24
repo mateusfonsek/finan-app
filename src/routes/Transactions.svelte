@@ -1,4 +1,7 @@
 <script lang="ts">
+  import { locale } from "$lib/i18n/locale.svelte";
+
+  const t = locale.t;
   import { onMount } from "svelte";
   import TxTable from "$lib/components/transactions/TxTable.svelte";
   import TxFilterBar from "$lib/components/transactions/TxFilterBar.svelte";
@@ -111,10 +114,12 @@
 <section class="p-8 max-w-5xl mx-auto flex flex-col gap-5">
   <header class="flex items-baseline justify-between gap-4 flex-wrap">
     <h2 class="text-xl font-semibold tracking-tight" style="font-family: var(--font-display)">
-      Transações
+      {t("nav.transactions")}
     </h2>
     <span class="text-xs text-fg-faint tabular">
-      {transactions.length} {transactions.length === 1 ? "transação" : "transações"}
+      {transactions.length === 1
+        ? t("transactions_page.count_one", { n: transactions.length })
+        : t("transactions_page.count_many", { n: transactions.length })}
     </span>
   </header>
 
@@ -130,7 +135,7 @@
   />
 
   {#if loading}
-    <div class="text-fg-faint text-sm">Carregando…</div>
+    <div class="text-fg-faint text-sm">{t("common.loading")}</div>
   {:else if error}
     <div class="rounded-lg border border-border bg-surface p-3 text-sm text-neg">{error}</div>
   {:else}

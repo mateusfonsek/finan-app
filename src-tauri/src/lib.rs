@@ -2,6 +2,7 @@ mod commands;
 mod db;
 mod domain;
 mod error;
+mod locale;
 
 use tauri::menu::{MenuBuilder, SubmenuBuilder};
 use tauri::{Emitter, Manager};
@@ -46,6 +47,9 @@ pub fn run() {
         commands::openfile::take_pending_ofx,
         commands::backup::export_backup,
         commands::backup::restore_backup,
+        locale::list_locales,
+        locale::get_active_locale,
+        locale::set_active_locale,
     ]);
 
     #[cfg(debug_assertions)]
@@ -73,52 +77,6 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_window_state::Builder::default().build())
-        .menu(|handle| {
-            // App menu (finan): "Sobre" abre nosso modal; "Configurações" sem
-            // atalho (decisão do produto). Hide/Quit são os padrões do macOS.
-            let app_menu = SubmenuBuilder::new(handle, "finan app")
-                .text("about", "Sobre o finan app")
-                .separator()
-                .text("settings", "Configurações…")
-                .separator()
-                .services()
-                .separator()
-                .hide()
-                .hide_others()
-                .show_all()
-                .separator()
-                .quit()
-                .build()?;
-
-            // Editar: itens padrão fazem os campos de texto da webview se
-            // comportarem nativamente (desfazer/recortar/copiar/colar/⌘A).
-            let edit_menu = SubmenuBuilder::new(handle, "Editar")
-                .undo()
-                .redo()
-                .separator()
-                .cut()
-                .copy()
-                .paste()
-                .select_all()
-                .build()?;
-
-            let window_menu = SubmenuBuilder::new(handle, "Janela")
-                .minimize()
-                .maximize()
-                .separator()
-                .fullscreen()
-                .separator()
-                .close_window()
-                .build()?;
-
-            let help_menu = SubmenuBuilder::new(handle, "Ajuda")
-                .text("github", "finan app no GitHub")
-                .build()?;
-
-            MenuBuilder::new(handle)
-                .items(&[&app_menu, &edit_menu, &window_menu, &help_menu])
-                .build()
-        })
         .on_menu_event(|app, event| {
             let id = event.id();
             if id == "about" {
@@ -131,9 +89,65 @@ pub fn run() {
         })
         .invoke_handler(specta_builder.invoke_handler())
         .setup(|app| {
+            let locale_state = locale::LocaleState::init(app.handle());
+
+            // Native menu, localized from the active pack. Built here (not via
+            // `.menu()`) because the path resolver used to load the pack isn't
+            // ready until setup. The event handler is registered on the builder
+            // above and fires regardless of when the menu is created.
+            {
+                let handle = app.handle().clone();
+                let pack = locale_state.pack.lock().expect("locale mutex poisoned");
+                let app_menu = SubmenuBuilder::new(&handle, pack.menu_str("app_name", "finan app"))
+                    .text("about", pack.menu_str("about", "Sobre o finan app"))
+                    .separator()
+                    .text("settings", pack.menu_str("settings", "Configurações…"))
+                    .separator()
+                    .services()
+                    .separator()
+                    .hide()
+                    .hide_others()
+                    .show_all()
+                    .separator()
+                    .quit()
+                    .build()?;
+                let edit_menu = SubmenuBuilder::new(&handle, pack.menu_str("edit", "Editar"))
+                    .undo()
+                    .redo()
+                    .separator()
+                    .cut()
+                    .copy()
+                    .paste()
+                    .select_all()
+                    .build()?;
+                let window_menu = SubmenuBuilder::new(&handle, pack.menu_str("window", "Janela"))
+                    .minimize()
+                    .maximize()
+                    .separator()
+                    .fullscreen()
+                    .separator()
+                    .close_window()
+                    .build()?;
+                let help_menu = SubmenuBuilder::new(&handle, pack.menu_str("help", "Ajuda"))
+                    .text("github", pack.menu_str("github", "finan app no GitHub"))
+                    .build()?;
+                let menu = MenuBuilder::new(&handle)
+                    .items(&[&app_menu, &edit_menu, &window_menu, &help_menu])
+                    .build()?;
+                app.set_menu(menu)?;
+            }
+
             let database = db::init(app.handle()).expect("failed to initialize database");
             eprintln!("[finan] db at {}", database.path.display());
+            // Only a brand-new DB is seeded from the active locale pack — never
+            // an existing user's DB (would clobber their renamed categories).
+            if database.fresh {
+                let conn = database.conn.lock().expect("db mutex poisoned");
+                let pack = locale_state.pack.lock().expect("locale mutex poisoned");
+                db::seed_from_pack(&conn, &pack).expect("failed to seed from locale pack");
+            }
             app.manage(database);
+            app.manage(locale_state);
             app.manage(commands::openfile::PendingOpen::default());
             Ok(())
         })

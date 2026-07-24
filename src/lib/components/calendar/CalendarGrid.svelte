@@ -1,6 +1,9 @@
 <script lang="ts">
   import { formatMoney } from "$lib/format/money";
+  import { locale } from "$lib/i18n/locale.svelte";
   import type { CalendarEvent } from "$lib/bindings";
+
+  const t = locale.t;
 
   /** Totais por dia, calculados em Calendar.svelte a partir das transações do mês. */
   export type DayFlow = { inflow: number; outflow: number };
@@ -30,8 +33,6 @@
     selectedDay = null,
     onSelectDay,
   }: Props = $props();
-
-  const WEEKDAYS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 
   type DayCell = {
     day: number | null;
@@ -132,7 +133,7 @@
 
 <div class="rounded-lg border border-border-subtle bg-surface overflow-hidden">
   <div class="grid grid-cols-7 bg-surface-2 border-b border-border-subtle">
-    {#each WEEKDAYS as wd}
+    {#each locale.weekdaysShort as wd}
       <div class="px-2 py-1.5 text-[10px] uppercase tracking-wider font-semibold text-fg-faint text-center">
         {wd}
       </div>
@@ -157,7 +158,9 @@
                {i % 7 === 6 ? 'border-r-0' : ''}"
         aria-label={cell.day === null
           ? undefined
-          : `Dia ${cell.day}${flow ? ` — entradas ${flow.inflow}, saídas ${flow.outflow}` : ""}`}
+          : flow
+            ? t("calendar.day_aria_flow", { day: cell.day, inflow: flow.inflow, outflow: flow.outflow })
+            : t("calendar.day_aria", { day: cell.day })}
       >
         {#if cell.day !== null}
           <div class="flex items-center justify-between gap-1 w-full">
@@ -169,14 +172,14 @@
                 <span
                   class="w-2 h-2 rounded-full"
                   style={dotStyle("var(--color-neg)", outPct)}
-                  title={`Saídas: ${formatMoney(String(flow?.outflow ?? 0))}`}
+                  title={t("calendar.outflows_title", { value: formatMoney(String(flow?.outflow ?? 0)) })}
                 ></span>
               {/if}
               {#if inPct > 0}
                 <span
                   class="w-2 h-2 rounded-full"
                   style={dotStyle("var(--color-pos)", inPct)}
-                  title={`Entradas: ${formatMoney(String(flow?.inflow ?? 0))}`}
+                  title={t("calendar.inflows_title", { value: formatMoney(String(flow?.inflow ?? 0)) })}
                 ></span>
               {/if}
             </div>
@@ -188,14 +191,22 @@
             <div
               class="text-[9.5px] rounded px-1 py-0.5 truncate flex items-center gap-1 border"
               style={billStyle(state)}
-              title={`${e.pattern}${state === "paid" ? ` — pago dia ${e.paid_day}${e.paid_amount ? " · " + formatMoney(e.paid_amount) : ""}` : state === "overdue" ? ` — vencida (dia ${e.due_day})` : ` — vence dia ${e.due_day}`}`}
+              title={`${e.pattern}${
+                state === "paid"
+                  ? e.paid_amount
+                    ? t("calendar.bill_paid_amount", { day: e.paid_day ?? "", amount: formatMoney(e.paid_amount) })
+                    : t("calendar.bill_paid", { day: e.paid_day ?? "" })
+                  : state === "overdue"
+                    ? t("calendar.bill_overdue", { day: e.due_day ?? "" })
+                    : t("calendar.bill_due", { day: e.due_day ?? "" })
+              }`}
             >
               <span class="shrink-0 font-bold">{billIcon(state)}</span>
               <span class="truncate">{billLabel(e)}</span>
             </div>
           {/each}
           {#if cell.due.length > 2}
-            <div class="text-[9px] text-fg-faint px-1">+{cell.due.length - 2} mais</div>
+            <div class="text-[9px] text-fg-faint px-1">{t("calendar.more", { n: cell.due.length - 2 })}</div>
           {/if}
         {/if}
       </button>
@@ -206,7 +217,7 @@
     <div class="border-t border-border-subtle bg-surface-2 px-3 py-1.5 flex items-center gap-4 text-[10.5px] text-fg-muted flex-wrap">
       {#if maxOut > 0}
         <div class="flex items-center gap-1.5">
-          <span>Saída</span>
+          <span>{t("calendar.outflow")}</span>
           <div class="flex gap-0.5">
             {#each [20, 40, 60, 80, 100] as p}
               <span class="w-1.5 h-1.5 rounded-full" style={dotStyle("var(--color-neg)", p)}></span>
@@ -216,7 +227,7 @@
       {/if}
       {#if maxIn > 0}
         <div class="flex items-center gap-1.5">
-          <span>Entrada</span>
+          <span>{t("calendar.inflow")}</span>
           <div class="flex gap-0.5">
             {#each [20, 40, 60, 80, 100] as p}
               <span class="w-1.5 h-1.5 rounded-full" style={dotStyle("var(--color-pos)", p)}></span>
@@ -228,15 +239,15 @@
         <div class="flex items-center gap-2">
           <span class="inline-flex items-center gap-1">
             <span class="inline-block w-2 h-2 rounded border" style="border-color: var(--color-cat-amarelo);"></span>
-            <span style="color: var(--color-cat-amarelo);">○ pendente</span>
+            <span style="color: var(--color-cat-amarelo);">{t("calendar.legend_pending")}</span>
           </span>
           <span class="inline-flex items-center gap-1">
             <span class="inline-block w-2 h-2 rounded border" style="border-color: var(--color-neg);"></span>
-            <span style="color: var(--color-neg);">! vencida</span>
+            <span style="color: var(--color-neg);">{t("calendar.legend_overdue")}</span>
           </span>
           <span class="inline-flex items-center gap-1">
             <span class="inline-block w-2 h-2 rounded" style="background: color-mix(in oklch, var(--color-pos) 30%, transparent);"></span>
-            <span style="color: var(--color-pos);">✓ paga</span>
+            <span style="color: var(--color-pos);">{t("calendar.legend_paid")}</span>
           </span>
         </div>
       {/if}

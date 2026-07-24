@@ -52,15 +52,35 @@ const MIGRATIONS: &[(&str, &str)] = &[
         "0013_composite_fitid_unique",
         include_str!("../../migrations/0013_composite_fitid_unique.sql"),
     ),
+    (
+        "0014_category_keys",
+        include_str!("../../migrations/0014_category_keys.sql"),
+    ),
+    (
+        "0015_education_pets_categories",
+        include_str!("../../migrations/0015_education_pets_categories.sql"),
+    ),
 ];
 
-pub fn apply(conn: &Connection) -> AppResult<()> {
+/// Applies pending migrations. Returns `true` when this call created a **brand
+/// new** database (i.e. `0001_init` had not run before), so the caller can seed
+/// it from the active locale pack without clobbering an existing user's data.
+pub fn apply(conn: &Connection) -> AppResult<bool> {
     conn.execute_batch(
         "CREATE TABLE IF NOT EXISTS _migrations (
             name TEXT PRIMARY KEY,
             applied_at TEXT NOT NULL DEFAULT (datetime('now'))
         );",
     )?;
+
+    let already_initialized: bool = conn
+        .query_row(
+            "SELECT 1 FROM _migrations WHERE name = '0001_init'",
+            [],
+            |_row| Ok(true),
+        )
+        .unwrap_or(false);
+    let fresh_db = !already_initialized;
 
     for (name, sql) in MIGRATIONS {
         let already: bool = conn
@@ -77,7 +97,7 @@ pub fn apply(conn: &Connection) -> AppResult<()> {
         }
     }
 
-    Ok(())
+    Ok(fresh_db)
 }
 
 #[cfg(test)]
@@ -113,7 +133,7 @@ mod tests {
         let count: i64 = conn
             .query_row("SELECT COUNT(*) FROM categories", [], |row| row.get(0))
             .unwrap();
-        assert_eq!(count, 11);
+        assert_eq!(count, 13);
 
         // 'Renda' foi removida em 0008. Garantir que não sobrou no final.
         let renda_exists: i64 = conn
@@ -135,7 +155,7 @@ mod tests {
         let count: i64 = conn
             .query_row("SELECT COUNT(*) FROM categories", [], |row| row.get(0))
             .unwrap();
-        assert_eq!(count, 11, "re-running migrations should not duplicate seeds");
+        assert_eq!(count, 13, "re-running migrations should not duplicate seeds");
 
         let rule_count: i64 = conn
             .query_row(
@@ -179,7 +199,41 @@ mod tests {
                 "0011_account_kind".to_string(),
                 "0012_cc_seed".to_string(),
                 "0013_composite_fitid_unique".to_string(),
+                "0014_category_keys".to_string(),
+                "0015_education_pets_categories".to_string(),
             ]
         );
+    }
+
+    #[test]
+    fn backfills_category_keys() {
+        let conn = Connection::open_in_memory().unwrap();
+        apply(&conn).unwrap();
+
+        // Every seeded category must have a stable key after 0014.
+        let missing: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM categories WHERE key IS NULL",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(missing, 0, "todas as categorias seedadas têm key");
+
+        let market: String = conn
+            .query_row(
+                "SELECT key FROM categories WHERE name = 'Mercado'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(market, "market");
+    }
+
+    #[test]
+    fn reports_fresh_db_only_on_first_apply() {
+        let conn = Connection::open_in_memory().unwrap();
+        assert!(apply(&conn).unwrap(), "primeira aplicação = DB novo");
+        assert!(!apply(&conn).unwrap(), "reaplicar não é DB novo");
     }
 }

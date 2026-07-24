@@ -1,4 +1,7 @@
 <script lang="ts">
+  import { locale } from "$lib/i18n/locale.svelte";
+
+  const t = locale.t;
   import { onMount } from "svelte";
   import MonthStepper from "$lib/components/shell/MonthStepper.svelte";
   import KpiCard from "$lib/components/dashboard/KpiCard.svelte";
@@ -95,13 +98,13 @@
 <section class="p-8 max-w-6xl mx-auto flex flex-col gap-5">
   <header class="flex items-baseline justify-between gap-4 flex-wrap">
     <h2 class="text-xl font-semibold tracking-tight" style="font-family: var(--font-display)">
-      Dashboard
+      {t("nav.dashboard")}
     </h2>
     <MonthStepper month={filters.month} onChange={onMonthChange} />
   </header>
 
   {#if loading}
-    <div class="text-fg-faint text-sm">Carregando…</div>
+    <div class="text-fg-faint text-sm">{t("common.loading")}</div>
   {:else if error}
     <div class="rounded-lg border border-border bg-surface p-3 text-sm text-neg">{error}</div>
   {:else}
@@ -109,27 +112,27 @@
       <!-- KPIs principais: só contam gasto/renda REAL. Subtítulo explica o que NÃO entra. -->
       <div class="grid grid-cols-4 gap-3">
         <KpiCard
-          label="Renda"
+          label={t("dashboard.kpi_income")}
           value={kpis.income}
           tone="pos"
-          caption={Number(kpis.income) > 0 ? "entradas reais (sem transf. e investimentos)" : undefined}
+          caption={Number(kpis.income) > 0 ? t("dashboard.caption_income") : undefined}
         />
         <KpiCard
-          label="Gastos"
+          label={t("dashboard.kpi_expenses")}
           value={kpis.expense}
-          caption={Number(kpis.expense) > 0 ? "saídas reais (sem transf. e investimentos)" : undefined}
+          caption={Number(kpis.expense) > 0 ? t("dashboard.caption_expenses") : undefined}
         />
         <KpiCard
-          label="Saldo do mês"
+          label={t("dashboard.kpi_balance")}
           value={kpis.net}
           tone={Number(kpis.net) >= 0 ? "pos" : "neg"}
-          caption="renda − gastos"
+          caption={t("dashboard.caption_balance")}
         />
         <KpiCard
-          label="Transações"
+          label={t("dashboard.kpi_transactions")}
           value={String(kpis.transaction_count)}
           raw={true}
-          caption={kpis.transaction_count === 1 ? "uma tx no período (s/ transf.)" : "tx no período (s/ transf.)"}
+          caption={kpis.transaction_count === 1 ? t("dashboard.caption_tx_one") : t("dashboard.caption_tx_many")}
         />
       </div>
 
@@ -139,32 +142,32 @@
         <details class="rounded-lg border border-border-subtle bg-surface px-4 py-2.5">
           <summary class="text-[11.5px] text-fg-muted flex items-center gap-2">
             <span class="text-fg-faint">↻</span>
-            <span>Como esses números são calculados? <span class="text-fg-faint">(clique pra expandir)</span></span>
+            <span>{t("dashboard.calc_title")} <span class="text-fg-faint">{t("dashboard.calc_hint")}</span></span>
           </summary>
           <div class="pt-3 grid grid-cols-2 gap-x-6 text-[11.5px]">
             <!-- Coluna ENTRADAS -->
             <div class="flex flex-col gap-1">
               <div class="text-[10px] uppercase tracking-wider font-semibold text-fg-faint pb-0.5">
-                Entradas
+                {t("dashboard.inflows")}
               </div>
               <div class="flex justify-between">
-                <span class="text-fg-muted">Tudo que entrou (bruto)</span>
+                <span class="text-fg-muted">{t("dashboard.gross_in")}</span>
                 <span class="tabular text-fg">{formatMoney(String(grossInflow))}</span>
               </div>
               {#if transfers && Number(transfers.total_in) > 0}
                 <div class="flex justify-between text-fg-faint">
-                  <span>− Transferências internas</span>
+                  <span>{t("dashboard.minus_transfers")}</span>
                   <span class="tabular">{formatMoney(transfers.total_in)}</span>
                 </div>
               {/if}
               {#if investments && Number(investments.resgatado_no_mes) > 0}
                 <div class="flex justify-between text-fg-faint">
-                  <span>− Resgate de investimentos</span>
+                  <span>{t("dashboard.minus_redemption")}</span>
                   <span class="tabular">{formatMoney(investments.resgatado_no_mes)}</span>
                 </div>
               {/if}
               <div class="flex justify-between border-t border-border-subtle pt-1 mt-0.5">
-                <span class="text-fg-muted font-medium">= Renda real</span>
+                <span class="text-fg-muted font-medium">{t("dashboard.real_income")}</span>
                 <span class="tabular text-pos font-medium">{formatMoney(kpis.income)}</span>
               </div>
             </div>
@@ -172,26 +175,26 @@
             <!-- Coluna SAÍDAS -->
             <div class="flex flex-col gap-1">
               <div class="text-[10px] uppercase tracking-wider font-semibold text-fg-faint pb-0.5">
-                Saídas
+                {t("dashboard.outflows")}
               </div>
               <div class="flex justify-between">
-                <span class="text-fg-muted">Tudo que saiu (bruto)</span>
+                <span class="text-fg-muted">{t("dashboard.gross_out")}</span>
                 <span class="tabular text-fg">{formatMoney(String(grossOutflow))}</span>
               </div>
               {#if transfers && Number(transfers.total_out) > 0}
                 <div class="flex justify-between text-fg-faint">
-                  <span>− Transferências internas</span>
+                  <span>{t("dashboard.minus_transfers")}</span>
                   <span class="tabular">{formatMoney(transfers.total_out)}</span>
                 </div>
               {/if}
               {#if investments && Number(investments.aplicado_no_mes) > 0}
                 <div class="flex justify-between text-fg-faint">
-                  <span>− Aplicação em investimentos</span>
+                  <span>{t("dashboard.minus_application")}</span>
                   <span class="tabular">{formatMoney(investments.aplicado_no_mes)}</span>
                 </div>
               {/if}
               <div class="flex justify-between border-t border-border-subtle pt-1 mt-0.5">
-                <span class="text-fg-muted font-medium">= Gastos reais</span>
+                <span class="text-fg-muted font-medium">{t("dashboard.real_expenses")}</span>
                 <span class="tabular text-neg font-medium">{formatMoney(kpis.expense)}</span>
               </div>
             </div>
@@ -207,39 +210,39 @@
           <div class="flex items-center gap-2">
             <span class="w-2 h-2 rounded-full" style="background: var(--color-cat-investimento);"></span>
             <span class="text-[10.5px] uppercase tracking-wider font-semibold text-fg-faint">
-              Investimentos
+              {t("dashboard.investments")}
             </span>
           </div>
-          <span class="text-[10px] text-fg-faint">conta separada · não conta como gasto nem renda</span>
+          <span class="text-[10px] text-fg-faint">{t("dashboard.investments_note")}</span>
         </div>
         <div class="grid grid-cols-3 gap-4">
           <div class="flex flex-col gap-0.5">
-            <span class="text-[10px] uppercase tracking-wider text-fg-faint">Aplicado no mês</span>
+            <span class="text-[10px] uppercase tracking-wider text-fg-faint">{t("dashboard.applied_month")}</span>
             <span class="text-[15px] tabular font-semibold" style="color: var(--color-cat-investimento);">
               {Number(investments.aplicado_no_mes) > 0 ? formatMoney(investments.aplicado_no_mes) : "—"}
             </span>
             <span class="text-[10px] text-fg-faint">
-              {investments.aplicacoes_count} {investments.aplicacoes_count === 1 ? "aplicação" : "aplicações"}
+              {investments.aplicacoes_count === 1 ? t("dashboard.applications_one", { n: investments.aplicacoes_count }) : t("dashboard.applications_many", { n: investments.aplicacoes_count })}
             </span>
           </div>
           <div class="flex flex-col gap-0.5">
-            <span class="text-[10px] uppercase tracking-wider text-fg-faint">Resgatado no mês</span>
+            <span class="text-[10px] uppercase tracking-wider text-fg-faint">{t("dashboard.redeemed_month")}</span>
             <span class="text-[15px] tabular font-semibold text-fg">
               {Number(investments.resgatado_no_mes) > 0 ? formatMoney(investments.resgatado_no_mes) : "—"}
             </span>
             <span class="text-[10px] text-fg-faint">
-              {investments.resgates_count} {investments.resgates_count === 1 ? "resgate" : "resgates"}
+              {investments.resgates_count === 1 ? t("dashboard.redemptions_one", { n: investments.resgates_count }) : t("dashboard.redemptions_many", { n: investments.resgates_count })}
             </span>
           </div>
           <div class="flex flex-col gap-0.5 border-l border-border-subtle pl-4">
-            <span class="text-[10px] uppercase tracking-wider text-fg-faint" title="Aplicado no mês − Resgatado no mês. Positivo: investiu líquido. Negativo: retirou líquido do investimento.">
-              Saldo investido
+            <span class="text-[10px] uppercase tracking-wider text-fg-faint" title={t("dashboard.invested_balance_title")}>
+              {t("dashboard.invested_balance")}
             </span>
             <span class="text-[15px] tabular font-semibold {investmentNetMonth >= 0 ? 'text-fg' : 'text-neg'}">
               {formatMoney(String(investmentNetMonth))}
             </span>
             <span class="text-[10px] text-fg-faint">
-              no mês · aplicações − resgates
+              {t("dashboard.invested_balance_sub")}
             </span>
           </div>
         </div>
@@ -252,18 +255,18 @@
       <div class="rounded-xl bg-surface border border-border-subtle p-4 flex flex-col gap-3">
         <div class="flex items-baseline justify-between">
           <div class="text-[10.5px] uppercase tracking-wider font-semibold text-fg-faint">
-            Gastos por categoria
+            {t("dashboard.spend_by_category")}
           </div>
-          <span class="text-[10px] text-fg-faint">{byCategory.length} {byCategory.length === 1 ? "categoria" : "categorias"}</span>
+          <span class="text-[10px] text-fg-faint">{byCategory.length === 1 ? t("dashboard.categories_one", { n: byCategory.length }) : t("dashboard.categories_many", { n: byCategory.length })}</span>
         </div>
         <CategoryDonut items={byCategory} total={kpis?.expense ?? "0"} />
       </div>
       <div class="rounded-xl bg-surface border border-border-subtle p-4 flex flex-col gap-3">
         <div class="flex items-baseline justify-between">
           <div class="text-[10.5px] uppercase tracking-wider font-semibold text-fg-faint">
-            Fontes de renda
+            {t("dashboard.income_sources")}
           </div>
-          <span class="text-[10px] text-fg-faint">{sources.length} {sources.length === 1 ? "fonte" : "fontes"}</span>
+          <span class="text-[10px] text-fg-faint">{sources.length === 1 ? t("dashboard.sources_one", { n: sources.length }) : t("dashboard.sources_many", { n: sources.length })}</span>
         </div>
         <IncomeSourcesPanel items={sources} total={kpis?.income ?? "0"} />
       </div>
@@ -273,11 +276,11 @@
     <div class="rounded-xl bg-surface border border-border-subtle p-4 flex flex-col gap-3">
       <div class="flex items-baseline justify-between">
         <div class="text-[10.5px] uppercase tracking-wider font-semibold text-fg-faint">
-          Últimos 12 meses
+          {t("dashboard.last_12m")}
         </div>
         <div class="text-[10px] text-fg-faint flex gap-3">
-          <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded bg-pos"></span> entradas</span>
-          <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded bg-neg opacity-60"></span> saídas</span>
+          <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded bg-pos"></span> {t("dashboard.legend_inflows")}</span>
+          <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded bg-neg opacity-60"></span> {t("dashboard.legend_outflows")}</span>
         </div>
       </div>
       <MonthBars months={byMonth} />
@@ -287,9 +290,9 @@
       <div class="rounded-xl bg-surface border border-border-subtle p-4 flex flex-col gap-3">
         <div class="flex items-baseline justify-between">
           <div class="text-[10.5px] uppercase tracking-wider font-semibold text-fg-faint">
-            Top categorias do mês
+            {t("dashboard.top_categories")}
           </div>
-          <span class="text-[10px] text-fg-faint">por valor</span>
+          <span class="text-[10px] text-fg-faint">{t("dashboard.by_value")}</span>
         </div>
         <div class="h-[260px] overflow-y-auto pr-1">
           <TopCategoriesList items={byCategory} />
@@ -297,8 +300,8 @@
       </div>
       <div class="rounded-xl bg-surface border border-border-subtle flex flex-col">
         <div class="text-[10.5px] uppercase tracking-wider font-semibold text-fg-faint px-4 pt-4 pb-2 flex items-baseline justify-between">
-          <span>Maiores gastos do mês</span>
-          <span class="text-[10px] normal-case tracking-normal text-fg-faint font-normal">sem transf./invest.</span>
+          <span>{t("dashboard.biggest_expenses")}</span>
+          <span class="text-[10px] normal-case tracking-normal text-fg-faint font-normal">{t("dashboard.no_transf_invest")}</span>
         </div>
         <div class="h-[260px] overflow-y-auto">
           <RecentList transactions={topSpends} />

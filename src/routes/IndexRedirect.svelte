@@ -1,4 +1,7 @@
 <script lang="ts">
+  import { locale } from "$lib/i18n/locale.svelte";
+
+  const t = locale.t;
   import { onMount } from "svelte";
   import { push } from "svelte-spa-router";
   import { listTransactions } from "$lib/api/transactions";
@@ -24,5 +27,5 @@
 </script>
 
 {#if checking}
-  <section class="p-8 text-fg-faint text-sm">Carregando…</section>
+  <section class="p-8 text-fg-faint text-sm">{t("common.loading")}</section>
 {/if}

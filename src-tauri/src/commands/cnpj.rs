@@ -1,98 +1,44 @@
-use regex::Regex;
 use rusqlite::params;
 use serde::{Deserialize, Serialize};
 use specta::Type;
-use std::sync::OnceLock;
 use tauri::State;
 
 use crate::db::Db;
 use crate::error::{AppError, AppResult};
+use crate::locale::{LocalePack, LocaleState};
 
-fn cnpj_re() -> &'static Regex {
-    static R: OnceLock<Regex> = OnceLock::new();
-    R.get_or_init(|| Regex::new(r"\b\d{2}\.\d{3}\.\d{3}/\d{4}-\d{2}\b").unwrap())
+/// Extract the first business tax id (e.g. a Brazilian CNPJ) found in a
+/// description, using the active locale's `taxId.regex`. Returns None when the
+/// locale defines no tax id.
+pub fn extract_cnpj(pack: &LocalePack, description: &str) -> Option<String> {
+    let re = pack.tax_id_re.as_ref()?;
+    re.find(description).map(|m| m.as_str().to_string())
 }
 
-/// Extract the first canonical CNPJ (NN.NNN.NNN/NNNN-NN) found in a description.
-pub fn extract_cnpj(description: &str) -> Option<String> {
-    cnpj_re().find(description).map(|m| m.as_str().to_string())
-}
-
-/// CNAE prefix → category name. Longest prefix wins (e.g. "4711" beats "47").
-/// Categories must exist in the `categories` table (created by migrations or
-/// by the user). Unknown CNAE returns None — these go to manual triage.
-const CNAE_MAP: &[(&str, &str)] = &[
-    // Alimentação fora
-    ("561", "Restaurante"),
-    ("562", "Restaurante"),
-    // Supermercado / mercado
-    ("4711", "Mercado"),
-    ("4712", "Mercado"),
-    ("4721", "Mercado"),
-    // Combustíveis / mobilidade
-    ("4731", "Transporte"),
-    ("4921", "Transporte"),
-    ("4922", "Transporte"),
-    ("4923", "Transporte"),
-    ("4929", "Transporte"),
-    ("5310", "Transporte"),
-    // Farmácia / saúde
-    ("4771", "Saúde"),
-    ("4772", "Saúde"),
-    ("8610", "Saúde"),
-    ("8630", "Saúde"),
-    ("8650", "Saúde"),
-    // Lazer
-    ("5914", "Lazer"),
-    ("9319", "Lazer"),
-    ("9329", "Lazer"),
-    ("9001", "Lazer"),
-    // Casa / utilidades públicas
-    ("3511", "Casa"),
-    ("3513", "Casa"),
-    ("3514", "Casa"),
-    ("3600", "Casa"),
-    // Assinatura / serviços recorrentes (telecom, streaming, SaaS)
-    ("6110", "Assinatura"),
-    ("6120", "Assinatura"),
-    ("6130", "Assinatura"),
-    ("6190", "Assinatura"),
-    ("6201", "Assinatura"),
-    ("6202", "Assinatura"),
-    ("6203", "Assinatura"),
-    ("6204", "Assinatura"),
-    ("6209", "Assinatura"),
-    // Comércio varejista / e-commerce → Compras
-    ("4789", "Compras"),
-    ("4791", "Compras"),
-    ("4781", "Compras"),
-    ("4751", "Compras"),
-    ("4754", "Compras"),
-    ("4759", "Compras"),
-    ("4761", "Compras"),
-    ("4763", "Compras"),
-    // Fallback comércio varejista genérico (2 dígitos = última opção)
-    ("47", "Compras"),
-];
-
-/// Lookup category id by longest CNAE prefix that matches.
+/// Lookup category id by the longest tax-classification-code prefix that
+/// matches (e.g. Brazilian CNAE). The `cnae_map` maps prefixes to a stable
+/// category **key**, resolved to an id via the `categories` table. Longest
+/// prefix wins (e.g. "4711" beats "47"). Unknown code returns None.
 pub fn cnae_to_category_id(
     conn: &rusqlite::Connection,
     cnae: &str,
+    pack: &LocalePack,
 ) -> AppResult<Option<i64>> {
-    let mut best: Option<&'static (&str, &str)> = None;
-    for entry in CNAE_MAP {
-        if cnae.starts_with(entry.0) && best.map_or(true, |b| entry.0.len() > b.0.len()) {
+    let mut best: Option<&crate::locale::CnaeEntry> = None;
+    for entry in &pack.rules.cnae_map {
+        if cnae.starts_with(&entry.prefix)
+            && best.map_or(true, |b| entry.prefix.len() > b.prefix.len())
+        {
             best = Some(entry);
         }
     }
-    let Some((_, name)) = best else {
+    let Some(entry) = best else {
         return Ok(None);
     };
     let id: Option<i64> = conn
         .query_row(
-            "SELECT id FROM categories WHERE name = ?1",
-            params![name],
+            "SELECT id FROM categories WHERE key = ?1",
+            params![entry.category],
             |r| r.get(0),
         )
         .ok();
@@ -141,10 +87,26 @@ fn fetch_brasilapi(cnpj_digits_only: &str) -> AppResult<BrasilApiResponse> {
 }
 
 /// Shared engine used by `resolve_cnpj` and `auto_classify_with_cnpj`.
+///
+/// The online company lookup is gated on `taxId.provider`. Today only
+/// `brasilapi` is implemented; any other provider returns a bare resolution
+/// (no company name / no suggested category) so the app still works.
 pub fn resolve_cnpj_with_conn(
     conn: &rusqlite::Connection,
     cnpj: &str,
+    pack: &LocalePack,
 ) -> AppResult<CnpjResolution> {
+    if pack.manifest.tax_id.provider != "brasilapi" {
+        return Ok(CnpjResolution {
+            cnpj: cnpj.to_string(),
+            razao_social: None,
+            nome_fantasia: None,
+            cnae_fiscal: None,
+            cnae_fiscal_descricao: None,
+            suggested_category_id: None,
+        });
+    }
+
     let digits = cnpj_digits(cnpj);
     if digits.len() != 14 {
         return Err(AppError::Invalid(format!("CNPJ inválido: {cnpj}")));
@@ -152,7 +114,7 @@ pub fn resolve_cnpj_with_conn(
     let resp = fetch_brasilapi(&digits)?;
     let cnae = resp.cnae_fiscal.as_ref().and_then(cnae_value_to_string);
     let suggested = match cnae.as_deref() {
-        Some(c) => cnae_to_category_id(conn, c)?,
+        Some(c) => cnae_to_category_id(conn, c, pack)?,
         None => None,
     };
     Ok(CnpjResolution {
@@ -167,15 +129,21 @@ pub fn resolve_cnpj_with_conn(
 
 #[tauri::command]
 #[specta::specta]
-pub fn resolve_cnpj(db: State<'_, Db>, cnpj: String) -> AppResult<CnpjResolution> {
+pub fn resolve_cnpj(
+    db: State<'_, Db>,
+    locale: State<'_, LocaleState>,
+    cnpj: String,
+) -> AppResult<CnpjResolution> {
     let conn = db.conn.lock().expect("db mutex poisoned");
-    resolve_cnpj_with_conn(&conn, &cnpj)
+    let pack = locale.pack.lock().expect("locale mutex poisoned");
+    resolve_cnpj_with_conn(&conn, &cnpj, &pack)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::db::migrations;
+    use crate::locale::LocalePack;
     use rusqlite::Connection;
 
     fn fresh_conn() -> Connection {
@@ -184,15 +152,22 @@ mod tests {
         conn
     }
 
+    fn pack() -> LocalePack {
+        LocalePack::embedded_pt_br()
+    }
+
     #[test]
     fn extracts_canonical_cnpj() {
         let desc = "Transferência enviada pelo Pix - DEMERGE - 33.967.103/0001-84 - banco";
-        assert_eq!(extract_cnpj(desc), Some("33.967.103/0001-84".into()));
+        assert_eq!(
+            extract_cnpj(&pack(), desc),
+            Some("33.967.103/0001-84".into())
+        );
     }
 
     #[test]
     fn no_cnpj_returns_none() {
-        assert_eq!(extract_cnpj("Compra no débito - MISTER SUSHI"), None);
+        assert_eq!(extract_cnpj(&pack(), "Compra no débito - MISTER SUSHI"), None);
     }
 
     #[test]
@@ -203,14 +178,14 @@ mod tests {
     #[test]
     fn cnae_lookup_finds_mercado_for_4711() {
         let conn = fresh_conn();
-        let id = cnae_to_category_id(&conn, "4711301").unwrap();
+        let id = cnae_to_category_id(&conn, "4711301", &pack()).unwrap();
         assert!(id.is_some(), "4711 prefix should map to Mercado");
     }
 
     #[test]
     fn cnae_lookup_finds_restaurante_for_561() {
         let conn = fresh_conn();
-        let id = cnae_to_category_id(&conn, "5611201").unwrap();
+        let id = cnae_to_category_id(&conn, "5611201", &pack()).unwrap();
         assert!(id.is_some());
     }
 
@@ -218,14 +193,16 @@ mod tests {
     fn cnae_lookup_unknown_returns_none() {
         let conn = fresh_conn();
         // 0111 is "Cultivo de cereais" — not in our map
-        assert_eq!(cnae_to_category_id(&conn, "0111301").unwrap(), None);
+        assert_eq!(cnae_to_category_id(&conn, "0111301", &pack()).unwrap(), None);
     }
 
     #[test]
     fn longer_prefix_beats_shorter_for_4711_over_47() {
         // Both "4711" and "47" match; we want "4711" (Mercado) over "47" (Compras).
         let conn = fresh_conn();
-        let id = cnae_to_category_id(&conn, "4711301").unwrap().unwrap();
+        let id = cnae_to_category_id(&conn, "4711301", &pack())
+            .unwrap()
+            .unwrap();
         let mercado: i64 = conn
             .query_row(
                 "SELECT id FROM categories WHERE name = 'Mercado'",
@@ -239,7 +216,9 @@ mod tests {
     #[test]
     fn cnae_lookup_finds_compras_for_4789_amazon() {
         let conn = fresh_conn();
-        let id = cnae_to_category_id(&conn, "4789099").unwrap().unwrap();
+        let id = cnae_to_category_id(&conn, "4789099", &pack())
+            .unwrap()
+            .unwrap();
         let compras: i64 = conn
             .query_row(
                 "SELECT id FROM categories WHERE name = 'Compras'",
@@ -248,5 +227,37 @@ mod tests {
             )
             .unwrap();
         assert_eq!(id, compras, "Amazon's CNAE 4789 maps to Compras");
+    }
+
+    #[test]
+    fn cnae_lookup_finds_education_for_8531() {
+        let conn = fresh_conn();
+        // 8531-7 = Educação superior - graduação
+        let id = cnae_to_category_id(&conn, "8531700", &pack())
+            .unwrap()
+            .unwrap();
+        let education: i64 = conn
+            .query_row(
+                "SELECT id FROM categories WHERE key = 'education'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(id, education);
+    }
+
+    #[test]
+    fn cnae_lookup_finds_pets_for_veterinaria() {
+        let conn = fresh_conn();
+        // 7500-1 = Atividades veterinárias
+        let id = cnae_to_category_id(&conn, "7500100", &pack())
+            .unwrap()
+            .unwrap();
+        let pets: i64 = conn
+            .query_row("SELECT id FROM categories WHERE key = 'pets'", [], |r| {
+                r.get(0)
+            })
+            .unwrap();
+        assert_eq!(id, pets);
     }
 }

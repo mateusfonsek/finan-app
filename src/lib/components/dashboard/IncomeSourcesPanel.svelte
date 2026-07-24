@@ -1,4 +1,7 @@
 <script lang="ts">
+  import { locale } from "$lib/i18n/locale.svelte";
+
+  const t = locale.t;
   import { formatMoney } from "$lib/format/money";
   import type { IncomeSource } from "$lib/bindings";
 
@@ -53,7 +56,7 @@
   >
     <div class="absolute inset-[18px] rounded-full bg-surface border border-border-subtle"></div>
     <div class="relative text-center tabular">
-      <div class="text-[10px] uppercase tracking-wider text-fg-faint">Renda</div>
+      <div class="text-[10px] uppercase tracking-wider text-fg-faint">{t("dashboard.income")}</div>
       <div class="text-[18px] font-semibold mt-px" style="font-family: var(--font-display)">
         {formatMoney(total)}
       </div>
@@ -76,9 +79,9 @@
               <span
                 class="text-[9px] uppercase tracking-wider font-semibold px-1 py-px rounded shrink-0"
                 style="color: var(--color-pos); border: 1px solid var(--color-pos); opacity: 0.85;"
-                title={`Recorrente · ${it.recurring_months} meses distintos`}
+                title={t("dashboard.recurring_title", { months: it.recurring_months })}
               >
-                recorrente
+                {t("dashboard.recurring")}
               </span>
             {/if}
             <span class="text-[10.5px] tabular text-fg-faint shrink-0">
@@ -89,7 +92,7 @@
         </div>
       </li>
     {:else}
-      <li class="text-fg-faint italic">Sem entradas no período.</li>
+      <li class="text-fg-faint italic">{t("dashboard.no_income_period")}</li>
     {/each}
   </ul>
 </div>

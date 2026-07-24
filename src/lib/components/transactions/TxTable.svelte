@@ -1,7 +1,10 @@
 <script lang="ts">
   import { formatMoney } from "$lib/format/money";
+  import { locale } from "$lib/i18n/locale.svelte";
   import CategoryPicker from "./CategoryPicker.svelte";
   import type { Category, Transaction } from "$lib/bindings";
+
+  const t = locale.t;
 
   type Props = {
     transactions: Transaction[];
@@ -26,10 +29,10 @@
   <table class="w-full text-[12px]">
     <thead class="bg-surface-2">
       <tr>
-        <th class="text-left px-4 py-2 font-medium text-fg-faint uppercase tracking-wider text-[10.5px] w-[100px]">Data</th>
-        <th class="text-left px-4 py-2 font-medium text-fg-faint uppercase tracking-wider text-[10.5px]">Descrição</th>
-        <th class="text-left px-4 py-2 font-medium text-fg-faint uppercase tracking-wider text-[10.5px] w-[180px]">Categoria</th>
-        <th class="text-right px-4 py-2 font-medium text-fg-faint uppercase tracking-wider text-[10.5px] w-[140px]">Valor</th>
+        <th class="text-left px-4 py-2 font-medium text-fg-faint uppercase tracking-wider text-[10.5px] w-[100px]">{t("tx_table.date")}</th>
+        <th class="text-left px-4 py-2 font-medium text-fg-faint uppercase tracking-wider text-[10.5px]">{t("tx_table.description")}</th>
+        <th class="text-left px-4 py-2 font-medium text-fg-faint uppercase tracking-wider text-[10.5px] w-[180px]">{t("tx_table.category")}</th>
+        <th class="text-right px-4 py-2 font-medium text-fg-faint uppercase tracking-wider text-[10.5px] w-[140px]">{t("tx_table.amount")}</th>
       </tr>
     </thead>
     <tbody>
@@ -61,7 +64,7 @@
       {:else}
         <tr>
           <td colspan="4" class="px-4 py-10 text-center text-fg-faint">
-            Nenhuma transação ainda. <a href="#/import" class="text-accent hover:underline">Importar um OFX</a>?
+            {t("tx_table.empty")} <a href="#/import" class="text-accent hover:underline">{t("tx_table.import_link")}</a>?
           </td>
         </tr>
       {/each}
