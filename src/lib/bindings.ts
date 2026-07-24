@@ -386,6 +386,20 @@ async restoreBackup(source: string) : Promise<Result<null, string>> {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
 }
+},
+async listLocales() : Promise<LocaleInfo[]> {
+    return await TAURI_INVOKE("list_locales");
+},
+async getActiveLocale() : Promise<string> {
+    return await TAURI_INVOKE("get_active_locale");
+},
+async setActiveLocale(code: string) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("set_active_locale", { code }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
 }
 }
 
@@ -463,6 +477,7 @@ export type InsertResult = { inserted: number; skipped_duplicates: number; auto_
  */
 export type InvestmentSummary = { aplicado_no_mes: string; resgatado_no_mes: string; aplicacoes_count: number; resgates_count: number; saldo_acumulado: string }
 export type KpiSummary = { income: string; expense: string; net: string; transaction_count: number }
+export type LocaleInfo = { code: string; name: string; flag: string }
 export type MonthSummary = { month: string; income: string; expense: string }
 export type NewAccount = { name: string; bank: string | null; ofx_acctid: string | null; 
 /**

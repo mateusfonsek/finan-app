@@ -30,6 +30,7 @@
   "bundle": {
     "active": true,
     "targets": ["app", "dmg"],
+    "resources": ["../locales/**/*"],
     "category": "Finance",
     "copyright": "© 2026 Mateus Fonseca",
     "publisher": "Mateus Fonseca",

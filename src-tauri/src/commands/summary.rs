@@ -282,9 +282,11 @@ pub fn transfer_summary(
 #[specta::specta]
 pub fn income_sources(
     db: State<'_, Db>,
+    locale: State<'_, crate::locale::LocaleState>,
     month: Option<String>,
 ) -> AppResult<Vec<IncomeSource>> {
     let conn = db.conn.lock().expect("db mutex poisoned");
+    let pack = locale.pack.lock().expect("locale mutex poisoned");
 
     // Carrega TODAS as entradas reais (positivas, não-transfer) de toda a DB.
     // Precisamos do histórico completo pra detectar recorrência.
@@ -314,7 +316,7 @@ pub fn income_sources(
     let mut current: HashMap<String, Agg> = HashMap::new();
 
     for (date, amount_str, desc) in rows {
-        let (key, label, _pattern) = normalize(&desc);
+        let (key, label, _pattern) = normalize(&desc, &pack);
         let month_key: &str = if date.len() >= 7 { &date[..7] } else { &date };
 
         months_seen
