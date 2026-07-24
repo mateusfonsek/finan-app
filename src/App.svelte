@@ -8,7 +8,11 @@
   import { loadOfxFromPath } from "$lib/ofx/load";
   import { takePendingOfx } from "$lib/api/files";
   import type { ParsedOfx } from "$lib/ofx/types";
+  import { locale } from "$lib/i18n/locale.svelte";
   import { routes } from "./routes/routes";
+
+  // Sync the UI language from the backend's persisted choice on boot.
+  void locale.init();
 
   const GITHUB_URL = "https://github.com/MateusFonseK/finan-app";
 
