@@ -4,7 +4,10 @@
   import { decodeOfxFile } from "$lib/ofx/normalize";
   import { parseOfx } from "$lib/ofx/parse";
   import { readFileBytes } from "$lib/api/files";
+  import { locale } from "$lib/i18n/locale.svelte";
   import type { ParsedOfx } from "$lib/ofx/types";
+
+  const t = locale.t;
 
   type Props = {
     onparsed?: (result: { file: File; parsed: ParsedOfx }) => void;
@@ -43,7 +46,7 @@
           active = false;
           const ofx = p.paths.find((path) => path.toLowerCase().endsWith(".ofx"));
           if (ofx) void handlePath(ofx);
-          else if (p.paths.length > 0) onerror?.("Solte um arquivo .ofx.");
+          else if (p.paths.length > 0) onerror?.(t("import.drop_ofx_error"));
         }
       })
       .then((un) => (unlisten = un));
@@ -109,15 +112,15 @@
   </div>
 
   <h3 class="text-base font-semibold tracking-tight" style="font-family: var(--font-display)">
-    Arraste seu extrato OFX
+    {t("import.dropzone_title")}
   </h3>
   <p class="text-fg-muted text-xs max-w-sm">
-    Exporte o extrato mensal do seu banco (Itaú, Nubank, Bradesco, etc.) no formato
-    <strong class="text-fg">.ofx</strong> e solte aqui — ou clique pra escolher um arquivo.
+    {t("import.dropzone_desc_1")}
+    <strong class="text-fg">.ofx</strong> {t("import.dropzone_desc_2")}
   </p>
 
   {#if busy}
-    <p class="text-fg-faint text-xs mt-2">Lendo arquivo…</p>
+    <p class="text-fg-faint text-xs mt-2">{t("import.reading")}</p>
   {/if}
 
   <input

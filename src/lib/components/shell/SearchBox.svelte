@@ -1,4 +1,8 @@
 <script lang="ts">
+  import { locale } from "$lib/i18n/locale.svelte";
+
+  const t = locale.t;
+
   type Props = {
     value: string;
     placeholder?: string;
@@ -6,7 +10,7 @@
     ref?: HTMLInputElement | null;
   };
 
-  let { value, placeholder = "Buscar…", onInput, ref = $bindable(null) }: Props = $props();
+  let { value, placeholder, onInput, ref = $bindable(null) }: Props = $props();
 </script>
 
 <div class="inline-flex items-center gap-1.5 px-2 py-1 rounded-md border border-border bg-surface-2 focus-within:border-accent focus-within:bg-bg transition-colors">
@@ -19,7 +23,7 @@
     type="text"
     data-search-input
     {value}
-    {placeholder}
+    placeholder={placeholder ?? t("search.placeholder")}
     oninput={(e) => onInput((e.currentTarget as HTMLInputElement).value)}
     class="bg-transparent border-0 outline-none text-[12px] w-44 text-fg placeholder:text-fg-faint"
   />
@@ -27,7 +31,7 @@
     <button
       type="button"
       onclick={() => onInput("")}
-      aria-label="Limpar busca"
+      aria-label={t("search.clear")}
       class="text-fg-faint hover:text-fg-muted text-[11px]"
     >
       ✕

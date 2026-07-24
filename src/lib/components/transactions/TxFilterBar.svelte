@@ -1,7 +1,10 @@
 <script lang="ts">
   import MonthStepper from "$lib/components/shell/MonthStepper.svelte";
   import SearchBox from "$lib/components/shell/SearchBox.svelte";
+  import { locale } from "$lib/i18n/locale.svelte";
   import type { Category } from "$lib/bindings";
+
+  const t = locale.t;
 
   type Props = {
     categories: Category[];
@@ -39,14 +42,14 @@
     }}
     class="text-[12px] rounded-md border border-border bg-surface-2 px-2 py-1 text-fg"
   >
-    <option value="">Todas as categorias</option>
+    <option value="">{t("tx_filter.all_categories")}</option>
     {#each categories as c}
       <option value={String(c.id)}>{c.name}</option>
     {/each}
   </select>
 
   {#if currentCategory}
-    <span class="text-[11px] text-fg-faint">· {currentCategory.kind}</span>
+    <span class="text-[11px] text-fg-faint">· {t("kind." + currentCategory.kind)}</span>
   {/if}
 
   <div class="ml-auto">

@@ -1,6 +1,9 @@
 <script lang="ts">
   import { Button } from "$lib/components/ui/button";
+  import { locale } from "$lib/i18n/locale.svelte";
   import type { CategoryWithCount } from "$lib/bindings";
+
+  const t = locale.t;
 
   type Props = {
     initial?: CategoryWithCount | null;
@@ -42,7 +45,7 @@
     e.preventDefault();
     error = null;
     if (name.trim().length === 0) {
-      error = "Nome não pode ser vazio.";
+      error = t("categories.name_required");
       return;
     }
     busy = true;
@@ -63,43 +66,43 @@
 
 <form onsubmit={submit} class="rounded-lg border border-border-subtle bg-surface p-4 flex flex-col gap-3">
   <div class="text-[10.5px] uppercase tracking-wider font-semibold text-fg-faint">
-    {initial ? "Editar categoria" : "Nova categoria"}
+    {initial ? t("categories.form_edit") : t("categories.form_new")}
   </div>
 
   <div class="grid grid-cols-[1fr_140px_auto] gap-2 items-end">
     <label class="flex flex-col gap-1">
-      <span class="text-[11px] text-fg-muted">Nome</span>
+      <span class="text-[11px] text-fg-muted">{t("categories.name")}</span>
       <input
         bind:value={name}
-        placeholder="ex: Pets"
+        placeholder={t("categories.name_placeholder")}
         class="rounded-md border border-border bg-surface-2 px-2 py-1 text-[12px] text-fg focus:outline-none focus:border-accent"
       />
     </label>
 
     <label class="flex flex-col gap-1">
-      <span class="text-[11px] text-fg-muted">Tipo</span>
+      <span class="text-[11px] text-fg-muted">{t("categories.type")}</span>
       <select
         bind:value={kind}
         class="rounded-md border border-border bg-surface-2 px-2 py-1 text-[12px] text-fg"
       >
-        <option value="expense">Despesa</option>
-        <option value="income">Receita</option>
-        <option value="transfer">Transferência</option>
+        <option value="expense">{t("kind.expense")}</option>
+        <option value="income">{t("kind.income")}</option>
+        <option value="transfer">{t("kind.transfer")}</option>
       </select>
     </label>
 
     <div class="flex gap-2">
       {#if onCancel}
-        <Button variant="ghost" onclick={onCancel} type="button">Cancelar</Button>
+        <Button variant="ghost" onclick={onCancel} type="button">{t("common.cancel")}</Button>
       {/if}
       <Button type="submit" disabled={busy}>
-        {busy ? "Salvando…" : initial ? "Salvar" : "Adicionar"}
+        {busy ? t("categories.saving") : initial ? t("categories.save") : t("categories.add")}
       </Button>
     </div>
   </div>
 
   <div class="flex flex-col gap-1.5">
-    <span class="text-[11px] text-fg-muted">Cor</span>
+    <span class="text-[11px] text-fg-muted">{t("categories.color")}</span>
     <div class="flex gap-1.5 flex-wrap">
       {#each COLOR_TOKENS as token}
         <button

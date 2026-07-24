@@ -1,4 +1,7 @@
 <script lang="ts">
+  import { locale } from "$lib/i18n/locale.svelte";
+
+  const t = locale.t;
   import { formatMoney } from "$lib/format/money";
   import type { CategorySpend } from "$lib/bindings";
 
@@ -37,7 +40,7 @@
   >
     <div class="absolute inset-[18px] rounded-full bg-surface border border-border-subtle"></div>
     <div class="relative text-center tabular">
-      <div class="text-[10px] uppercase tracking-wider text-fg-faint">Gastos</div>
+      <div class="text-[10px] uppercase tracking-wider text-fg-faint">{t("dashboard.expenses")}</div>
       <div class="text-[18px] font-semibold mt-px" style="font-family: var(--font-display)">
         {formatMoney(total)}
       </div>
@@ -61,7 +64,7 @@
       </li>
     {/each}
     {#if items.length === 0}
-      <li class="text-fg-faint italic">Sem gastos no período.</li>
+      <li class="text-fg-faint italic">{t("dashboard.no_expenses_period")}</li>
     {/if}
   </ul>
 </div>

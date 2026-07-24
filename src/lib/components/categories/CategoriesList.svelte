@@ -1,5 +1,8 @@
 <script lang="ts">
+  import { locale } from "$lib/i18n/locale.svelte";
   import type { CategoryWithCount } from "$lib/bindings";
+
+  const t = locale.t;
 
   type Props = {
     categories: CategoryWithCount[];
@@ -10,9 +13,7 @@
   let { categories, onEdit, onDelete }: Props = $props();
 
   function kindLabel(k: string): string {
-    if (k === "income") return "Receita";
-    if (k === "transfer") return "Transferência";
-    return "Despesa";
+    return t("kind." + k);
   }
 </script>
 
@@ -20,9 +21,9 @@
   <table class="w-full text-[12px]">
     <thead class="bg-surface-2">
       <tr>
-        <th class="text-left px-4 py-2 font-medium text-fg-faint uppercase tracking-wider text-[10.5px]">Categoria</th>
-        <th class="text-left px-4 py-2 font-medium text-fg-faint uppercase tracking-wider text-[10.5px] w-[140px]">Tipo</th>
-        <th class="text-right px-4 py-2 font-medium text-fg-faint uppercase tracking-wider text-[10.5px] w-[120px]">Transações</th>
+        <th class="text-left px-4 py-2 font-medium text-fg-faint uppercase tracking-wider text-[10.5px]">{t("categories.col_category")}</th>
+        <th class="text-left px-4 py-2 font-medium text-fg-faint uppercase tracking-wider text-[10.5px] w-[140px]">{t("categories.col_type")}</th>
+        <th class="text-right px-4 py-2 font-medium text-fg-faint uppercase tracking-wider text-[10.5px] w-[120px]">{t("categories.col_transactions")}</th>
         <th class="px-4 py-2 w-[140px]"></th>
       </tr>
     </thead>
@@ -44,21 +45,21 @@
               onclick={() => onEdit(c)}
               class="text-[11px] text-fg-muted hover:text-fg underline-offset-2 hover:underline"
             >
-              Editar
+              {t("categories.edit")}
             </button>
             <button
               type="button"
               onclick={() => onDelete(c)}
               class="text-[11px] text-neg hover:underline underline-offset-2"
             >
-              Apagar
+              {t("categories.delete")}
             </button>
           </td>
         </tr>
       {:else}
         <tr>
           <td colspan="4" class="px-4 py-10 text-center text-fg-faint">
-            Sem categorias.
+            {t("categories.empty")}
           </td>
         </tr>
       {/each}

@@ -1,6 +1,9 @@
 <script lang="ts">
   import { formatMoney } from "$lib/format/money";
+  import { locale } from "$lib/i18n/locale.svelte";
   import type { CalendarEvent, Category, Transaction } from "$lib/bindings";
+
+  const t = locale.t;
 
   type Props = {
     selectedDate: string | null;
@@ -40,9 +43,11 @@
 
   function billStatusText(e: CalendarEvent, state: BillState): string {
     if (state === "paid") {
-      return `Paga dia ${e.paid_day}${e.paid_amount ? " · " + formatMoney(e.paid_amount) : ""}`;
+      return e.paid_amount
+        ? t("day_details.paid_amount", { day: e.paid_day ?? "", amount: formatMoney(e.paid_amount) })
+        : t("day_details.paid", { day: e.paid_day ?? "" });
     }
-    return state === "overdue" ? "Vencida" : "Pendente";
+    return state === "overdue" ? t("day_details.overdue") : t("day_details.pending");
   }
 
   type Bucket = "gastos" | "renda" | "transfer" | "investimento";
@@ -68,10 +73,10 @@
     if (!selectedDate) return [];
     const day = transactions.filter((t) => t.date === selectedDate);
     const out: Group[] = [
-      { bucket: "renda",        label: "Renda",          color: "var(--color-pos)",        txs: [], total: 0 },
-      { bucket: "gastos",       label: "Gastos",         color: "var(--color-neg)",        txs: [], total: 0 },
-      { bucket: "transfer",     label: "Transferências", color: "var(--color-fg-faint)",   txs: [], total: 0 },
-      { bucket: "investimento", label: "Investimentos",  color: "var(--color-cat-investimento)", txs: [], total: 0 },
+      { bucket: "renda",        label: t("day_details.income"),       color: "var(--color-pos)",        txs: [], total: 0 },
+      { bucket: "gastos",       label: t("day_details.expenses"),     color: "var(--color-neg)",        txs: [], total: 0 },
+      { bucket: "transfer",     label: t("day_details.transfers"),    color: "var(--color-fg-faint)",   txs: [], total: 0 },
+      { bucket: "investimento", label: t("day_details.investments"),  color: "var(--color-cat-investimento)", txs: [], total: 0 },
     ];
     for (const t of day) {
       const b = bucketOf(t, categories);
@@ -92,8 +97,8 @@
   });
 
   function categoryName(id: number | null): string {
-    if (id == null) return "Sem categoria";
-    return categories.find((c) => c.id === id)?.name ?? "Sem categoria";
+    if (id == null) return t("day_details.no_category");
+    return categories.find((c) => c.id === id)?.name ?? t("day_details.no_category");
   }
 
   function categoryToken(id: number | null): string {
@@ -104,7 +109,7 @@
   function formatDateLong(d: string): string {
     const [y, m, day] = d.split("-").map(Number);
     const date = new Date(y, m - 1, day);
-    return date.toLocaleDateString("pt-BR", {
+    return date.toLocaleDateString(locale.dateLocale, {
       weekday: "long",
       day: "numeric",
       month: "long",
@@ -117,7 +122,7 @@
 <div class="rounded-lg border border-border-subtle bg-surface flex flex-col">
   <header class="px-4 pt-3 pb-2 flex flex-col gap-0.5 border-b border-border-subtle">
     <div class="text-[10.5px] uppercase tracking-wider font-semibold text-fg-faint">
-      {selectedDate ? "Dia selecionado" : "Selecione um dia"}
+      {selectedDate ? t("day_details.selected_day") : t("day_details.select_day")}
     </div>
     {#if selectedDate}
       <div class="text-[13px] font-medium text-fg">{formatDateLong(selectedDate)}</div>
@@ -126,18 +131,18 @@
 
   {#if !selectedDate}
     <div class="px-4 py-6 text-[12px] text-fg-faint italic">
-      Clique em qualquer dia do calendário pra ver as transações desse dia.
+      {t("day_details.empty_select")}
     </div>
   {:else if !hasAny}
     <div class="px-4 py-6 text-[12px] text-fg-faint italic">
-      Nenhuma transação nesse dia.
+      {t("day_details.empty_none")}
     </div>
   {:else}
     {#if dueOnSelectedDay.length > 0}
       <!-- Contas com vencimento neste dia, com estado visual claro -->
       <section class="border-b border-border-subtle">
         <div class="px-4 py-1.5 bg-surface-2/50 text-[10.5px] uppercase tracking-wider font-semibold text-fg-faint">
-          Contas com vencimento
+          {t("day_details.due_bills")}
         </div>
         <ul>
           {#each dueOnSelectedDay as e (e.rule_id)}
@@ -180,19 +185,19 @@
     <!-- Totais REAIS (excluem transfer/investimento) — alinhado com KPIs do Dashboard -->
     <div class="px-4 py-3 grid grid-cols-3 gap-2 border-b border-border-subtle">
       <div class="flex flex-col gap-0.5">
-        <span class="text-[9.5px] uppercase tracking-wider text-fg-faint">Renda</span>
+        <span class="text-[9.5px] uppercase tracking-wider text-fg-faint">{t("day_details.income")}</span>
         <span class="text-[11.5px] tabular text-pos font-medium">
           {totals.renda > 0 ? formatMoney(String(totals.renda)) : "—"}
         </span>
       </div>
       <div class="flex flex-col gap-0.5">
-        <span class="text-[9.5px] uppercase tracking-wider text-fg-faint">Gastos</span>
+        <span class="text-[9.5px] uppercase tracking-wider text-fg-faint">{t("day_details.expenses")}</span>
         <span class="text-[11.5px] tabular text-neg font-medium">
           {totals.gastos > 0 ? formatMoney(String(totals.gastos)) : "—"}
         </span>
       </div>
       <div class="flex flex-col gap-0.5">
-        <span class="text-[9.5px] uppercase tracking-wider text-fg-faint">Saldo</span>
+        <span class="text-[9.5px] uppercase tracking-wider text-fg-faint">{t("day_details.balance")}</span>
         <span class="text-[11.5px] tabular font-semibold {totals.net >= 0 ? 'text-pos' : 'text-neg'}">
           {formatMoney(String(totals.net))}
         </span>

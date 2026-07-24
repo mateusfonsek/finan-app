@@ -2,6 +2,9 @@
   import { onMount } from "svelte";
   import { openUrl } from "@tauri-apps/plugin-opener";
   import logoUrl from "$lib/assets/logo.png";
+  import { locale } from "$lib/i18n/locale.svelte";
+
+  const t = locale.t;
 
   type Props = { onClose: () => void };
   let { onClose }: Props = $props();
@@ -10,12 +13,9 @@
 
   let closeEl: HTMLButtonElement | undefined = $state();
 
-  const specs = [
-    { label: "Sem internet", value: "Funciona sem precisar de conexão" },
-    { label: "Sem conta", value: "Nada de cadastro nem senha" },
-    { label: "Sem custo", value: "Grátis e sem anúncios" },
-    { label: "Sem pegadinha", value: "Você vê tudo que ele faz" },
-  ];
+  let specs = $derived(
+    locale.raw<Array<{ label: string; value: string }>>("about.specs") ?? [],
+  );
 
   function onkeydown(e: KeyboardEvent) {
     if (e.key === "Escape") {
@@ -38,7 +38,7 @@
 <!-- backdrop -->
 <button
   type="button"
-  aria-label="Fechar"
+  aria-label={t("common.close")}
   onclick={onClose}
   class="fixed inset-0 z-40 bg-black/50"
   style="backdrop-filter: blur(2px)"
@@ -48,7 +48,7 @@
 <div
   role="dialog"
   aria-modal="true"
-  aria-label="Sobre o finan app"
+  aria-label={t("sidebar.about_title")}
   class="fixed left-1/2 top-1/2 z-50 w-[min(400px,calc(100vw-2rem))] max-h-[calc(100vh-3rem)] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-2xl border border-border bg-surface"
   style="box-shadow: 0 24px 64px -16px rgba(0,0,0,.65), 0 0 0 1px var(--color-border)"
 >
@@ -56,7 +56,7 @@
     bind:this={closeEl}
     type="button"
     onclick={onClose}
-    aria-label="Fechar"
+    aria-label={t("common.close")}
     class="absolute right-4 top-4 z-10 text-fg-faint hover:text-fg transition-colors"
   >
     ✕
@@ -76,7 +76,7 @@
         <h2 class="text-[22px] font-semibold tracking-tight leading-none" style="font-family: var(--font-display)">
           finan app
         </h2>
-        <p class="text-[12.5px] text-fg-muted">O dinheiro é seu. Os dados também.</p>
+        <p class="text-[12.5px] text-fg-muted">{t("about.tagline")}</p>
       </div>
     </div>
 
@@ -84,8 +84,7 @@
 
     <!-- promise -->
     <p class="px-10 py-7 text-center text-[12.5px] text-fg-muted leading-relaxed">
-      Sem conta, sem nuvem, sem internet. Tudo que você registra fica no seu
-      computador e só você vê.
+      {t("about.promise")}
     </p>
 
     <div class="h-px bg-border-subtle"></div>
@@ -114,8 +113,7 @@
         github.com/MateusFonseK ↗
       </button>
       <p class="text-[10.5px] text-fg-faint leading-relaxed pt-2">
-        Serve pra você organizar suas finanças pessoais. Não dá conselhos de
-        investimento nem funciona como banco.
+        {t("about.disclaimer")}
       </p>
     </div>
   </div>

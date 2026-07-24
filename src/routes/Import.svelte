@@ -1,4 +1,7 @@
 <script lang="ts">
+  import { locale } from "$lib/i18n/locale.svelte";
+
+  const t = locale.t;
   import { onMount } from "svelte";
   import { push } from "svelte-spa-router";
   import { Button } from "$lib/components/ui/button";
@@ -53,7 +56,7 @@
 
   async function prepareImport(parsed: ParsedOfx) {
     busy = true;
-    busyMsg = "Preparando…";
+    busyMsg = t("import.preparing");
     try {
       account = await createOrGetAccount({
         name: parsed.account.displayName,
@@ -119,9 +122,9 @@
           description: t.description,
           ofx_fitid: t.fitid,
         }));
-      busyMsg = "Importando…";
+      busyMsg = t("import.importing");
       importResult = await insertTransactions(account.id, toInsert);
-      busyMsg = "Resolvendo CNPJs novos…";
+      busyMsg = t("import.resolving_cnpj");
       autoReport = await autoClassifyWithCnpj(account.id);
     } catch (e) {
       error = e instanceof Error ? e.message : String(e);
@@ -183,9 +186,7 @@
 
   async function onDeleteRule(rule: Rule) {
     if (!autoReport) return;
-    const ok = confirm(
-      `Apagar regra "${rule.pattern}"? As transações categorizadas por ela voltarão a ficar sem categoria.`,
-    );
+    const ok = confirm(t("import.delete_rule_confirm", { pattern: rule.pattern }));
     if (!ok) return;
     busyKey = `rule:${rule.id}`;
     try {
@@ -205,7 +206,7 @@
     if (!autoReport) return;
     const categoryId = chosen[cnpj];
     if (categoryId == null) {
-      error = "Escolha uma categoria antes de criar a regra.";
+      error = t("import.choose_category_first");
       return;
     }
     const u = autoReport.unresolved.find((x) => x.cnpj === cnpj);
@@ -247,7 +248,7 @@
 <section class="p-8 max-w-5xl mx-auto flex flex-col gap-5">
   <header class="flex items-baseline justify-between">
     <h2 class="text-xl font-semibold tracking-tight" style="font-family: var(--font-display)">
-      Importar OFX
+      {t("nav.import")}
     </h2>
     {#if pending}
       <span class="text-xs text-fg-faint tabular">{pending.file.name}</span>
@@ -260,19 +261,18 @@
     <!-- ============ Post-import view ============ -->
     <div class="rounded-lg border border-border-subtle bg-surface p-4 flex flex-col gap-1.5">
       <div class="text-[10.5px] uppercase tracking-wider font-semibold text-fg-faint">
-        Resultado do import
+        {t("import.result_title")}
       </div>
       <div class="text-[13px] text-fg">
         <span class="font-medium">{importResult.inserted}</span>
-        {importResult.inserted === 1 ? "transação importada" : "transações importadas"}
+        {importResult.inserted === 1 ? t("import.imported_one") : t("import.imported_many")}
         {#if importResult.skipped_duplicates > 0}
-          · <span class="text-fg-faint">{importResult.skipped_duplicates} duplicadas ignoradas</span>
+          · <span class="text-fg-faint">{t("import.skipped_dups", { n: importResult.skipped_duplicates })}</span>
         {/if}
       </div>
       <div class="text-[12px] text-fg-muted">
         <span class="text-fg font-medium">{autoReport.txs_classified}</span>
-        categorizada{autoReport.txs_classified === 1 ? "" : "s"} automaticamente
-        via regras existentes + CNPJ novo.
+        {autoReport.txs_classified === 1 ? t("import.classified_one") : t("import.classified_many")}
       </div>
     </div>
 
@@ -280,10 +280,10 @@
       <div class="rounded-xl bg-surface border border-border-subtle p-4 flex flex-col gap-3">
         <div class="flex items-baseline justify-between">
           <div class="text-[10.5px] uppercase tracking-wider font-semibold text-fg-faint">
-            Regras criadas via CNPJ ({autoReport.created_rules.length})
+            {t("import.rules_created_title", { n: autoReport.created_rules.length })}
           </div>
           <div class="text-[10.5px] text-fg-faint">
-            Apagar uma regra desfaz a categorização das transações casadas por ela.
+            {t("import.rules_created_hint")}
           </div>
         </div>
         <div class="flex flex-col gap-2">
@@ -301,7 +301,7 @@
                     if (e.key === "Enter") (e.currentTarget as HTMLInputElement).blur();
                   }}
                   class="rounded-md border border-transparent hover:border-border focus:border-accent bg-transparent focus:bg-surface-2 px-2 py-1 text-[12.5px] text-fg font-medium focus:outline-none w-full"
-                  title="Nome amigável da regra"
+                  title={t("import.rule_name_title")}
                 />
                 <div class="text-[10.5px] text-fg-faint tabular px-2">{r.pattern}</div>
               </div>
@@ -313,7 +313,7 @@
                 }}
                 disabled={busyKey === `rule:${r.id}`}
                 class="rounded-md border border-border bg-surface-2 px-2 py-1 text-[12px] text-fg"
-                title="Categoria sugerida pela CNAE — você pode alterar"
+                title={t("import.rule_category_title")}
               >
                 {#each categories as c}
                   <option value={String(c.id)}>{c.name}</option>
@@ -324,7 +324,7 @@
                 onclick={() => onDeleteRule(r)}
                 disabled={busyKey === `rule:${r.id}`}
               >
-                {busyKey === `rule:${r.id}` ? "…" : "Apagar"}
+                {busyKey === `rule:${r.id}` ? "…" : t("import.delete")}
               </Button>
             </div>
           {/each}
@@ -335,11 +335,10 @@
     {#if autoReport.unresolved.length > 0}
       <div class="rounded-xl bg-surface border border-border-subtle p-4 flex flex-col gap-3">
         <div class="text-[10.5px] uppercase tracking-wider font-semibold text-fg-faint">
-          CNPJs sem mapeamento CNAE ({autoReport.unresolved.length})
+          {t("import.unresolved_title", { n: autoReport.unresolved.length })}
         </div>
         <div class="text-[10.5px] text-fg-faint">
-          A BrasilAPI retornou dados, mas a atividade (CNAE) não está mapeada
-          pra uma categoria. Escolha manualmente.
+          {t("import.unresolved_hint")}
         </div>
         <div class="flex flex-col gap-2">
           {#each autoReport.unresolved as u}
@@ -351,7 +350,7 @@
                 <div class="text-[10.5px] text-fg-faint tabular">
                   {u.cnpj}
                   {#if u.cnae_fiscal_descricao}
-                    · CNAE {u.cnae_fiscal ?? "—"} · {u.cnae_fiscal_descricao}
+                    {t("import.cnae_label", { code: u.cnae_fiscal ?? "—", desc: u.cnae_fiscal_descricao })}
                   {/if}
                 </div>
               </div>
@@ -363,7 +362,7 @@
                 }}
                 class="rounded-md border border-border bg-surface-2 px-2 py-1 text-[12px] text-fg"
               >
-                <option value="">— categoria —</option>
+                <option value="">{t("import.category_placeholder")}</option>
                 {#each categories as c}
                   <option value={String(c.id)}>{c.name}</option>
                 {/each}
@@ -372,7 +371,7 @@
                 onclick={() => onCreateRuleForCnpj(u.cnpj)}
                 disabled={busyKey === `cnpj:${u.cnpj}` || chosen[u.cnpj] == null}
               >
-                {busyKey === `cnpj:${u.cnpj}` ? "Criando…" : "Criar regra"}
+                {busyKey === `cnpj:${u.cnpj}` ? t("import.creating") : t("import.create_rule")}
               </Button>
             </div>
           {/each}
@@ -385,8 +384,8 @@
     {/if}
 
     <div class="flex justify-end gap-2 sticky bottom-0 bg-bg pt-3 border-t border-border-subtle">
-      <Button variant="ghost" onclick={reset}>Importar outro arquivo</Button>
-      <Button onclick={() => push("/transactions")}>Ver transações</Button>
+      <Button variant="ghost" onclick={reset}>{t("import.import_another")}</Button>
+      <Button onclick={() => push("/transactions")}>{t("import.view_transactions")}</Button>
     </div>
   {:else}
     <!-- ============ Preview view ============ -->
@@ -395,7 +394,7 @@
       <div class="flex flex-col gap-3">
         <div class="rounded-lg border border-border-subtle bg-surface p-4 flex items-center gap-3">
           <div class="text-[10.5px] uppercase tracking-wider font-semibold text-accent-hi bg-accent-soft border border-accent/30 rounded-full px-2 py-0.5">
-            {p.account.bank === "unknown" ? "Desconhecido" : p.account.bank}
+            {p.account.bank === "unknown" ? t("import.bank_unknown") : p.account.bank}
           </div>
           <div
             class="text-[10.5px] uppercase tracking-wider font-semibold rounded-full px-2 py-0.5 border"
@@ -403,14 +402,14 @@
               ? "color: var(--color-cat-amarelo); border-color: var(--color-cat-amarelo); background: color-mix(in oklch, var(--color-cat-amarelo) 14%, transparent);"
               : "color: var(--color-fg-muted); border-color: var(--color-border); background: var(--color-surface-2);"}
             title={p.account.type === "credit_card"
-              ? "Fatura de cartão de crédito"
-              : "Extrato de conta corrente"}
+              ? t("import.credit_card_title")
+              : t("import.checking_title")}
           >
-            {p.account.type === "credit_card" ? "Cartão de crédito" : "Conta corrente"}
+            {p.account.type === "credit_card" ? t("import.credit_card") : t("import.checking")}
           </div>
           <div class="text-sm font-medium">{p.account.displayName}</div>
           <div class="ml-auto text-xs text-fg-faint tabular">
-            {p.transactions.length} transações ·
+            {t("import.tx_count", { n: p.transactions.length })} ·
             {p.summary.earliest ?? "?"} → {p.summary.latest ?? "?"}
           </div>
         </div>
@@ -426,15 +425,15 @@
       </div>
 
       <aside class="rounded-lg border border-border-subtle bg-surface p-4 flex flex-col gap-2 text-[12px]">
-        <div class="text-[10.5px] uppercase tracking-wider font-semibold text-fg-faint mb-1">Resumo</div>
-        <div class="flex justify-between"><span class="text-fg-muted">Entradas</span><span class="tabular text-pos">{formatMoney(p.summary.totalIn)}</span></div>
-        <div class="flex justify-between"><span class="text-fg-muted">Saídas</span><span class="tabular">{formatMoney(p.summary.totalOut)}</span></div>
-        <div class="flex justify-between border-t border-border-subtle pt-2 mt-1"><span class="text-fg-muted">Líquido</span><span class="tabular font-semibold">{formatMoney(p.summary.net)}</span></div>
-        <div class="flex justify-between mt-2"><span class="text-fg-muted">Selecionadas</span><span class="tabular">{selected.size}</span></div>
-        <div class="flex justify-between"><span class="text-fg-muted">Duplicadas</span><span class="tabular text-fg-faint">{duplicateKeys.size}</span></div>
+        <div class="text-[10.5px] uppercase tracking-wider font-semibold text-fg-faint mb-1">{t("import.summary")}</div>
+        <div class="flex justify-between"><span class="text-fg-muted">{t("import.sum_inflows")}</span><span class="tabular text-pos">{formatMoney(p.summary.totalIn)}</span></div>
+        <div class="flex justify-between"><span class="text-fg-muted">{t("import.sum_outflows")}</span><span class="tabular">{formatMoney(p.summary.totalOut)}</span></div>
+        <div class="flex justify-between border-t border-border-subtle pt-2 mt-1"><span class="text-fg-muted">{t("import.sum_net")}</span><span class="tabular font-semibold">{formatMoney(p.summary.net)}</span></div>
+        <div class="flex justify-between mt-2"><span class="text-fg-muted">{t("import.sum_selected")}</span><span class="tabular">{selected.size}</span></div>
+        <div class="flex justify-between"><span class="text-fg-muted">{t("import.sum_duplicates")}</span><span class="tabular text-fg-faint">{duplicateKeys.size}</span></div>
         {#if reversalMap.size > 0}
-          <div class="flex justify-between" title="Pares estorno/reembolso ↔ transação revertida (desmarcados por padrão)">
-            <span class="text-fg-muted">Pares neutralizados</span>
+          <div class="flex justify-between" title={t("import.neutralized_pairs_title")}>
+            <span class="text-fg-muted">{t("import.neutralized_pairs")}</span>
             <span class="tabular text-fg-faint">{reversalMap.size / 2}</span>
           </div>
         {/if}
@@ -446,9 +445,9 @@
     {/if}
 
     <div class="flex justify-end gap-2 sticky bottom-0 bg-bg pt-3 border-t border-border-subtle">
-      <Button variant="ghost" onclick={reset}>Cancelar</Button>
+      <Button variant="ghost" onclick={reset}>{t("common.cancel")}</Button>
       <Button onclick={confirmImport} disabled={busy || selected.size === 0}>
-        {busy ? busyMsg || "Importando…" : `Importar ${selected.size} ${selected.size === 1 ? "transação" : "transações"}`}
+        {busy ? (busyMsg || t("import.importing")) : (selected.size === 1 ? t("import.import_n_one", { n: selected.size }) : t("import.import_n_many", { n: selected.size }))}
       </Button>
     </div>
   {/if}

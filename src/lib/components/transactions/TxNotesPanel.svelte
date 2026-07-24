@@ -1,4 +1,7 @@
 <script lang="ts">
+  import { locale } from "$lib/i18n/locale.svelte";
+
+  const t = locale.t;
   import { tick } from "svelte";
   import { Button } from "$lib/components/ui/button";
   import { formatMoney } from "$lib/format/money";
@@ -37,11 +40,11 @@
     ruleError = null;
     const pattern = rulePattern.trim();
     if (!pattern) {
-      ruleError = "Pattern não pode ser vazio.";
+      ruleError = t("rule_form.pattern_required");
       return;
     }
     if (ruleCategoryId === null) {
-      ruleError = "Selecione uma categoria.";
+      ruleError = t("rule_form.category_required");
       return;
     }
     ruleBusy = true;
@@ -82,7 +85,7 @@
 
 <button
   type="button"
-  aria-label="Fechar"
+  aria-label={t("common.close")}
   onclick={onClose}
   class="fixed inset-0 z-20 bg-black/30"
 ></button>
@@ -92,25 +95,25 @@
   style="box-shadow: -12px 0 32px -8px rgba(0,0,0,.55)"
 >
   <header class="flex items-center justify-between px-4 py-3 border-b border-border-subtle">
-    <span class="text-[10.5px] uppercase tracking-wider font-semibold text-fg-faint">Detalhe</span>
-    <button type="button" onclick={onClose} class="text-fg-muted hover:text-fg" aria-label="Fechar">
+    <span class="text-[10.5px] uppercase tracking-wider font-semibold text-fg-faint">{t("tx_notes.detail")}</span>
+    <button type="button" onclick={onClose} class="text-fg-muted hover:text-fg" aria-label={t("common.close")}>
       ✕
     </button>
   </header>
 
   <div class="p-4 flex flex-col gap-3 text-[12px]">
     <div class="flex justify-between">
-      <span class="text-fg-muted">Data</span>
+      <span class="text-fg-muted">{t("tx_table.date")}</span>
       <span class="tabular">{transaction.date}</span>
     </div>
     <div class="flex justify-between">
-      <span class="text-fg-muted">Valor</span>
+      <span class="text-fg-muted">{t("tx_table.amount")}</span>
       <span class="tabular font-semibold {Number(transaction.amount) >= 0 ? 'text-pos' : 'text-fg'}">
         {formatMoney(transaction.amount)}
       </span>
     </div>
     <div class="flex flex-col gap-1">
-      <span class="text-fg-muted">Descrição</span>
+      <span class="text-fg-muted">{t("tx_table.description")}</span>
       <span class="text-fg">{transaction.description}</span>
     </div>
     {#if transaction.ofx_fitid}
@@ -124,21 +127,21 @@
   <div class="px-4 pb-3 border-b border-border-subtle">
     {#if !ruleOpen}
       <Button variant="ghost" onclick={openRuleForm} class="w-full justify-center">
-        + Criar regra desta transação
+        {t("tx_notes.create_rule_cta")}
       </Button>
     {:else}
       <div class="flex flex-col gap-2 rounded-md border border-border-subtle bg-surface-2/50 p-3">
-        <span class="text-[10.5px] uppercase tracking-wider font-semibold text-fg-faint">Nova regra</span>
+        <span class="text-[10.5px] uppercase tracking-wider font-semibold text-fg-faint">{t("tx_notes.new_rule")}</span>
         <label class="flex flex-col gap-1">
-          <span class="text-[11px] text-fg-muted">Pattern (descrição contém)</span>
+          <span class="text-[11px] text-fg-muted">{t("rule_form.pattern_label")}</span>
           <input
             bind:value={rulePattern}
             class="rounded-md border border-border bg-surface px-2 py-1 text-[12px] text-fg font-mono focus:outline-none focus:border-accent"
-            title="LIKE substring que será gravado na regra"
+            title={t("tx_notes.pattern_title")}
           />
         </label>
         <label class="flex flex-col gap-1">
-          <span class="text-[11px] text-fg-muted">Categoria</span>
+          <span class="text-[11px] text-fg-muted">{t("rule_form.category")}</span>
           <select
             value={ruleCategoryId === null ? "" : String(ruleCategoryId)}
             onchange={(e) => {
@@ -147,7 +150,7 @@
             }}
             class="rounded-md border border-border bg-surface px-2 py-1 text-[12px] text-fg"
           >
-            <option value="">— selecione —</option>
+            <option value="">{t("rule_form.select_placeholder")}</option>
             {#each categories as c}
               <option value={String(c.id)}>{c.name}</option>
             {/each}
@@ -157,9 +160,9 @@
           <div class="text-[11px] text-neg">{ruleError}</div>
         {/if}
         <div class="flex justify-end gap-2">
-          <Button variant="ghost" onclick={() => (ruleOpen = false)} disabled={ruleBusy}>Cancelar</Button>
+          <Button variant="ghost" onclick={() => (ruleOpen = false)} disabled={ruleBusy}>{t("common.cancel")}</Button>
           <Button onclick={createRule} disabled={ruleBusy}>
-            {ruleBusy ? "Criando…" : "Criar e aplicar"}
+            {ruleBusy ? t("tx_notes.creating") : t("tx_notes.create_apply")}
           </Button>
         </div>
       </div>
@@ -168,20 +171,20 @@
 
   <div class="px-4 pb-2 pt-3">
     <label class="text-[10.5px] uppercase tracking-wider font-semibold text-fg-faint mb-1 block" for="tx-notes">
-      Notes
+      {t("tx_notes.notes")}
     </label>
     <textarea
       id="tx-notes"
       bind:this={textarea}
       bind:value={draft}
-      placeholder="Anotações sobre essa transação…"
+      placeholder={t("tx_notes.notes_placeholder")}
       rows="6"
       class="w-full rounded-md border border-border bg-surface-2 p-2 text-[12px] text-fg resize-none focus:outline-none focus:border-accent focus:bg-bg"
     ></textarea>
   </div>
 
   <footer class="mt-auto px-4 py-3 border-t border-border-subtle flex justify-end gap-2">
-    <Button variant="ghost" onclick={onClose}>Cancelar</Button>
-    <Button onclick={save} disabled={busy}>{busy ? "Salvando…" : "Salvar"}</Button>
+    <Button variant="ghost" onclick={onClose}>{t("common.cancel")}</Button>
+    <Button onclick={save} disabled={busy}>{busy ? t("categories.saving") : t("categories.save")}</Button>
   </footer>
 </aside>

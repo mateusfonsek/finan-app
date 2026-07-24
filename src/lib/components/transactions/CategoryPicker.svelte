@@ -1,6 +1,9 @@
 <script lang="ts">
   import { onMount, tick } from "svelte";
+  import { locale } from "$lib/i18n/locale.svelte";
   import type { Category } from "$lib/bindings";
+
+  const t = locale.t;
 
   type Props = {
     categories: Category[];
@@ -127,7 +130,7 @@
       <span class="w-2 h-2 rounded-full" style={colorStyle(current.color_token)}></span>
       <span class="text-fg">{current.name}</span>
     {:else}
-      <span class="text-fg-faint">Sem categoria</span>
+      <span class="text-fg-faint">{t("category_picker.no_category")}</span>
     {/if}
   </button>
 
@@ -141,7 +144,7 @@
           bind:this={inputEl}
           bind:value={query}
           {onkeydown}
-          placeholder="Buscar ou criar…"
+          placeholder={t("category_picker.search_or_create")}
           class="w-full bg-transparent border-0 outline-none text-[12px] px-1.5 py-1"
         />
       </div>
@@ -159,19 +162,19 @@
             >
               {#if opt.kind === "clear"}
                 <span class="w-2 h-2 rounded-full bg-transparent border border-border"></span>
-                <span class="italic">Remover categoria</span>
+                <span class="italic">{t("category_picker.remove_category")}</span>
               {:else if opt.kind === "category"}
                 <span class="w-2 h-2 rounded-full" style={colorStyle(opt.category.color_token)}></span>
                 <span>{opt.category.name}</span>
-                <span class="ml-auto text-[10px] text-fg-faint">{opt.category.kind}</span>
+                <span class="ml-auto text-[10px] text-fg-faint">{t("kind." + opt.category.kind)}</span>
               {:else}
                 <span class="w-2 h-2 rounded-full bg-accent"></span>
-                <span>Criar <strong class="text-fg">"{opt.name}"</strong></span>
+                <span>{t("category_picker.create_prefix")} <strong class="text-fg">"{opt.name}"</strong></span>
               {/if}
             </button>
           </li>
         {:else}
-          <li class="px-2.5 py-2 text-fg-faint italic">Nenhuma categoria.</li>
+          <li class="px-2.5 py-2 text-fg-faint italic">{t("category_picker.empty")}</li>
         {/each}
       </ul>
     </div>

@@ -1,4 +1,7 @@
 <script lang="ts">
+  import { locale } from "$lib/i18n/locale.svelte";
+
+  const t = locale.t;
   import { formatMoney } from "$lib/format/money";
   import type { CategorySpend } from "$lib/bindings";
 
@@ -39,6 +42,6 @@
       </div>
     </div>
   {:else}
-    <div class="text-fg-faint italic text-[12px]">Sem gastos no período.</div>
+    <div class="text-fg-faint italic text-[12px]">{t("dashboard.no_expenses_period")}</div>
   {/each}
 </div>

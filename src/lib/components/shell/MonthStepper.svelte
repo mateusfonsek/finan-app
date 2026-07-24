@@ -1,5 +1,8 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import { locale } from "$lib/i18n/locale.svelte";
+
+  const t = locale.t;
 
   type Props = {
     /** "YYYY-MM" = mês específico, "YYYY" = ano inteiro, null = todos os períodos */
@@ -9,14 +12,9 @@
 
   let { month, onChange }: Props = $props();
 
-  const MONTH_NAMES = [
-    "Jan", "Fev", "Mar", "Abr", "Mai", "Jun",
-    "Jul", "Ago", "Set", "Out", "Nov", "Dez",
-  ];
-  const MONTH_NAMES_FULL = [
-    "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
-    "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro",
-  ];
+  function monthShort(i: number): string {
+    return locale.monthsShort[i] ?? String(i + 1);
+  }
 
   function currentYear(): number {
     return new Date().getFullYear();
@@ -51,10 +49,10 @@
   function computeLabel(m: string | null, mo: "month" | "year"): string {
     if (mo === "year" && m) return m;
     if (mo === "month" && m && m.length === 7) {
-      return `${MONTH_NAMES[Number(m.slice(5, 7)) - 1]}/${m.slice(0, 4)}`;
+      return `${monthShort(Number(m.slice(5, 7)) - 1)}/${m.slice(0, 4)}`;
     }
     // fallback: mês atual (enquanto $effect ainda não normalizou)
-    return `${MONTH_NAMES[currentMonth() - 1]}/${currentYear()}`;
+    return `${monthShort(currentMonth() - 1)}/${currentYear()}`;
   }
 
   function shift(delta: number) {
@@ -164,7 +162,7 @@
       type="button"
       class="px-2 py-1 text-fg-muted hover:bg-hover rounded-l-md"
       onclick={() => shift(-1)}
-      aria-label={mode === "year" ? "Ano anterior" : "Mês anterior"}
+      aria-label={mode === "year" ? t("month_stepper.prev_year") : t("month_stepper.prev_month")}
     >
       ‹
     </button>
@@ -175,7 +173,7 @@
       type="button"
       class="px-2 py-1 text-fg-muted hover:bg-hover rounded-r-md"
       onclick={() => shift(1)}
-      aria-label={mode === "year" ? "Próximo ano" : "Próximo mês"}
+      aria-label={mode === "year" ? t("month_stepper.next_year") : t("month_stepper.next_month")}
     >
       ›
     </button>
@@ -186,7 +184,7 @@
     type="button"
     onclick={togglePicker}
     class="w-7 h-7 grid place-items-center rounded-md border border-border bg-surface-2 text-fg-muted hover:bg-hover hover:text-fg transition-colors"
-    aria-label="Calendário"
+    aria-label={t("month_stepper.calendar")}
   >
     <svg
       viewBox="0 0 24 24"
@@ -213,7 +211,7 @@
           type="button"
           onclick={() => (pickerYear -= 1)}
           class="w-7 h-7 grid place-items-center text-fg-muted hover:bg-hover rounded-md"
-          aria-label="Ano anterior"
+          aria-label={t("month_stepper.prev_year")}
         >
           ‹
         </button>
@@ -222,7 +220,7 @@
           onclick={() => pickYearOnly(pickerYear)}
           class="text-[13.5px] font-semibold tabular tracking-tight hover:bg-hover rounded-md px-3 py-0.5
                  {selYear === pickerYear && selMonth === null ? 'bg-accent-soft text-fg' : 'text-fg'}"
-          title="Filtrar pelo ano inteiro"
+          title={t("month_stepper.filter_year")}
           style="font-family: var(--font-display)"
         >
           {pickerYear}
@@ -231,14 +229,14 @@
           type="button"
           onclick={() => (pickerYear += 1)}
           class="w-7 h-7 grid place-items-center text-fg-muted hover:bg-hover rounded-md"
-          aria-label="Próximo ano"
+          aria-label={t("month_stepper.next_year")}
         >
           ›
         </button>
       </div>
 
       <div class="grid grid-cols-3 gap-1">
-        {#each MONTH_NAMES_FULL as name, i}
+        {#each locale.months as name, i}
           {@const monthNum = i + 1}
           {@const isSelected = selYear === pickerYear && selMonth === monthNum}
           <button
@@ -248,7 +246,7 @@
                    {isSelected ? 'bg-accent text-accent-on font-medium' : 'text-fg-muted hover:bg-hover hover:text-fg'}"
             title={name}
           >
-            {name.slice(0, 3)}
+            {monthShort(i)}
           </button>
         {/each}
       </div>
@@ -263,7 +261,7 @@
             }}
             class="text-fg-faint hover:text-fg-muted underline-offset-2 hover:underline"
           >
-            Todos os meses
+            {t("month_stepper.all_months")}
           </button>
         {:else}
           <span></span>
@@ -273,7 +271,7 @@
           onclick={pickCurrentMonth}
           class="text-accent hover:underline underline-offset-2"
         >
-          Mês atual
+          {t("month_stepper.current_month")}
         </button>
       </div>
     </div>

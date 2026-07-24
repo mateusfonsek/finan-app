@@ -1,4 +1,7 @@
 <script lang="ts">
+  import { locale } from "$lib/i18n/locale.svelte";
+
+  const t = locale.t;
   import { onMount } from "svelte";
   import MonthStepper from "$lib/components/shell/MonthStepper.svelte";
   import CalendarGrid, { type DayFlow } from "$lib/components/calendar/CalendarGrid.svelte";
@@ -147,11 +150,10 @@
   <header class="flex items-baseline justify-between gap-4 flex-wrap">
     <div class="flex flex-col gap-1">
       <h2 class="text-xl font-semibold tracking-tight" style="font-family: var(--font-display)">
-        Calendário
+        {t("nav.calendar")}
       </h2>
       <p class="text-xs text-fg-faint max-w-xl">
-        Heatmap de entradas/saídas <strong>reais</strong> (sem transferências e investimentos).
-        Clique em um dia pra ver tudo que aconteceu nele, agrupado por tipo.
+        {t("calendar_page.desc_1")} <strong>{t("calendar_page.desc_strong")}</strong> {t("calendar_page.desc_2")}
       </p>
     </div>
     <MonthStepper month={viewMonth} onChange={onMonthChange} />
@@ -164,22 +166,22 @@
   <!-- Resumo do mês compacto (sempre visível, mesmo em mês vazio) -->
   <div class="rounded-lg border border-border-subtle bg-surface px-4 py-2.5 flex items-center gap-6 text-[12px]">
     <div class="flex items-center gap-2">
-      <span class="text-fg-faint text-[10.5px] uppercase tracking-wider">Entradas</span>
+      <span class="text-fg-faint text-[10.5px] uppercase tracking-wider">{t("calendar_page.inflows")}</span>
       <span class="tabular text-pos font-medium">
         {monthTotals.inflow > 0 ? formatMoney(String(monthTotals.inflow)) : "—"}
       </span>
     </div>
     <div class="flex items-center gap-2">
-      <span class="text-fg-faint text-[10.5px] uppercase tracking-wider">Saídas</span>
+      <span class="text-fg-faint text-[10.5px] uppercase tracking-wider">{t("calendar_page.outflows")}</span>
       <span class="tabular text-neg font-medium">
         {monthTotals.outflow > 0 ? formatMoney(String(monthTotals.outflow)) : "—"}
       </span>
     </div>
     <div class="flex items-center gap-2 ml-auto">
       {#if loading}
-        <span class="text-fg-faint text-[11px]">carregando…</span>
+        <span class="text-fg-faint text-[11px]">{t("calendar_page.loading")}</span>
       {/if}
-      <span class="text-fg-faint text-[10.5px] uppercase tracking-wider">Líquido</span>
+      <span class="text-fg-faint text-[10.5px] uppercase tracking-wider">{t("calendar_page.net")}</span>
       <span class="tabular font-semibold {monthTotals.net >= 0 ? 'text-pos' : 'text-neg'}">
         {formatMoney(String(monthTotals.net))}
       </span>
