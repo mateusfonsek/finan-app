@@ -153,7 +153,7 @@
       {t("settings.about")}
     </div>
     <div class="text-[12px] text-fg-muted">
-      <strong class="text-fg">finan app</strong> v0.1.0 — {t("settings.about_line")}
+      <strong class="text-fg">finan app</strong> v0.2.0 — {t("settings.about_line")}
     </div>
     <div class="text-[11px] text-fg-faint">
       {t("settings.shortcuts_label")}

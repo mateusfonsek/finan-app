@@ -103,7 +103,7 @@
     <div class="px-10 pt-8 flex flex-col gap-4">
       <div class="flex items-baseline justify-between gap-3">
         <span class="text-[13px] font-medium text-fg">Mateus Fonseca</span>
-        <span class="font-mono text-[11px] text-fg-faint tabular">v0.1.0</span>
+        <span class="font-mono text-[11px] text-fg-faint tabular">v0.2.0</span>
       </div>
       <button
         type="button"
