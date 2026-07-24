@@ -37,7 +37,16 @@ jobs:
           tagName: ${{ github.ref_name }}
           releaseName: "finan ${{ github.ref_name }}"
           releaseBody: |
-            App não assinado — veja o README para instalar (remover a quarentena do Gatekeeper).
-          releaseDraft: true
+            ## Instalação (macOS)
+
+            1. Baixe o `.dmg` abaixo, abra e arraste o **finan app** para a pasta **Aplicativos**.
+            2. O app **não é assinado** (projeto open-source individual), então o macOS bloqueia na primeira abertura. Remova a quarentena do Gatekeeper no Terminal:
+
+               ```
+               xattr -dr com.apple.quarantine "/Applications/finan app.app"
+               ```
+
+            3. Abra normalmente. Tudo **100% local** — seus dados ficam só no seu Mac, em `~/Library/Application Support/app.finan/finan.db`.
+          releaseDraft: false
           prerelease: false
           args: --target universal-apple-darwin
