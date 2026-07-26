@@ -31,7 +31,18 @@
 
   async function dismissHint() {
     hintDismissed = true;
-    await setAppSetting(WATCH_HINT_DISMISSED_KEY, "1");
+    try {
+      await setAppSetting(WATCH_HINT_DISMISSED_KEY, "1");
+    } catch {
+      // Este componente não tem superfície de erro (não é um fluxo de import
+      // que já mostra `error`) — dispensar a isca é cosmético, não vale um
+      // toast. Mas se a escrita falhar silenciosamente, `hintDismissed` local
+      // ficaria mentindo: a isca reaparece no próximo boot (nunca foi salva)
+      // enquanto o usuário acha que já dispensou. Desfazer o otimismo local
+      // mantém a UI honesta com o disco, sem inventar uma superfície de erro
+      // nova só pra isso.
+      hintDismissed = false;
+    }
   }
 
   // Drag-and-drop nativo: o Tauri intercepta o drop do Finder e entrega só o

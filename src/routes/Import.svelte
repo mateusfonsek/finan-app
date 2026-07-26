@@ -265,14 +265,32 @@
   async function openNextFromQueue() {
     const next = watch.discoveries[0];
     if (!next) return;
-    reset();
+    error = null;
+    busy = true;
     try {
+      // Só tocamos em `pending`/no resto do estado do import depois que o
+      // arquivo novo já foi lido e parseado com sucesso — igual a `onparsed`.
+      // Zerar `pending` antes (como fazia o `reset()` aqui) deixava a tela sem
+      // extrato nenhum durante toda a leitura, e se o load falhasse (arquivo
+      // movido, apagado, ou placeholder do iCloud evictado depois do scan) o
+      // erro caía com `pending` já nulo — a tela voltava pra dropzone vazia,
+      // sem explicação nenhuma.
       const loaded = await loadOfxFromPath(next.path);
+      reset();
       pending = { file: loaded.file, parsed: loaded.parsed };
       watchHash = next.hash;
       await prepareImport(loaded.parsed);
     } catch (e) {
       error = e instanceof Error ? e.message : String(e);
+      // Arquivo não deu pra ler/parsear agora: resolve como "invalid" pra sair
+      // da fila — é exatamente o que esse status já significa (mesmo critério
+      // usado pelo scan pra descobertas que não parsearam). Sem isso, esse
+      // arquivo quebrado ficaria travado em discoveries[0] pra sempre, e todo
+      // clique em "Próximo extrato" bateria de novo nele, bloqueando os
+      // extratos atrás na fila.
+      await watch.resolve(next.hash, "invalid");
+    } finally {
+      busy = false;
     }
   }
 </script>
@@ -288,6 +306,9 @@
   </header>
 
   {#if !pending}
+    {#if error}
+      <div class="rounded-lg border border-border bg-surface p-3 text-sm text-neg">{error}</div>
+    {/if}
     <DropZone {onparsed} {onerror} />
   {:else if importResult && autoReport}
     <!-- ============ Post-import view ============ -->
@@ -418,8 +439,8 @@
     <div class="flex justify-end gap-2 sticky bottom-0 bg-bg pt-3 border-t border-border-subtle">
       <Button variant="ghost" onclick={reset}>{t("import.import_another")}</Button>
       {#if watch.pendingCount > 0}
-        <Button variant="outline" onclick={openNextFromQueue}>
-          {t("watch.queue_next", { current: 1, total: watch.pendingCount })}
+        <Button variant="outline" onclick={openNextFromQueue} disabled={busy}>
+          {busy ? t("import.reading") : t("watch.queue_next", { current: 1, total: watch.pendingCount })}
         </Button>
       {/if}
       <Button onclick={() => push("/transactions")}>{t("import.view_transactions")}</Button>
