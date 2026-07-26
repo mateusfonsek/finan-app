@@ -167,4 +167,42 @@ describe("watch store", () => {
 
     expect(api.scanWatchedFolders).not.toHaveBeenCalled();
   });
+
+  it("duas chamadas concorrentes de refresh compartilham uma única leitura de settings", async () => {
+    api.scanWatchedFolders.mockResolvedValue([]);
+    const store = createWatchStore();
+
+    // Nenhum await entre as duas chamadas — simula App.svelte (boot) e o
+    // listener de foco disparando quase ao mesmo tempo.
+    await Promise.all([store.refresh(), store.refresh()]);
+
+    expect(api.getAppSetting).toHaveBeenCalledTimes(1);
+  });
+
+  it("resolve durante uma varredura em andamento não revive o arquivo já resolvido", async () => {
+    let releaseScan!: (files: ReturnType<typeof discovered>[]) => void;
+    const scanPromise = new Promise<ReturnType<typeof discovered>[]>((resolve) => {
+      releaseScan = resolve;
+    });
+    api.scanWatchedFolders.mockReturnValue(scanPromise);
+    loadOfxFromPath.mockResolvedValue(parsed(3));
+
+    const store = createWatchStore();
+    const refreshPromise = store.refresh();
+
+    // Espera a varredura realmente começar (i.e. scanWatchedFolders já foi
+    // chamado) antes de resolver o arquivo — só assim o cenário testado
+    // (resolve() enquanto o scan está em voo) de fato acontece.
+    while (api.scanWatchedFolders.mock.calls.length === 0) {
+      await Promise.resolve();
+    }
+
+    await store.resolve("h5", "ignored");
+
+    releaseScan([discovered("h5", "b.ofx")]);
+    await refreshPromise;
+
+    expect(store.discoveries.find((d) => d.hash === "h5")).toBeUndefined();
+    expect(store.pendingCount).toBe(0);
+  });
 });
