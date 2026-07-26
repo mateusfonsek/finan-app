@@ -14,6 +14,7 @@
   import { createRule, deleteRuleWithCleanup, updateRule } from "$lib/api/rules";
   import { autoClassifyWithCnpj } from "$lib/api/suggestions";
   import type { ParsedOfx } from "$lib/ofx/types";
+  import { takeStashed } from "$lib/ofx/open";
   import { detectReversalPairs, type ReversalInfo } from "$lib/ofx/reversals";
   import type {
     Account,
@@ -44,12 +45,15 @@
   let chosen = $state<Record<string, number | null>>({});
   let busyKey = $state<string | null>(null);
 
+  // `stash.watchHash` ainda não tem consumidor nesta task — quem vai marcar o
+  // arquivo como resolvido é a Task 7/8 (toast/fila da pasta observada). Ler o
+  // campo aqui sem usá-lo violaria noUnusedLocals; deixamos o dado no stash
+  // (via `takeStashed()`) pra essa task futura recuperar.
   onMount(() => {
     void listCategories().then((c) => (categories = c));
-    const stash = (window as unknown as { __finanPending?: PendingImport }).__finanPending;
+    const stash = takeStashed();
     if (stash) {
-      pending = stash;
-      (window as unknown as { __finanPending?: PendingImport }).__finanPending = undefined;
+      pending = { file: stash.file, parsed: stash.parsed };
       void prepareImport(stash.parsed);
     }
   });
