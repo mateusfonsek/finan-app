@@ -1,3 +1,4 @@
+pub mod app_settings;
 pub mod accounts;
 pub mod backup;
 pub mod categories;
