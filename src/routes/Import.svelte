@@ -15,6 +15,7 @@
   import { autoClassifyWithCnpj } from "$lib/api/suggestions";
   import type { ParsedOfx } from "$lib/ofx/types";
   import { takeStashed } from "$lib/ofx/open";
+  import { watch } from "$lib/stores/watch.svelte";
   import { detectReversalPairs, type ReversalInfo } from "$lib/ofx/reversals";
   import type {
     Account,
@@ -44,16 +45,22 @@
   /** category chosen per unresolved CNPJ (keyed by cnpj) */
   let chosen = $state<Record<string, number | null>>({});
   let busyKey = $state<string | null>(null);
+  /** Hash do arquivo na pasta observada, quando o import veio de lá — marca o
+   *  arquivo como importado ao final, pra sumir do badge e nunca mais avisar. */
+  let watchHash = $state<string | undefined>(undefined);
 
-  // `stash.watchHash` ainda não tem consumidor nesta task — quem vai marcar o
-  // arquivo como resolvido é a Task 7/8 (toast/fila da pasta observada). Ler o
-  // campo aqui sem usá-lo violaria noUnusedLocals; deixamos o dado no stash
-  // (via `takeStashed()`) pra essa task futura recuperar.
+  // O toast nunca interrompe quem já está revisando um extrato.
+  $effect(() => {
+    watch.suppressToast = pending !== null;
+    return () => (watch.suppressToast = false);
+  });
+
   onMount(() => {
     void listCategories().then((c) => (categories = c));
     const stash = takeStashed();
     if (stash) {
       pending = { file: stash.file, parsed: stash.parsed };
+      watchHash = stash.watchHash;
       void prepareImport(stash.parsed);
     }
   });
@@ -130,6 +137,7 @@
       importResult = await insertTransactions(account.id, toInsert);
       busyMsg = t("import.resolving_cnpj");
       autoReport = await autoClassifyWithCnpj(account.id);
+      if (watchHash) await watch.resolve(watchHash, "imported");
     } catch (e) {
       error = e instanceof Error ? e.message : String(e);
     } finally {
@@ -246,6 +254,9 @@
     importResult = null;
     autoReport = null;
     chosen = {};
+    // Sem isso, "importar outro" com um arquivo solto (DropZone) herdaria o
+    // hash do extrato anterior vindo da pasta observada.
+    watchHash = undefined;
   }
 </script>
 

@@ -36,6 +36,18 @@ export function createWatchStore() {
    *  arriscaria varrer o disco antes de sabermos se o usuário quer isso.
    */
   let settingsLoaded = false;
+  /** Promise em voo da leitura da flag. App.svelte (boot) e o listener de foco
+   *  agora podem chamar `refresh()` quase ao mesmo tempo; sem isso, os dois
+   *  disparariam sua própria leitura de `getAppSetting` antes que a primeira
+   *  resolvesse. Não corrompe nada (leitura é idempotente), mas é I/O em
+   *  dobro de graça — compartilhar a promise em voo resolve isso.
+   */
+  let loadingSettings: Promise<void> | null = null;
+  /** Hashes resolvidos (toast/import) enquanto uma varredura está em voo. O
+   *  scan trabalha com um snapshot tirado no início; sem isso, seu resultado
+   *  no final (`discoveries = next`) reviveria uma descoberta que o usuário
+   *  já resolveu enquanto o scan rodava. */
+  const resolvedDuringScan = new Set<string>();
 
   async function refresh(opts: { force?: boolean } = {}) {
     if (!settingsLoaded) await loadEnabled();
@@ -46,6 +58,7 @@ export function createWatchStore() {
 
     scanning = true;
     lastScan = now;
+    resolvedDuringScan.clear();
     try {
       const files = await scanWatchedFolders();
       const next: Discovery[] = [];
@@ -66,15 +79,25 @@ export function createWatchStore() {
           await markFile(f.content_hash, "invalid");
         }
       }
-      discoveries = next;
+      // Descarta do snapshot qualquer hash que o toast/import já resolveu
+      // enquanto o scan estava em voo — ver `resolvedDuringScan` acima.
+      discoveries = next.filter((d) => !resolvedDuringScan.has(d.hash));
     } finally {
       scanning = false;
     }
   }
 
   async function loadEnabled() {
-    enabled = (await getAppSetting(WATCH_ENABLED_KEY)) === "1";
-    settingsLoaded = true;
+    if (loadingSettings) return loadingSettings;
+    loadingSettings = (async () => {
+      try {
+        enabled = (await getAppSetting(WATCH_ENABLED_KEY)) === "1";
+        settingsLoaded = true;
+      } finally {
+        loadingSettings = null;
+      }
+    })();
+    return loadingSettings;
   }
 
   async function setEnabled(value: boolean) {
@@ -88,6 +111,9 @@ export function createWatchStore() {
   async function resolve(hash: string, status: FileStatus) {
     await markFile(hash, status);
     discoveries = discoveries.filter((d) => d.hash !== hash);
+    // Se um scan estiver em voo, seu snapshot ainda não sabe dessa resolução —
+    // avisamos aqui pra ele não reviver o item ao terminar.
+    if (scanning) resolvedDuringScan.add(hash);
   }
 
   return {

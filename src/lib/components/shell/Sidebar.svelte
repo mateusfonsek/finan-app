@@ -2,6 +2,7 @@
   import { link, router } from "svelte-spa-router";
   import logoUrl from "$lib/assets/logo.png";
   import { locale } from "$lib/i18n/locale.svelte";
+  import { watch } from "$lib/stores/watch.svelte";
 
   const t = locale.t;
 
@@ -57,7 +58,14 @@
         <a use:link
            href={item.href}
            class="flex items-center gap-2 px-2 py-1.5 rounded-md text-[12.5px] font-medium transition-colors {active ? 'bg-accent-soft text-fg' : 'text-fg-muted hover:bg-hover hover:text-fg'}">
-          {t("nav." + item.labelKey)}
+          <span class="flex-1">{t("nav." + item.labelKey)}</span>
+          {#if item.labelKey === "import" && watch.pendingCount > 0}
+            <span
+              class="min-w-[16px] h-4 px-1 rounded-full bg-accent text-[10px] font-semibold text-white grid place-items-center tabular"
+            >
+              {watch.pendingCount}
+            </span>
+          {/if}
         </a>
       {/each}
     </div>

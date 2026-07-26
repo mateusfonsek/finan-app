@@ -5,9 +5,11 @@
   import { openUrl } from "@tauri-apps/plugin-opener";
   import Sidebar from "$lib/components/shell/Sidebar.svelte";
   import AboutDialog from "$lib/components/shell/AboutDialog.svelte";
+  import WatchToast from "$lib/components/shell/WatchToast.svelte";
   import { openOfxPath } from "$lib/ofx/open";
   import { takePendingOfx } from "$lib/api/files";
   import { locale } from "$lib/i18n/locale.svelte";
+  import { watch } from "$lib/stores/watch.svelte";
   import { routes } from "./routes/routes";
 
   // Sync the UI language from the backend's persisted choice on boot.
@@ -91,6 +93,15 @@
     listen("open-ofx", () => void handleOpenedOfx()).then((u) => unlisten.push(u));
     // Cold start: o arquivo pode já estar na fila antes deste listener existir.
     void handleOpenedOfx();
+
+    // Gatilhos de varredura: abertura do app e foco da janela. É o foco que
+    // torna o watcher de filesystem desnecessário — o usuário manda o arquivo
+    // do celular e então vem olhar o Mac.
+    void watch.loadEnabled().then(() => watch.refresh({ force: true }));
+    const onFocus = () => void watch.refresh();
+    window.addEventListener("focus", onFocus);
+    unlisten.push(() => window.removeEventListener("focus", onFocus));
+
     return () => unlisten.forEach((u) => u());
   });
 </script>
@@ -101,6 +112,8 @@
     <Router {routes} />
   </main>
 </div>
+
+<WatchToast />
 
 {#if aboutOpen}
   <AboutDialog onClose={() => (aboutOpen = false)} />
