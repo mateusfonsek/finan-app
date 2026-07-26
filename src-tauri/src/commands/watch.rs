@@ -341,15 +341,17 @@ pub fn is_enabled(conn: &Connection) -> AppResult<bool> {
 /// Varre todas as pastas observadas e registra os arquivos novos como
 /// `pending`. Devolve **todos** os pendentes (não só os desta rodada), que é o
 /// que a UI precisa pro badge e pra fila.
-pub fn scan_all(conn: &Connection) -> AppResult<Vec<DiscoveredFile>> {
+///
+/// `now` é injetado (mesmo motivo de `scan_dir`): os testes simulam passagem
+/// de tempo sem dormir. Em produção o chamador sempre passa `SystemTime::now()`
+/// — se a varredura inventasse seu próprio relógio "adiantado" aqui, o guard
+/// de `SETTLE` em `scan_dir` nunca adiaria nada, e um arquivo ainda sendo
+/// escrito (AirDrop, download) seria lido e hasheado pela metade.
+pub fn scan_all(conn: &Connection, now: SystemTime) -> AppResult<Vec<DiscoveredFile>> {
     if !is_enabled(conn)? {
         return Ok(Vec::new());
     }
 
-    // Desloca a hora pra o futuro pra simular que tempo passou desde que os
-    // arquivos foram descobertos. Assim, mesmo arquivos recém-chegados (AirDrop,
-    // download) não são adiados, e a varredura não fica inativa.
-    let now = SystemTime::now() + Duration::from_secs(60);
     let mut icloud_pending = 0usize;
     for folder in list_folders(conn)? {
         let outcome = scan_dir(Path::new(&folder.path), now);
@@ -398,7 +400,7 @@ pub fn mark(conn: &Connection, content_hash: &str, status: &str) -> AppResult<()
 #[specta::specta]
 pub fn scan_watched_folders(db: State<'_, Db>) -> AppResult<Vec<DiscoveredFile>> {
     let conn = db.conn.lock().expect("db mutex poisoned");
-    scan_all(&conn)
+    scan_all(&conn, SystemTime::now())
 }
 
 #[tauri::command]
@@ -624,6 +626,26 @@ mod tests {
     }
 
     #[test]
+    fn scan_all_defers_files_written_moments_ago() {
+        // Mesma proteção do teste acima, mas na ponta que a UI realmente
+        // chama: se `scan_all` inventasse seu próprio `now` adiantado (como
+        // já aconteceu), esse guard nunca dispararia e um arquivo ainda em
+        // transferência seria registrado como pendente.
+        let conn = fresh_conn();
+        crate::commands::app_settings::set_setting(&conn, "watch_enabled", "1").unwrap();
+        let dir = tmpdir("scan-all-fresh");
+        add_folder(&conn, dir.to_str().unwrap()).unwrap();
+        write_old(&dir, "chegando.ofx", "OFXDATA");
+
+        // `now` real, não `later()`: o arquivo tem mtime de milissegundos atrás.
+        let found = scan_all(&conn, SystemTime::now()).unwrap();
+        assert!(
+            found.is_empty(),
+            "arquivo escrito há pouco não pode ser registrado como pendente"
+        );
+    }
+
+    #[test]
     fn scan_reports_icloud_stubs_without_treating_them_as_candidates() {
         let dir = tmpdir("scan-icloud");
         // Placeholder do iCloud: nome com ponto na frente e sufixo .icloud
@@ -661,7 +683,7 @@ mod tests {
         add_folder(&conn, dir.to_str().unwrap()).unwrap();
         // watch_enabled ausente = desligado (default)
 
-        assert!(scan_all(&conn).unwrap().is_empty());
+        assert!(scan_all(&conn, later()).unwrap().is_empty());
     }
 
     #[test]
@@ -672,7 +694,7 @@ mod tests {
         add_folder(&conn, dir.to_str().unwrap()).unwrap();
         crate::commands::app_settings::set_setting(&conn, "watch_enabled", "1").unwrap();
 
-        let found = scan_all(&conn).unwrap();
+        let found = scan_all(&conn, later()).unwrap();
         assert_eq!(found.len(), 1);
         assert_eq!(found[0].file_name, "extrato.ofx");
         assert_eq!(found[0].status, "pending");
@@ -686,7 +708,7 @@ mod tests {
         add_folder(&conn, dir.to_str().unwrap()).unwrap();
         crate::commands::app_settings::set_setting(&conn, "watch_enabled", "1").unwrap();
 
-        scan_all(&conn).unwrap();
+        scan_all(&conn, later()).unwrap();
 
         assert_eq!(
             crate::commands::app_settings::get_setting(&conn, ICLOUD_PENDING_KEY).unwrap(),
@@ -702,11 +724,11 @@ mod tests {
         add_folder(&conn, dir.to_str().unwrap()).unwrap();
         crate::commands::app_settings::set_setting(&conn, "watch_enabled", "1").unwrap();
 
-        let found = scan_all(&conn).unwrap();
+        let found = scan_all(&conn, later()).unwrap();
         mark(&conn, &found[0].content_hash, "imported").unwrap();
 
         assert!(
-            scan_all(&conn).unwrap().is_empty(),
+            scan_all(&conn, later()).unwrap().is_empty(),
             "arquivo já resolvido não volta a aparecer"
         );
     }
@@ -719,13 +741,13 @@ mod tests {
         add_folder(&conn, dir.to_str().unwrap()).unwrap();
         crate::commands::app_settings::set_setting(&conn, "watch_enabled", "1").unwrap();
 
-        let first = scan_all(&conn).unwrap();
+        let first = scan_all(&conn, later()).unwrap();
         mark(&conn, &first[0].content_hash, "imported").unwrap();
 
         // Mesmo extrato, baixado de novo com outro nome.
         write_old(&dir, "extrato (1).ofx", "OFXDATA");
         assert!(
-            scan_all(&conn).unwrap().is_empty(),
+            scan_all(&conn, later()).unwrap().is_empty(),
             "hash do conteúdo já foi visto"
         );
     }
@@ -740,11 +762,11 @@ mod tests {
         add_folder(&conn, b.to_str().unwrap()).unwrap();
         crate::commands::app_settings::set_setting(&conn, "watch_enabled", "1").unwrap();
 
-        let first = scan_all(&conn).unwrap();
+        let first = scan_all(&conn, later()).unwrap();
         assert_eq!(first.len(), 1);
 
         std::fs::rename(a.join("extrato.ofx"), b.join("extrato.ofx")).unwrap();
-        let second = scan_all(&conn).unwrap();
+        let second = scan_all(&conn, later()).unwrap();
 
         assert_eq!(second.len(), 1, "continua um só arquivo pendente");
         assert!(
@@ -761,7 +783,7 @@ mod tests {
         add_folder(&conn, dir.to_str().unwrap()).unwrap();
         crate::commands::app_settings::set_setting(&conn, "watch_enabled", "1").unwrap();
 
-        let found = scan_all(&conn).unwrap();
+        let found = scan_all(&conn, later()).unwrap();
         mark(&conn, &found[0].content_hash, "ignored").unwrap();
 
         let (status, resolved): (String, Option<String>) = conn
@@ -790,7 +812,7 @@ mod tests {
         add_folder(&conn, dir.to_str().unwrap()).unwrap();
         crate::commands::app_settings::set_setting(&conn, "watch_enabled", "1").unwrap();
 
-        let found = scan_all(&conn).unwrap();
+        let found = scan_all(&conn, later()).unwrap();
         assert_eq!(found.len(), 2);
         mark(&conn, &found[0].content_hash, "invalid").unwrap();
 
