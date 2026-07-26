@@ -368,6 +368,7 @@
     "pitch_body": "Salve o .ofx numa pasta do seu Mac — pelo iCloud, por AirDrop ou baixando direto. O finan avisa quando encontrar um extrato novo e já abre a revisão.",
     "privacy_note": "O app lê apenas arquivos .ofx, apenas nas pastas que você escolher. Nada sai do seu Mac.",
     "enable_cta": "Ativar e escolher pasta",
+    "disable": "Desativar",
     "folders_label": "Pastas observadas",
     "add_folder": "Adicionar pasta",
     "preset_icloud": "iCloud Drive › finan",

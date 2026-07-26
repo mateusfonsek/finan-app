@@ -3,8 +3,21 @@
   import { Button } from "$lib/components/ui/button";
   import { open as openDialog, save as saveDialog, message } from "@tauri-apps/plugin-dialog";
   import { revealItemInDir } from "@tauri-apps/plugin-opener";
+  import { homeDir, join } from "@tauri-apps/api/path";
   import { dbPath, exportBackup, restoreBackup } from "$lib/api/backup";
   import { locale } from "$lib/i18n/locale.svelte";
+  import { watch } from "$lib/stores/watch.svelte";
+  import {
+    addWatchedFolder,
+    dirExists,
+    ensureDir,
+    getAppSetting,
+    ICLOUD_PENDING_KEY,
+    listWatchedFolders,
+    removeWatchedFolder,
+    updateWatchedFolderPath,
+  } from "$lib/api/watch";
+  import type { WatchedFolder } from "$lib/bindings";
 
   const t = locale.t;
   const locales = locale.list();
@@ -14,9 +27,20 @@
   let info = $state<string | null>(null);
   let error = $state<string | null>(null);
 
+  let folders = $state<WatchedFolder[]>([]);
+  let menuOpen = $state(false);
+  let icloudWaiting = $state(0);
+
+  async function loadFolders() {
+    folders = await listWatchedFolders();
+    icloudWaiting = Number((await getAppSetting(ICLOUD_PENDING_KEY)) ?? "0");
+  }
+
   onMount(async () => {
     try {
       path = await dbPath();
+      await watch.loadEnabled();
+      if (watch.enabled) await loadFolders();
     } catch (e) {
       error = e instanceof Error ? e.message : String(e);
     }
@@ -29,6 +53,87 @@
     } catch (e) {
       error = e instanceof Error ? e.message : String(e);
     }
+  }
+
+  /** Todos os presets passam pelo painel do Finder, com `defaultPath` já
+   *  apontado. Não é cerimônia: é assim que o consentimento TCC do macOS pra
+   *  ~/Downloads e ~/Mesa é concedido pelo caminho natural do sistema, em vez
+   *  de um diálogo de permissão surgindo sem contexto no primeiro scan. */
+  async function pickFolder(defaultPath?: string): Promise<string | null> {
+    const picked = await openDialog({
+      title: t("watch.picker_title"),
+      directory: true,
+      multiple: false,
+      defaultPath,
+    });
+    return typeof picked === "string" ? picked : null;
+  }
+
+  async function addFrom(defaultPath?: string) {
+    menuOpen = false;
+    error = null;
+    const picked = await pickFolder(defaultPath);
+    if (!picked) return;
+    try {
+      await addWatchedFolder(picked);
+      await loadFolders();
+      await watch.refresh({ force: true });
+    } catch (e) {
+      error = e instanceof Error ? e.message : String(e);
+    }
+  }
+
+  async function addICloud() {
+    menuOpen = false;
+    const home = await homeDir();
+    const target = await join(home, "Library", "Mobile Documents", "com~apple~CloudDocs", "finan");
+    // Criar a pasta é a ÚNICA escrita em disco da feature — por isso pergunta,
+    // e só quando ela realmente não existe.
+    if (!(await dirExists(target))) {
+      if (!confirm(t("watch.create_icloud_confirm"))) return;
+      await ensureDir(target);
+    }
+    await addFrom(target);
+  }
+
+  async function addDownloads() {
+    addFrom(await join(await homeDir(), "Downloads"));
+  }
+
+  async function addDesktop() {
+    addFrom(await join(await homeDir(), "Desktop"));
+  }
+
+  async function enableWatch() {
+    const picked = await pickFolder();
+    if (!picked) return; // cancelar não ativa nada — sem estado zumbi
+    await addWatchedFolder(picked);
+    await watch.setEnabled(true);
+    await loadFolders();
+  }
+
+  async function disableWatch() {
+    await watch.setEnabled(false); // mantém a lista de pastas
+  }
+
+  async function relocate(folder: WatchedFolder) {
+    const picked = await pickFolder();
+    if (!picked) return;
+    await updateWatchedFolderPath(folder.id, picked);
+    await loadFolders();
+    await watch.refresh({ force: true });
+  }
+
+  async function dropFolder(folder: WatchedFolder) {
+    await removeWatchedFolder(folder.id);
+    await loadFolders();
+  }
+
+  // Varredura manual — o terceiro gatilho previsto na spec §5.1, ao lado da
+  // abertura do app e do foco da janela.
+  async function scanNow() {
+    await watch.refresh({ force: true });
+    await loadFolders();
   }
 
   async function doExport() {
@@ -110,6 +215,138 @@
         </button>
       {/each}
     </div>
+  </div>
+
+  <div class="rounded-xl bg-surface border border-border-subtle p-5 flex flex-col gap-3">
+    <div class="flex items-center justify-between">
+      <div class="text-[10.5px] uppercase tracking-wider font-semibold text-fg-faint">
+        {t("watch.section_title")}
+      </div>
+      {#if watch.enabled}
+        <button
+          type="button"
+          onclick={disableWatch}
+          class="text-[11px] text-fg-muted hover:text-fg transition-colors"
+        >
+          {t("watch.disable")}
+        </button>
+      {/if}
+    </div>
+
+    {#if !watch.enabled}
+      <div class="text-[13px] font-medium text-fg">{t("watch.pitch_title")}</div>
+      <p class="text-xs text-fg-muted leading-relaxed">{t("watch.pitch_body")}</p>
+      <p class="text-[11px] text-fg-faint leading-relaxed">🔒 {t("watch.privacy_note")}</p>
+      <div>
+        <Button onclick={enableWatch}>{t("watch.enable_cta")}</Button>
+      </div>
+    {:else}
+      <div class="text-[10px] uppercase tracking-wider text-fg-faint">
+        {t("watch.folders_label")}
+      </div>
+      <div class="rounded-lg border border-border-subtle divide-y divide-border-subtle">
+        {#each folders as f (f.id)}
+          <div class="p-3 flex items-start gap-3">
+            <span class="text-base leading-none pt-0.5">{f.exists ? "📁" : "⚠️"}</span>
+            <div class="flex-1 min-w-0">
+              <div class="text-[12.5px] font-medium text-fg">{f.label}</div>
+              <div class="text-[10.5px] text-fg-faint truncate">{f.path}</div>
+              {#if !f.exists}
+                <div class="text-[11px] text-neg mt-1">{t("watch.folder_missing")}</div>
+                <div class="flex gap-2 mt-1.5">
+                  <Button variant="outline" onclick={() => relocate(f)}>
+                    {t("watch.folder_relocate")}
+                  </Button>
+                  <Button variant="ghost" onclick={() => dropFolder(f)}>
+                    {t("watch.folder_remove")}
+                  </Button>
+                </div>
+              {:else}
+                <div class="text-[10.5px] text-fg-muted mt-0.5">
+                  {#if f.imported_count === 0}
+                    {t("watch.imported_none")}
+                  {:else}
+                    {f.imported_count === 1
+                      ? t("watch.imported_one", { n: f.imported_count })
+                      : t("watch.imported_many", { n: f.imported_count })}
+                    {#if f.last_imported_at}
+                      · {t("watch.imported_last", { date: f.last_imported_at.slice(0, 10) })}
+                    {/if}
+                  {/if}
+                </div>
+              {/if}
+            </div>
+            {#if f.exists}
+              <div class="flex gap-1 shrink-0">
+                <button
+                  type="button"
+                  onclick={() => revealItemInDir(f.path)}
+                  title={t("watch.folder_menu_reveal")}
+                  class="text-[11px] text-fg-muted hover:text-fg px-1.5 py-0.5 rounded hover:bg-hover"
+                >
+                  ↗
+                </button>
+                <button
+                  type="button"
+                  onclick={() => dropFolder(f)}
+                  title={t("watch.folder_menu_remove")}
+                  class="text-[11px] text-fg-muted hover:text-neg px-1.5 py-0.5 rounded hover:bg-hover"
+                >
+                  ×
+                </button>
+              </div>
+            {/if}
+          </div>
+        {/each}
+      </div>
+
+      <div class="relative">
+        <Button variant="outline" onclick={() => (menuOpen = !menuOpen)}>
+          + {t("watch.add_folder")} ▾
+        </Button>
+        {#if menuOpen}
+          <div class="absolute z-10 mt-1 w-64 rounded-lg border border-border bg-surface shadow-lg py-1 text-[12.5px]">
+            <button type="button" onclick={addICloud}
+              class="w-full text-left px-3 py-1.5 hover:bg-hover text-fg">
+              ☁️ {t("watch.preset_icloud")}
+            </button>
+            <button type="button" onclick={addDownloads}
+              class="w-full text-left px-3 py-1.5 hover:bg-hover text-fg flex justify-between">
+              <span>⬇️ {t("watch.preset_downloads")}</span>
+              <span class="text-fg-faint text-[10.5px]">{t("watch.preset_downloads_hint")}</span>
+            </button>
+            <button type="button" onclick={addDesktop}
+              class="w-full text-left px-3 py-1.5 hover:bg-hover text-fg">
+              🖥️ {t("watch.preset_desktop")}
+            </button>
+            <div class="border-t border-border-subtle my-1"></div>
+            <button type="button" onclick={() => addFrom()}
+              class="w-full text-left px-3 py-1.5 hover:bg-hover text-fg">
+              📁 {t("watch.preset_other")}
+            </button>
+          </div>
+        {/if}
+      </div>
+
+      {#if icloudWaiting > 0}
+        <div class="text-[11px] text-fg-faint">
+          ☁️ {icloudWaiting === 1
+            ? t("watch.icloud_waiting_one", { n: icloudWaiting })
+            : t("watch.icloud_waiting_many", { n: icloudWaiting })}
+        </div>
+      {/if}
+
+      <div class="flex items-center justify-between pt-1 border-t border-border-subtle">
+        <span class="text-[10.5px] text-fg-faint">{t("watch.last_scan")}</span>
+        <button
+          type="button"
+          onclick={scanNow}
+          class="text-[11px] text-fg-muted hover:text-fg transition-colors"
+        >
+          {t("watch.folder_menu_scan")}
+        </button>
+      </div>
+    {/if}
   </div>
 
   <div class="rounded-xl bg-surface border border-border-subtle p-5 flex flex-col gap-3">
