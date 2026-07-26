@@ -29,6 +29,7 @@
 
   let folders = $state<WatchedFolder[]>([]);
   let menuOpen = $state(false);
+  let menuWrapperEl: HTMLDivElement | undefined = $state();
   let icloudWaiting = $state(0);
 
   async function loadFolders() {
@@ -44,6 +45,26 @@
     } catch (e) {
       error = e instanceof Error ? e.message : String(e);
     }
+  });
+
+  // Fecha o menu "+ Adicionar pasta" por clique fora ou Esc — mesmo padrão do
+  // CategoryPicker: listener único registrado no mount, virando no-op via
+  // guarda `!menuOpen` quando o menu já está fechado, e removido no unmount.
+  onMount(() => {
+    function onDocClick(e: MouseEvent) {
+      if (!menuOpen) return;
+      const target = e.target as Node | null;
+      if (target && !menuWrapperEl?.contains(target)) menuOpen = false;
+    }
+    function onKeydown(e: KeyboardEvent) {
+      if (e.key === "Escape" && menuOpen) menuOpen = false;
+    }
+    document.addEventListener("mousedown", onDocClick);
+    document.addEventListener("keydown", onKeydown);
+    return () => {
+      document.removeEventListener("mousedown", onDocClick);
+      document.removeEventListener("keydown", onKeydown);
+    };
   });
 
   async function reveal() {
@@ -85,13 +106,19 @@
 
   async function addICloud() {
     menuOpen = false;
+    error = null;
     const home = await homeDir();
     const target = await join(home, "Library", "Mobile Documents", "com~apple~CloudDocs", "finan");
     // Criar a pasta é a ÚNICA escrita em disco da feature — por isso pergunta,
     // e só quando ela realmente não existe.
     if (!(await dirExists(target))) {
       if (!confirm(t("watch.create_icloud_confirm"))) return;
-      await ensureDir(target);
+      try {
+        await ensureDir(target);
+      } catch (e) {
+        error = e instanceof Error ? e.message : String(e);
+        return;
+      }
     }
     await addFrom(target);
   }
@@ -105,28 +132,48 @@
   }
 
   async function enableWatch() {
+    error = null;
     const picked = await pickFolder();
     if (!picked) return; // cancelar não ativa nada — sem estado zumbi
-    await addWatchedFolder(picked);
-    await watch.setEnabled(true);
-    await loadFolders();
+    try {
+      await addWatchedFolder(picked);
+      await watch.setEnabled(true);
+      await loadFolders();
+    } catch (e) {
+      error = e instanceof Error ? e.message : String(e);
+    }
   }
 
   async function disableWatch() {
-    await watch.setEnabled(false); // mantém a lista de pastas
+    error = null;
+    try {
+      await watch.setEnabled(false); // mantém a lista de pastas
+    } catch (e) {
+      error = e instanceof Error ? e.message : String(e);
+    }
   }
 
   async function relocate(folder: WatchedFolder) {
+    error = null;
     const picked = await pickFolder();
     if (!picked) return;
-    await updateWatchedFolderPath(folder.id, picked);
-    await loadFolders();
-    await watch.refresh({ force: true });
+    try {
+      await updateWatchedFolderPath(folder.id, picked);
+      await loadFolders();
+      await watch.refresh({ force: true });
+    } catch (e) {
+      error = e instanceof Error ? e.message : String(e);
+    }
   }
 
   async function dropFolder(folder: WatchedFolder) {
-    await removeWatchedFolder(folder.id);
-    await loadFolders();
+    error = null;
+    try {
+      await removeWatchedFolder(folder.id);
+      await loadFolders();
+    } catch (e) {
+      error = e instanceof Error ? e.message : String(e);
+    }
   }
 
   // Varredura manual — o terceiro gatilho previsto na spec §5.1, ao lado da
@@ -300,7 +347,7 @@
         {/each}
       </div>
 
-      <div class="relative">
+      <div class="relative" bind:this={menuWrapperEl}>
         <Button variant="outline" onclick={() => (menuOpen = !menuOpen)}>
           + {t("watch.add_folder")} ▾
         </Button>
