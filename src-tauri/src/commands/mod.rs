@@ -1,5 +1,5 @@
-pub mod app_settings;
 pub mod accounts;
+pub mod app_settings;
 pub mod backup;
 pub mod categories;
 pub mod cnpj;
@@ -9,3 +9,4 @@ pub mod rules;
 pub mod suggestions;
 pub mod summary;
 pub mod transactions;
+pub mod watch;
