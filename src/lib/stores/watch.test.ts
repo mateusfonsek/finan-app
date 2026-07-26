@@ -119,4 +119,52 @@ describe("watch store", () => {
     expect(store.enabled).toBe(false);
     expect(api.scanWatchedFolders).not.toHaveBeenCalled();
   });
+
+  it("habilitar persiste e inverte a flag", async () => {
+    const store = createWatchStore();
+
+    await store.setEnabled(true);
+
+    expect(api.setAppSetting).toHaveBeenCalledWith("watch_enabled", "1");
+    expect(store.enabled).toBe(true);
+  });
+
+  it("habilitar força varredura imediata", async () => {
+    api.scanWatchedFolders.mockResolvedValue([]);
+    const store = createWatchStore();
+
+    await store.setEnabled(true);
+
+    expect(api.scanWatchedFolders).toHaveBeenCalled();
+  });
+
+  it("desabilitar persiste \"0\" e desativa a flag", async () => {
+    const store = createWatchStore();
+
+    await store.setEnabled(false);
+
+    expect(api.setAppSetting).toHaveBeenCalledWith("watch_enabled", "0");
+    expect(store.enabled).toBe(false);
+  });
+
+  it("desabilitar limpa a lista de descobertas", async () => {
+    api.scanWatchedFolders.mockResolvedValue([discovered("h4", "a.ofx")]);
+    loadOfxFromPath.mockResolvedValue(parsed(5));
+    const store = createWatchStore();
+
+    await store.refresh();
+    expect(store.pendingCount).toBe(1);
+
+    await store.setEnabled(false);
+
+    expect(store.pendingCount).toBe(0);
+  });
+
+  it("desabilitar não varre", async () => {
+    const store = createWatchStore();
+
+    await store.setEnabled(false);
+
+    expect(api.scanWatchedFolders).not.toHaveBeenCalled();
+  });
 });
