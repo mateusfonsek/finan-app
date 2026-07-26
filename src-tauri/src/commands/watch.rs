@@ -317,4 +317,17 @@ mod tests {
         ensure_dir(dir.to_string_lossy().to_string()).unwrap();
         assert!(dir.is_dir());
     }
+
+    #[test]
+    fn dir_exists_distinguishes_directories_from_files() {
+        let dir = tmpdir("dir-exists");
+        assert!(dir_exists(dir.to_string_lossy().to_string()), "pasta existente");
+
+        let nonexistent = dir.join("nonexistent");
+        assert!(!dir_exists(nonexistent.to_string_lossy().to_string()), "caminho inexistente");
+
+        let file = dir.join("test.txt");
+        std::fs::write(&file, b"test").unwrap();
+        assert!(!dir_exists(file.to_string_lossy().to_string()), "arquivo, não pasta");
+    }
 }
