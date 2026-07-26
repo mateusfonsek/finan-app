@@ -16,6 +16,7 @@
   import type { ParsedOfx } from "$lib/ofx/types";
   import { takeStashed } from "$lib/ofx/open";
   import { watch } from "$lib/stores/watch.svelte";
+  import { loadOfxFromPath } from "$lib/ofx/load";
   import { detectReversalPairs, type ReversalInfo } from "$lib/ofx/reversals";
   import type {
     Account,
@@ -258,6 +259,22 @@
     // hash do extrato anterior vindo da pasta observada.
     watchHash = undefined;
   }
+
+  /** Carrega o próximo extrato descoberto direto no preview, reaproveitando a
+   *  tela em que já estamos. */
+  async function openNextFromQueue() {
+    const next = watch.discoveries[0];
+    if (!next) return;
+    reset();
+    try {
+      const loaded = await loadOfxFromPath(next.path);
+      pending = { file: loaded.file, parsed: loaded.parsed };
+      watchHash = next.hash;
+      await prepareImport(loaded.parsed);
+    } catch (e) {
+      error = e instanceof Error ? e.message : String(e);
+    }
+  }
 </script>
 
 <section class="p-8 max-w-5xl mx-auto flex flex-col gap-5">
@@ -400,6 +417,11 @@
 
     <div class="flex justify-end gap-2 sticky bottom-0 bg-bg pt-3 border-t border-border-subtle">
       <Button variant="ghost" onclick={reset}>{t("import.import_another")}</Button>
+      {#if watch.pendingCount > 0}
+        <Button variant="outline" onclick={openNextFromQueue}>
+          {t("watch.queue_next", { current: 1, total: watch.pendingCount })}
+        </Button>
+      {/if}
       <Button onclick={() => push("/transactions")}>{t("import.view_transactions")}</Button>
     </div>
   {:else}

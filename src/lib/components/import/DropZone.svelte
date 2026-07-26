@@ -6,6 +6,9 @@
   import { readFileBytes } from "$lib/api/files";
   import { locale } from "$lib/i18n/locale.svelte";
   import type { ParsedOfx } from "$lib/ofx/types";
+  import { push } from "svelte-spa-router";
+  import { watch } from "$lib/stores/watch.svelte";
+  import { getAppSetting, setAppSetting, WATCH_HINT_DISMISSED_KEY } from "$lib/api/watch";
 
   const t = locale.t;
 
@@ -19,6 +22,17 @@
   let active = $state(false);
   let busy = $state(false);
   let fileInput: HTMLInputElement | undefined = $state();
+
+  let hintDismissed = $state(true); // pessimista até carregar, evita piscar
+
+  onMount(() => {
+    void getAppSetting(WATCH_HINT_DISMISSED_KEY).then((v) => (hintDismissed = v === "1"));
+  });
+
+  async function dismissHint() {
+    hintDismissed = true;
+    await setAppSetting(WATCH_HINT_DISMISSED_KEY, "1");
+  }
 
   // Drag-and-drop nativo: o Tauri intercepta o drop do Finder e entrega só o
   // caminho (não um File), via evento da webview. Lemos os bytes e reusamos o
@@ -131,3 +145,25 @@
     class="hidden"
   />
 </div>
+
+{#if !watch.enabled && !hintDismissed}
+  <!-- Fora da dropzone: o elemento acima tem onclick pro file picker, então a
+       isca precisa ser irmã, não filha, senão o clique nela abriria o picker. -->
+  <div class="flex items-center justify-center gap-2 mt-3 text-[11.5px] text-fg-faint">
+    <button
+      type="button"
+      onclick={() => push("/settings")}
+      class="hover:text-fg transition-colors"
+    >
+      ⚡ {t("watch.hint_dropzone")} →
+    </button>
+    <button
+      type="button"
+      onclick={dismissHint}
+      title={t("watch.hint_dismiss")}
+      class="hover:text-fg transition-colors px-1"
+    >
+      ×
+    </button>
+  </div>
+{/if}
