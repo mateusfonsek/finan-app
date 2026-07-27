@@ -387,6 +387,100 @@ async restoreBackup(source: string) : Promise<Result<null, string>> {
     else return { status: "error", error: e  as any };
 }
 },
+async getAppSetting(key: string) : Promise<Result<string | null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("get_app_setting", { key }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async setAppSetting(key: string, value: string) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("set_app_setting", { key, value }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async listWatchedFolders() : Promise<Result<WatchedFolder[], string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("list_watched_folders") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async addWatchedFolder(path: string) : Promise<Result<WatchedFolder, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("add_watched_folder", { path }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async updateWatchedFolderPath(id: number, path: string) : Promise<Result<WatchedFolder, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("update_watched_folder_path", { id, path }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async removeWatchedFolder(id: number) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("remove_watched_folder", { id }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Cria uma pasta se ela não existir. Existe só pro preset "iCloud Drive ›
+ * finan", que é a ÚNICA escrita em disco da feature — e mesmo assim só roda
+ * depois da confirmação explícita do usuário na UI.
+ * 
+ * Três linhas aqui evitam adicionar o plugin `tauri-plugin-fs` inteiro
+ * (que abriria acesso a arquivo muito além do necessário).
+ */
+async ensureDir(path: string) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("ensure_dir", { path }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Permite à UI perguntar "criar a pasta?" apenas quando ela realmente não
+ * existe, em vez de perguntar sempre.
+ */
+async dirExists(path: string) : Promise<boolean> {
+    return await TAURI_INVOKE("dir_exists", { path });
+},
+/**
+ * A varredura roda no foco da janela — exatamente quando o usuário está
+ * voltando pra interagir. Por isso o mutex do banco é pego em dois momentos
+ * curtos (ler as pastas / gravar o resultado) e **solto** durante o trabalho
+ * de disco: segurá-lo do começo ao fim travaria toda a UI, que compartilha
+ * essa mesma mutex.
+ */
+async scanWatchedFolders() : Promise<Result<DiscoveredFile[], string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("scan_watched_folders") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async markFile(contentHash: string, status: string) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("mark_file", { contentHash, status }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async listLocales() : Promise<LocaleInfo[]> {
     return await TAURI_INVOKE("list_locales");
 },
@@ -429,6 +523,7 @@ export type Category = { id: number; name: string; color_token: string | null; k
 export type CategorySpend = { category_id: number | null; name: string; color_token: string | null; total: string; percent: number }
 export type CategoryWithCount = { id: number; name: string; color_token: string | null; kind: string; created_at: string; transaction_count: number }
 export type CnpjResolution = { cnpj: string; razao_social: string | null; nome_fantasia: string | null; cnae_fiscal: string | null; cnae_fiscal_descricao: string | null; suggested_category_id: number | null }
+export type DiscoveredFile = { id: number; content_hash: string; path: string; file_name: string; size: number; status: string; seen_at: string }
 /**
  * Linha do widget "Maiores gastos do mês" — transação com categoria
  * resolvida inline (nome + token de cor) pra evitar segundo round-trip.
@@ -522,6 +617,17 @@ export type TransferSummary = { total_out: string; total_in: string; count: numb
 export type TxKey = { ofx_fitid: string; date: string; amount: string }
 export type UpdateCategory = { name: string; color_token: string | null; kind: string }
 export type UpdateRule = { pattern: string; category_id: number; priority: number; due_day: number | null; display_name?: string | null }
+export type WatchedFolder = { id: number; path: string; 
+/**
+ * Nome curto pra exibir ("finan", "Downloads"). Derivado do último
+ * componente do caminho no momento em que a pasta foi adicionada.
+ */
+label: string; 
+/**
+ * `false` quando a pasta sumiu ou foi desmontada — a linha vira estado de
+ * erro na UI, mas as outras pastas seguem funcionando.
+ */
+exists: boolean; imported_count: number; last_imported_at: string | null }
 
 /** tauri-specta globals **/
 

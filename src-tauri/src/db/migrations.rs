@@ -60,6 +60,10 @@ const MIGRATIONS: &[(&str, &str)] = &[
         "0015_education_pets_categories",
         include_str!("../../migrations/0015_education_pets_categories.sql"),
     ),
+    (
+        "0016_watched_folders",
+        include_str!("../../migrations/0016_watched_folders.sql"),
+    ),
 ];
 
 /// Applies pending migrations. Returns `true` when this call created a **brand
@@ -201,6 +205,7 @@ mod tests {
                 "0013_composite_fitid_unique".to_string(),
                 "0014_category_keys".to_string(),
                 "0015_education_pets_categories".to_string(),
+                "0016_watched_folders".to_string(),
             ]
         );
     }
@@ -235,5 +240,65 @@ mod tests {
         let conn = Connection::open_in_memory().unwrap();
         assert!(apply(&conn).unwrap(), "primeira aplicação = DB novo");
         assert!(!apply(&conn).unwrap(), "reaplicar não é DB novo");
+    }
+
+    #[test]
+    fn creates_watch_tables() {
+        let conn = Connection::open_in_memory().unwrap();
+        apply(&conn).unwrap();
+
+        assert!(table_exists(&conn, "app_settings"));
+        assert!(table_exists(&conn, "watched_folders"));
+        assert!(table_exists(&conn, "seen_files"));
+    }
+
+    #[test]
+    fn seen_files_rejects_unknown_status() {
+        let conn = Connection::open_in_memory().unwrap();
+        apply(&conn).unwrap();
+
+        let result = conn.execute(
+            "INSERT INTO seen_files (content_hash, path, file_name, size, status)
+             VALUES ('abc', '/tmp/x.ofx', 'x.ofx', 10, 'garbage')",
+            [],
+        );
+        assert!(result.is_err(), "CHECK deveria bloquear status inválido");
+    }
+
+    #[test]
+    fn seen_files_hash_is_unique() {
+        let conn = Connection::open_in_memory().unwrap();
+        apply(&conn).unwrap();
+
+        conn.execute(
+            "INSERT INTO seen_files (content_hash, path, file_name, size, status)
+             VALUES ('abc', '/tmp/a.ofx', 'a.ofx', 10, 'pending')",
+            [],
+        )
+        .unwrap();
+        // Mesmo conteúdo, outro nome/caminho: deve colidir.
+        let result = conn.execute(
+            "INSERT INTO seen_files (content_hash, path, file_name, size, status)
+             VALUES ('abc', '/tmp/b.ofx', 'b.ofx', 10, 'pending')",
+            [],
+        );
+        assert!(result.is_err(), "hash duplicado deveria ser barrado");
+    }
+
+    #[test]
+    fn watched_folders_path_is_unique() {
+        let conn = Connection::open_in_memory().unwrap();
+        apply(&conn).unwrap();
+
+        conn.execute(
+            "INSERT INTO watched_folders (path, label) VALUES ('/tmp/finan', 'finan')",
+            [],
+        )
+        .unwrap();
+        let result = conn.execute(
+            "INSERT INTO watched_folders (path, label) VALUES ('/tmp/finan', 'outro')",
+            [],
+        );
+        assert!(result.is_err(), "mesma pasta não pode entrar duas vezes");
     }
 }

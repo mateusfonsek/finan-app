@@ -14,6 +14,9 @@
   import { createRule, deleteRuleWithCleanup, updateRule } from "$lib/api/rules";
   import { autoClassifyWithCnpj } from "$lib/api/suggestions";
   import type { ParsedOfx } from "$lib/ofx/types";
+  import { takeStashed } from "$lib/ofx/open";
+  import { watch, type Discovery } from "$lib/stores/watch.svelte";
+  import { loadOfxFromPath } from "$lib/ofx/load";
   import { detectReversalPairs, type ReversalInfo } from "$lib/ofx/reversals";
   import type {
     Account,
@@ -43,15 +46,34 @@
   /** category chosen per unresolved CNPJ (keyed by cnpj) */
   let chosen = $state<Record<string, number | null>>({});
   let busyKey = $state<string | null>(null);
+  /** Hash do arquivo na pasta observada, quando o import veio de lá — marca o
+   *  arquivo como importado ao final, pra sumir do badge e nunca mais avisar. */
+  let watchHash = $state<string | undefined>(undefined);
+
+  // O toast nunca interrompe quem já está revisando um extrato.
+  $effect(() => {
+    watch.suppressToast = pending !== null;
+    return () => (watch.suppressToast = false);
+  });
 
   onMount(() => {
     void listCategories().then((c) => (categories = c));
-    const stash = (window as unknown as { __finanPending?: PendingImport }).__finanPending;
+    const stash = takeStashed();
     if (stash) {
-      pending = stash;
-      (window as unknown as { __finanPending?: PendingImport }).__finanPending = undefined;
+      pending = { file: stash.file, parsed: stash.parsed };
+      watchHash = stash.watchHash;
       void prepareImport(stash.parsed);
     }
+  });
+
+  // "Revisar" no toast só pede pra abrir; quem abre é esta tela. Isso vale pra
+  // quando ela acabou de montar (veio de outra rota) e pra quando o usuário já
+  // estava aqui — nesse segundo caso `push("/import")` não remontaria nada, e
+  // o `onMount` acima nunca rodaria de novo.
+  $effect(() => {
+    if (!watch.openRequest) return;
+    const req = watch.takeOpenRequest();
+    if (req) void openDiscovery(req);
   });
 
   async function prepareImport(parsed: ParsedOfx) {
@@ -126,6 +148,7 @@
       importResult = await insertTransactions(account.id, toInsert);
       busyMsg = t("import.resolving_cnpj");
       autoReport = await autoClassifyWithCnpj(account.id);
+      if (watchHash) await watch.resolve(watchHash, "imported");
     } catch (e) {
       error = e instanceof Error ? e.message : String(e);
     } finally {
@@ -242,6 +265,47 @@
     importResult = null;
     autoReport = null;
     chosen = {};
+    // Sem isso, "importar outro" com um arquivo solto (DropZone) herdaria o
+    // hash do extrato anterior vindo da pasta observada.
+    watchHash = undefined;
+  }
+
+  /** Carrega o próximo extrato descoberto direto no preview, reaproveitando a
+   *  tela em que já estamos. */
+  async function openNextFromQueue() {
+    const next = watch.discoveries[0];
+    if (next) await openDiscovery(next);
+  }
+
+  /** Carrega uma descoberta específica no preview, sem sair da tela. */
+  async function openDiscovery(next: Discovery) {
+    error = null;
+    busy = true;
+    try {
+      // Só tocamos em `pending`/no resto do estado do import depois que o
+      // arquivo novo já foi lido e parseado com sucesso — igual a `onparsed`.
+      // Zerar `pending` antes (como fazia o `reset()` aqui) deixava a tela sem
+      // extrato nenhum durante toda a leitura, e se o load falhasse (arquivo
+      // movido, apagado, ou placeholder do iCloud evictado depois do scan) o
+      // erro caía com `pending` já nulo — a tela voltava pra dropzone vazia,
+      // sem explicação nenhuma.
+      const loaded = await loadOfxFromPath(next.path);
+      reset();
+      pending = { file: loaded.file, parsed: loaded.parsed };
+      watchHash = next.hash;
+      await prepareImport(loaded.parsed);
+    } catch (e) {
+      error = e instanceof Error ? e.message : String(e);
+      // Tira o arquivo da fila pra que ele não trave `discoveries[0]` — sem
+      // isso, todo clique em "Próximo extrato" bateria de novo nele e os
+      // extratos atrás nunca sairiam. *Como* ele sai depende da falha: só
+      // conteúdo que não é OFX vira `invalid` (permanente); não conseguir ler
+      // agora é transitório e apenas some desta rodada, voltando na próxima
+      // varredura (spec §5.4).
+      await watch.noteLoadFailure(next.hash, e);
+    } finally {
+      busy = false;
+    }
   }
 </script>
 
@@ -256,6 +320,9 @@
   </header>
 
   {#if !pending}
+    {#if error}
+      <div class="rounded-lg border border-border bg-surface p-3 text-sm text-neg">{error}</div>
+    {/if}
     <DropZone {onparsed} {onerror} />
   {:else if importResult && autoReport}
     <!-- ============ Post-import view ============ -->
@@ -385,6 +452,11 @@
 
     <div class="flex justify-end gap-2 sticky bottom-0 bg-bg pt-3 border-t border-border-subtle">
       <Button variant="ghost" onclick={reset}>{t("import.import_another")}</Button>
+      {#if watch.pendingCount > 0}
+        <Button variant="outline" onclick={openNextFromQueue} disabled={busy}>
+          {busy ? t("import.reading") : t("watch.queue_next", { n: watch.pendingCount })}
+        </Button>
+      {/if}
       <Button onclick={() => push("/transactions")}>{t("import.view_transactions")}</Button>
     </div>
   {:else}

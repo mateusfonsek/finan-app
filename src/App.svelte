@@ -5,10 +5,11 @@
   import { openUrl } from "@tauri-apps/plugin-opener";
   import Sidebar from "$lib/components/shell/Sidebar.svelte";
   import AboutDialog from "$lib/components/shell/AboutDialog.svelte";
-  import { loadOfxFromPath } from "$lib/ofx/load";
+  import WatchToast from "$lib/components/shell/WatchToast.svelte";
+  import { openOfxPath } from "$lib/ofx/open";
   import { takePendingOfx } from "$lib/api/files";
-  import type { ParsedOfx } from "$lib/ofx/types";
   import { locale } from "$lib/i18n/locale.svelte";
+  import { watch } from "$lib/stores/watch.svelte";
   import { routes } from "./routes/routes";
 
   // Sync the UI language from the backend's persisted choice on boot.
@@ -21,21 +22,15 @@
   // "Abrir com finan": drena os .ofx abertos via Finder, carrega e entrega pra
   // tela de Importar via o mesmo stash que ela já lê no onMount.
   async function handleOpenedOfx() {
-    let paths: string[] = [];
-    try {
-      paths = await takePendingOfx();
-    } catch {
-      return;
+    const paths = await takePendingOfx();
+    for (const path of paths) {
+      try {
+        await openOfxPath(path);
+      } catch {
+        // Arquivo inválido aberto pelo Finder: o Import mostra o erro quando
+        // o usuário tenta de novo. Não vale interromper o boot por isso.
+      }
     }
-    if (paths.length === 0) return;
-    try {
-      const result = await loadOfxFromPath(paths[0]);
-      (window as unknown as { __finanPending?: { file: File; parsed: ParsedOfx } }).__finanPending =
-        result;
-    } catch {
-      // arquivo inválido — abre a tela de Importar pro usuário tentar de novo
-    }
-    push("/import");
   }
 
   const SHORTCUTS: Record<string, () => void> = {
@@ -98,6 +93,15 @@
     listen("open-ofx", () => void handleOpenedOfx()).then((u) => unlisten.push(u));
     // Cold start: o arquivo pode já estar na fila antes deste listener existir.
     void handleOpenedOfx();
+
+    // Gatilhos de varredura: abertura do app e foco da janela. É o foco que
+    // torna o watcher de filesystem desnecessário — o usuário manda o arquivo
+    // do celular e então vem olhar o Mac.
+    void watch.loadEnabled().then(() => watch.refresh({ force: true }));
+    const onFocus = () => void watch.refresh();
+    window.addEventListener("focus", onFocus);
+    unlisten.push(() => window.removeEventListener("focus", onFocus));
+
     return () => unlisten.forEach((u) => u());
   });
 </script>
@@ -108,6 +112,8 @@
     <Router {routes} />
   </main>
 </div>
+
+<WatchToast />
 
 {#if aboutOpen}
   <AboutDialog onClose={() => (aboutOpen = false)} />
