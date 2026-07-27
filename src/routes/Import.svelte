@@ -15,7 +15,7 @@
   import { autoClassifyWithCnpj } from "$lib/api/suggestions";
   import type { ParsedOfx } from "$lib/ofx/types";
   import { takeStashed } from "$lib/ofx/open";
-  import { watch } from "$lib/stores/watch.svelte";
+  import { watch, type Discovery } from "$lib/stores/watch.svelte";
   import { loadOfxFromPath } from "$lib/ofx/load";
   import { detectReversalPairs, type ReversalInfo } from "$lib/ofx/reversals";
   import type {
@@ -64,6 +64,16 @@
       watchHash = stash.watchHash;
       void prepareImport(stash.parsed);
     }
+  });
+
+  // "Revisar" no toast só pede pra abrir; quem abre é esta tela. Isso vale pra
+  // quando ela acabou de montar (veio de outra rota) e pra quando o usuário já
+  // estava aqui — nesse segundo caso `push("/import")` não remontaria nada, e
+  // o `onMount` acima nunca rodaria de novo.
+  $effect(() => {
+    if (!watch.openRequest) return;
+    const req = watch.takeOpenRequest();
+    if (req) void openDiscovery(req);
   });
 
   async function prepareImport(parsed: ParsedOfx) {
@@ -264,7 +274,11 @@
    *  tela em que já estamos. */
   async function openNextFromQueue() {
     const next = watch.discoveries[0];
-    if (!next) return;
+    if (next) await openDiscovery(next);
+  }
+
+  /** Carrega uma descoberta específica no preview, sem sair da tela. */
+  async function openDiscovery(next: Discovery) {
     error = null;
     busy = true;
     try {
@@ -282,13 +296,13 @@
       await prepareImport(loaded.parsed);
     } catch (e) {
       error = e instanceof Error ? e.message : String(e);
-      // Arquivo não deu pra ler/parsear agora: resolve como "invalid" pra sair
-      // da fila — é exatamente o que esse status já significa (mesmo critério
-      // usado pelo scan pra descobertas que não parsearam). Sem isso, esse
-      // arquivo quebrado ficaria travado em discoveries[0] pra sempre, e todo
-      // clique em "Próximo extrato" bateria de novo nele, bloqueando os
-      // extratos atrás na fila.
-      await watch.resolve(next.hash, "invalid");
+      // Tira o arquivo da fila pra que ele não trave `discoveries[0]` — sem
+      // isso, todo clique em "Próximo extrato" bateria de novo nele e os
+      // extratos atrás nunca sairiam. *Como* ele sai depende da falha: só
+      // conteúdo que não é OFX vira `invalid` (permanente); não conseguir ler
+      // agora é transitório e apenas some desta rodada, voltando na próxima
+      // varredura (spec §5.4).
+      await watch.noteLoadFailure(next.hash, e);
     } finally {
       busy = false;
     }
@@ -440,7 +454,7 @@
       <Button variant="ghost" onclick={reset}>{t("import.import_another")}</Button>
       {#if watch.pendingCount > 0}
         <Button variant="outline" onclick={openNextFromQueue} disabled={busy}>
-          {busy ? t("import.reading") : t("watch.queue_next", { current: 1, total: watch.pendingCount })}
+          {busy ? t("import.reading") : t("watch.queue_next", { n: watch.pendingCount })}
         </Button>
       {/if}
       <Button onclick={() => push("/transactions")}>{t("import.view_transactions")}</Button>

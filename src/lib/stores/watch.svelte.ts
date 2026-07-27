@@ -6,6 +6,7 @@ import {
   WATCH_ENABLED_KEY,
   type FileStatus,
 } from "$lib/api/watch";
+import { OfxReadError } from "$lib/ofx/errors";
 import { loadOfxFromPath } from "$lib/ofx/load";
 
 /** Uma descoberta já validada: só chega aqui o que parseou como OFX. */
@@ -73,10 +74,8 @@ export function createWatchStore() {
             earliest: parsed.summary.earliest ?? null,
             latest: parsed.summary.latest ?? null,
           });
-        } catch {
-          // Não é OFX de verdade. Marca e nunca mais incomoda — nunca mostrar
-          // ao usuário um erro que é nosso.
-          await markFile(f.content_hash, "invalid");
+        } catch (e) {
+          await noteLoadFailure(f.content_hash, e);
         }
       }
       // Descarta do snapshot qualquer hash que o toast/import já resolveu
@@ -116,6 +115,45 @@ export function createWatchStore() {
     if (scanning) resolvedDuringScan.add(hash);
   }
 
+  /** Tira a descoberta da lista **sem** tocar no banco: o arquivo continua
+   *  `pending` e a próxima varredura tenta de novo. É o oposto de `resolve`,
+   *  que é definitivo. */
+  function skip(hash: string) {
+    discoveries = discoveries.filter((d) => d.hash !== hash);
+    if (scanning) resolvedDuringScan.add(hash);
+  }
+
+  /** Política única pra "não consegui abrir esta descoberta" (spec §5.4).
+   *
+   *  Ler falhou → transitório (stub do iCloud evictado depois da varredura,
+   *  arquivo movido, permissão): fica `pending` e volta no próximo scan.
+   *  Parse falhou → o conteúdo não é OFX e não vai virar: `invalid`, que é
+   *  permanente, e o usuário nunca vê um erro que é nosso. */
+  async function noteLoadFailure(hash: string, e: unknown) {
+    if (e instanceof OfxReadError) skip(hash);
+    else await resolve(hash, "invalid");
+  }
+
+  /** Pedido de "abrir esta descoberta no Import", vindo do toast.
+   *
+   *  Sinal em vez de navegação direta porque `push("/import")` estando já em
+   *  `/import` não dispara `hashchange` — o Import não remonta e o `onMount`
+   *  não roda de novo. A tela de Import observa este sinal e carrega no lugar,
+   *  funcione ela recém-montada ou já na tela. */
+  let openRequest = $state<Discovery | null>(null);
+
+  function requestOpen(discovery: Discovery) {
+    openRequest = discovery;
+  }
+
+  /** Consome o pedido (só pode ser atendido uma vez — sem isso, um pedido
+   *  antigo reabriria um extrato ao voltar pra tela depois). */
+  function takeOpenRequest(): Discovery | null {
+    const req = openRequest;
+    openRequest = null;
+    return req;
+  }
+
   return {
     get enabled() {
       return enabled;
@@ -132,10 +170,17 @@ export function createWatchStore() {
     set suppressToast(v: boolean) {
       suppressToast = v;
     },
+    get openRequest() {
+      return openRequest;
+    },
     refresh,
     loadEnabled,
     setEnabled,
     resolve,
+    skip,
+    noteLoadFailure,
+    requestOpen,
+    takeOpenRequest,
   };
 }
 

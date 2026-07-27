@@ -1,7 +1,7 @@
 <script lang="ts">
+  import { push, router } from "svelte-spa-router";
   import { locale } from "$lib/i18n/locale.svelte";
   import { watch } from "$lib/stores/watch.svelte";
-  import { openOfxPath } from "$lib/ofx/open";
 
   const t = locale.t;
 
@@ -24,11 +24,20 @@
     return () => clearTimeout(timer);
   });
 
-  async function review() {
+  const IMPORT_ROUTE = "/import";
+
+  function review() {
     if (!current) return;
-    const { path, hash } = current;
-    hiddenFor = hash;
-    await openOfxPath(path, hash);
+    // Quem carrega o arquivo é a tela de Importar, via sinal na store: daqui
+    // não dá pra navegar pra `/import` estando já em `/import` (o `push` não
+    // dispara `hashchange`, o Import não remonta, e o clique viraria nada).
+    watch.requestOpen(current);
+    // Esconder aqui não desalinha nada com o badge: se a abertura falhar lá no
+    // Import, a descoberta sai da lista de um jeito ou de outro — `invalid`
+    // quando o conteúdo não presta, ou só some desta rodada quando não deu pra
+    // ler agora. Toast e badge continuam contando a mesma coisa.
+    hiddenFor = current.hash;
+    if (router.location !== IMPORT_ROUTE) void push(IMPORT_ROUTE);
   }
 
   async function ignore() {

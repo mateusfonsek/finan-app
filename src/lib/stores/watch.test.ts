@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const api = vi.hoisted(() => ({
   scanWatchedFolders: vi.fn(),
-  listPendingFiles: vi.fn(),
   markFile: vi.fn(),
   getAppSetting: vi.fn(),
   setAppSetting: vi.fn(),
@@ -17,6 +16,7 @@ vi.mock("$lib/api/watch", () => ({
 const loadOfxFromPath = vi.hoisted(() => vi.fn());
 vi.mock("$lib/ofx/load", () => ({ loadOfxFromPath }));
 
+import { OfxReadError } from "$lib/ofx/errors";
 import { createWatchStore } from "./watch.svelte";
 
 function discovered(hash: string, name: string) {
@@ -73,6 +73,60 @@ describe("watch store", () => {
 
     expect(store.pendingCount).toBe(0);
     expect(api.markFile).toHaveBeenCalledWith("h2", "invalid");
+  });
+
+  it("falha de leitura não marca invalid — o arquivo continua pendente", async () => {
+    // Stub do iCloud que voltou a ser placeholder, arquivo movido, permissão
+    // negada: `invalid` é permanente e enterraria o extrato pra sempre, já que
+    // a chave é o hash do conteúdo (spec §5.4).
+    api.scanWatchedFolders.mockResolvedValue([discovered("h6", "nubank.ofx")]);
+    loadOfxFromPath.mockRejectedValue(
+      new OfxReadError("/tmp/nubank.ofx", new Error("No such file or directory")),
+    );
+
+    const store = createWatchStore();
+    await store.refresh();
+
+    expect(api.markFile).not.toHaveBeenCalled();
+    expect(store.pendingCount).toBe(0);
+  });
+
+  it("arquivo que não deu pra ler volta a aparecer na varredura seguinte", async () => {
+    api.scanWatchedFolders.mockResolvedValue([discovered("h7", "nubank.ofx")]);
+    loadOfxFromPath.mockRejectedValueOnce(
+      new OfxReadError("/tmp/nubank.ofx", new Error("No such file or directory")),
+    );
+
+    const store = createWatchStore();
+    await store.refresh();
+    expect(store.pendingCount).toBe(0);
+
+    // iCloud terminou o download: a mesma descoberta agora lê e parseia.
+    loadOfxFromPath.mockResolvedValue(parsed(12));
+    await store.refresh({ force: true });
+
+    expect(store.pendingCount).toBe(1);
+    expect(store.discoveries[0]).toMatchObject({ hash: "h7", txCount: 12 });
+  });
+
+  it("pedido de abertura é entregue uma vez só", async () => {
+    const store = createWatchStore();
+    const discovery = {
+      hash: "h8",
+      path: "/tmp/a.ofx",
+      fileName: "a.ofx",
+      txCount: 3,
+      earliest: null,
+      latest: null,
+    };
+
+    store.requestOpen(discovery);
+
+    expect(store.openRequest).toEqual(discovery);
+    expect(store.takeOpenRequest()).toEqual(discovery);
+    // Sem isso, um pedido antigo reabriria um extrato ao voltar pra tela.
+    expect(store.takeOpenRequest()).toBeNull();
+    expect(store.openRequest).toBeNull();
   });
 
   it("resolve remove a descoberta da lista", async () => {
