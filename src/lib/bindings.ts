@@ -458,17 +458,16 @@ async ensureDir(path: string) : Promise<Result<null, string>> {
 async dirExists(path: string) : Promise<boolean> {
     return await TAURI_INVOKE("dir_exists", { path });
 },
+/**
+ * A varredura roda no foco da janela — exatamente quando o usuário está
+ * voltando pra interagir. Por isso o mutex do banco é pego em dois momentos
+ * curtos (ler as pastas / gravar o resultado) e **solto** durante o trabalho
+ * de disco: segurá-lo do começo ao fim travaria toda a UI, que compartilha
+ * essa mesma mutex.
+ */
 async scanWatchedFolders() : Promise<Result<DiscoveredFile[], string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("scan_watched_folders") };
-} catch (e) {
-    if(e instanceof Error) throw e;
-    else return { status: "error", error: e  as any };
-}
-},
-async listPendingFiles() : Promise<Result<DiscoveredFile[], string>> {
-    try {
-    return { status: "ok", data: await TAURI_INVOKE("list_pending_files") };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };

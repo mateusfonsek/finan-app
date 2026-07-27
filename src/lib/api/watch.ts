@@ -11,6 +11,8 @@ export type FileStatus = "pending" | "imported" | "ignored" | "invalid";
 export const WATCH_ENABLED_KEY = "watch_enabled";
 export const WATCH_HINT_DISMISSED_KEY = "watch_hint_dismissed";
 export const ICLOUD_PENDING_KEY = "watch_icloud_pending";
+/** Quando a última varredura terminou (UTC, `datetime('now')` do SQLite). */
+export const LAST_SCAN_KEY = "watch_last_scan_at";
 
 /** Cria a pasta do preset do iCloud. Única escrita em disco da feature. */
 export async function ensureDir(path: string): Promise<void> {
@@ -39,10 +41,6 @@ export async function removeWatchedFolder(id: number): Promise<void> {
 
 export async function scanWatchedFolders(): Promise<DiscoveredFile[]> {
   return unwrap(await commands.scanWatchedFolders());
-}
-
-export async function listPendingFiles(): Promise<DiscoveredFile[]> {
-  return unwrap(await commands.listPendingFiles());
 }
 
 export async function markFile(contentHash: string, status: FileStatus): Promise<void> {

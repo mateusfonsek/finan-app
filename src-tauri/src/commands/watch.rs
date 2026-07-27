@@ -45,12 +45,17 @@ fn label_for(path: &str) -> String {
 
 /// Resolve symlinks e normaliza (`/tmp` → `/private/tmp` no macOS) pra que o
 /// UNIQUE da tabela realmente barre a mesma pasta adicionada duas vezes.
+///
+/// As mensagens de erro daqui pra baixo são de desenvolvedor, em inglês, como
+/// no resto dos comandos: elas vazam pra UI via `e.message`, e a UI é quem
+/// traduz o caso em texto para o usuário (`t("watch.error_*")`). Se o texto
+/// nascesse em português aqui, ele continuaria em português em todo pacote de
+/// idioma futuro.
 fn canonical(path: &str) -> AppResult<String> {
-    let p = std::fs::canonicalize(path).map_err(|e| {
-        AppError::Path(format!("não consegui resolver o caminho '{path}': {e}"))
-    })?;
+    let p = std::fs::canonicalize(path)
+        .map_err(|e| AppError::Path(format!("failed to resolve path '{path}': {e}")))?;
     if !p.is_dir() {
-        return Err(AppError::Invalid(format!("'{path}' não é uma pasta")));
+        return Err(AppError::Invalid(format!("'{path}' is not a directory")));
     }
     Ok(p.to_string_lossy().to_string())
 }
@@ -98,7 +103,7 @@ fn folder_by_id(conn: &Connection, id: i64) -> AppResult<WatchedFolder> {
     };
     all.into_iter()
         .find(|f| f.id == id)
-        .ok_or_else(|| AppError::Invalid(format!("pasta {id} não encontrada")))
+        .ok_or_else(|| AppError::Invalid(format!("watched folder {id} not found")))
 }
 
 pub fn add_folder(conn: &Connection, path: &str) -> AppResult<WatchedFolder> {
@@ -127,7 +132,7 @@ pub fn update_folder_path(conn: &Connection, id: i64, path: &str) -> AppResult<W
         params![id, canon, label],
     )?;
     if changed == 0 {
-        return Err(AppError::Invalid(format!("pasta {id} não encontrada")));
+        return Err(AppError::Invalid(format!("watched folder {id} not found")));
     }
     folder_by_id(conn, id)
 }
@@ -196,6 +201,11 @@ pub const WATCH_ENABLED_KEY: &str = "watch_enabled";
 /// Quantos `.ofx` a última varredura viu como placeholder do iCloud ainda não
 /// baixado. A Settings mostra isso como informação — nunca como erro.
 pub const ICLOUD_PENDING_KEY: &str = "watch_icloud_pending";
+
+/// Quando a última varredura terminou (UTC, formato do `datetime('now')` do
+/// SQLite). A Settings mostra isso como evidência de que a feature está viva —
+/// por isso é a hora real, não um texto genérico.
+pub const LAST_SCAN_KEY: &str = "watch_last_scan_at";
 
 /// Arquivo com mtime mais recente que isto pode estar sendo escrito ainda
 /// (AirDrop chegando, download em andamento). Adiamos pro próximo ciclo em vez
@@ -266,10 +276,12 @@ pub fn scan_dir(dir: &Path, now: SystemTime) -> ScanOutcome {
         let name = entry.file_name().to_string_lossy().to_string();
 
         if let Some(target) = icloud_stub_target(&name) {
-            // Tenta materializar: no macOS, ler o caminho real dispara o
-            // download sob demanda. Se ainda não veio, contabiliza e segue.
+            // Tenta materializar: no macOS, *abrir* o caminho real já dispara o
+            // download sob demanda — não é preciso ler os bytes (um extrato
+            // grande seria carregado na memória só pra ser descartado aqui).
+            // Se ainda não veio, contabiliza e segue.
             let real = dir.join(&target);
-            if std::fs::read(&real).is_err() {
+            if std::fs::File::open(&real).is_err() {
                 outcome.icloud_pending += 1;
             }
             continue;
@@ -279,6 +291,11 @@ pub fn scan_dir(dir: &Path, now: SystemTime) -> ScanOutcome {
             continue;
         }
 
+        // `DirEntry::metadata()` NÃO segue symlink, de propósito: um link
+        // simbólico dentro da pasta observada apontando pra fora dela não é
+        // arquivo regular aqui, cai no `_ => continue` e é ignorado. Assim o
+        // escopo da varredura continua sendo exatamente a pasta que o usuário
+        // escolheu — que é a promessa de privacidade da feature.
         let meta = match entry.metadata() {
             Ok(m) if m.is_file() => m,
             _ => continue,
@@ -338,36 +355,46 @@ pub fn is_enabled(conn: &Connection) -> AppResult<bool> {
     Ok(get_setting(conn, WATCH_ENABLED_KEY)?.as_deref() == Some("1"))
 }
 
-/// Varre todas as pastas observadas e registra os arquivos novos como
-/// `pending`. Devolve **todos** os pendentes (não só os desta rodada), que é o
-/// que a UI precisa pro badge e pra fila.
-///
-/// `now` é injetado (mesmo motivo de `scan_dir`): os testes simulam passagem
-/// de tempo sem dormir. Em produção o chamador sempre passa `SystemTime::now()`
-/// — se a varredura inventasse seu próprio relógio "adiantado" aqui, o guard
-/// de `SETTLE` em `scan_dir` nunca adiaria nada, e um arquivo ainda sendo
-/// escrito (AirDrop, download) seria lido e hasheado pela metade.
-pub fn scan_all(conn: &Connection, now: SystemTime) -> AppResult<Vec<DiscoveredFile>> {
+/// Fase 1 (precisa do banco): o que a varredura precisa saber antes de tocar em
+/// disco. `None` significa feature desligada — e é `None` *antes* de qualquer
+/// acesso ao filesystem, que é a garantia de que desligada ela é inerte.
+pub fn scan_targets(conn: &Connection) -> AppResult<Option<Vec<String>>> {
     if !is_enabled(conn)? {
-        return Ok(Vec::new());
+        return Ok(None);
     }
+    Ok(Some(
+        list_folders(conn)?.into_iter().map(|f| f.path).collect(),
+    ))
+}
 
-    let mut icloud_pending = 0usize;
-    for folder in list_folders(conn)? {
-        let outcome = scan_dir(Path::new(&folder.path), now);
-        icloud_pending += outcome.icloud_pending;
-        for c in outcome.candidates {
-            // Hash desconhecido → arquivo novo. Hash conhecido → só atualiza o
-            // caminho, porque o arquivo pode ter sido movido ou renomeado.
-            conn.execute(
-                "INSERT INTO seen_files (content_hash, path, file_name, size, status)
-                 VALUES (?1, ?2, ?3, ?4, 'pending')
-                 ON CONFLICT(content_hash) DO UPDATE SET
-                   path = excluded.path,
-                   file_name = excluded.file_name",
-                params![c.content_hash, c.path, c.file_name, c.size],
-            )?;
-        }
+/// Fase 2 (nada de banco): só filesystem. Fica separada justamente pra poder
+/// rodar **fora** do mutex do banco — `read_dir` + leitura + SHA-256 de cada
+/// arquivo pode levar segundos, e todo comando do app espera nessa mesma mutex.
+pub fn scan_paths(paths: &[String], now: SystemTime) -> ScanOutcome {
+    let mut merged = ScanOutcome::default();
+    for path in paths {
+        let outcome = scan_dir(Path::new(path), now);
+        merged.icloud_pending += outcome.icloud_pending;
+        merged.candidates.extend(outcome.candidates);
+    }
+    merged
+}
+
+/// Fase 3 (precisa do banco): registra o que a varredura achou e devolve
+/// **todos** os pendentes (não só os desta rodada), que é o que a UI precisa
+/// pro badge e pra fila.
+pub fn record_scan(conn: &Connection, outcome: &ScanOutcome) -> AppResult<Vec<DiscoveredFile>> {
+    for c in &outcome.candidates {
+        // Hash desconhecido → arquivo novo. Hash conhecido → só atualiza o
+        // caminho, porque o arquivo pode ter sido movido ou renomeado.
+        conn.execute(
+            "INSERT INTO seen_files (content_hash, path, file_name, size, status)
+             VALUES (?1, ?2, ?3, ?4, 'pending')
+             ON CONFLICT(content_hash) DO UPDATE SET
+               path = excluded.path,
+               file_name = excluded.file_name",
+            params![c.content_hash, c.path, c.file_name, c.size],
+        )?;
     }
 
     // Contagem de stubs do iCloud vai pro KV em vez de virar campo de retorno:
@@ -376,15 +403,44 @@ pub fn scan_all(conn: &Connection, now: SystemTime) -> AppResult<Vec<DiscoveredF
     crate::commands::app_settings::set_setting(
         conn,
         ICLOUD_PENDING_KEY,
-        &icloud_pending.to_string(),
+        &outcome.icloud_pending.to_string(),
     )?;
+
+    // Carimbo da varredura. Vem do relógio do SQLite (UTC), e não do `now`
+    // injetado, porque `now` é deliberadamente deslocado nos testes — o que a
+    // Settings mostra tem que ser a hora real.
+    let scanned_at: String = conn.query_row("SELECT datetime('now')", [], |r| r.get(0))?;
+    crate::commands::app_settings::set_setting(conn, LAST_SCAN_KEY, &scanned_at)?;
 
     pending_files(conn)
 }
 
+/// Varre todas as pastas observadas e registra os arquivos novos como
+/// `pending`.
+///
+/// `now` é injetado (mesmo motivo de `scan_dir`): os testes simulam passagem
+/// de tempo sem dormir. Em produção o chamador sempre passa `SystemTime::now()`
+/// — se a varredura inventasse seu próprio relógio "adiantado" aqui, o guard
+/// de `SETTLE` em `scan_dir` nunca adiaria nada, e um arquivo ainda sendo
+/// escrito (AirDrop, download) seria lido e hasheado pela metade.
+///
+/// Composição das três fases numa conexão só. O comando Tauri **não** passa por
+/// aqui — ele precisa soltar o mutex entre as fases (ver `scan_paths`) —, então
+/// esta função existe pros testes: é o pipeline inteiro dirigido por um relógio
+/// injetado, numa conexão em memória. `#[cfg(test)]` justamente pra que ela não
+/// vire uma segunda porta de entrada em produção.
+#[cfg(test)]
+pub fn scan_all(conn: &Connection, now: SystemTime) -> AppResult<Vec<DiscoveredFile>> {
+    let Some(paths) = scan_targets(conn)? else {
+        return Ok(Vec::new());
+    };
+    let outcome = scan_paths(&paths, now);
+    record_scan(conn, &outcome)
+}
+
 pub fn mark(conn: &Connection, content_hash: &str, status: &str) -> AppResult<()> {
     if !matches!(status, "pending" | "imported" | "ignored" | "invalid") {
-        return Err(AppError::Invalid(format!("status inválido '{status}'")));
+        return Err(AppError::Invalid(format!("invalid status '{status}'")));
     }
     conn.execute(
         "UPDATE seen_files
@@ -396,18 +452,26 @@ pub fn mark(conn: &Connection, content_hash: &str, status: &str) -> AppResult<()
     Ok(())
 }
 
+/// A varredura roda no foco da janela — exatamente quando o usuário está
+/// voltando pra interagir. Por isso o mutex do banco é pego em dois momentos
+/// curtos (ler as pastas / gravar o resultado) e **solto** durante o trabalho
+/// de disco: segurá-lo do começo ao fim travaria toda a UI, que compartilha
+/// essa mesma mutex.
 #[tauri::command]
 #[specta::specta]
 pub fn scan_watched_folders(db: State<'_, Db>) -> AppResult<Vec<DiscoveredFile>> {
-    let conn = db.conn.lock().expect("db mutex poisoned");
-    scan_all(&conn, SystemTime::now())
-}
+    let targets = {
+        let conn = db.conn.lock().expect("db mutex poisoned");
+        scan_targets(&conn)?
+    };
+    let Some(paths) = targets else {
+        return Ok(Vec::new());
+    };
 
-#[tauri::command]
-#[specta::specta]
-pub fn list_pending_files(db: State<'_, Db>) -> AppResult<Vec<DiscoveredFile>> {
+    let outcome = scan_paths(&paths, SystemTime::now());
+
     let conn = db.conn.lock().expect("db mutex poisoned");
-    pending_files(&conn)
+    record_scan(&conn, &outcome)
 }
 
 #[tauri::command]
@@ -714,6 +778,57 @@ mod tests {
             crate::commands::app_settings::get_setting(&conn, ICLOUD_PENDING_KEY).unwrap(),
             Some("1".to_string())
         );
+    }
+
+    #[test]
+    fn scan_all_records_last_scan_timestamp() {
+        let conn = fresh_conn();
+        let dir = tmpdir("last-scan");
+        add_folder(&conn, dir.to_str().unwrap()).unwrap();
+        crate::commands::app_settings::set_setting(&conn, "watch_enabled", "1").unwrap();
+
+        scan_all(&conn, later()).unwrap();
+
+        let stamp = crate::commands::app_settings::get_setting(&conn, LAST_SCAN_KEY).unwrap();
+        assert!(stamp.is_some(), "a Settings mostra quando foi a última varredura");
+    }
+
+    #[test]
+    fn disabled_scan_writes_nothing() {
+        // Desligada, a feature é inerte: nem toca em disco, nem carimba KV.
+        let conn = fresh_conn();
+        let dir = tmpdir("disabled-inert");
+        write_old(&dir, "extrato.ofx", "OFXDATA");
+        add_folder(&conn, dir.to_str().unwrap()).unwrap();
+
+        assert!(scan_targets(&conn).unwrap().is_none());
+        scan_all(&conn, later()).unwrap();
+
+        assert_eq!(
+            crate::commands::app_settings::get_setting(&conn, LAST_SCAN_KEY).unwrap(),
+            None
+        );
+        assert_eq!(
+            crate::commands::app_settings::get_setting(&conn, ICLOUD_PENDING_KEY).unwrap(),
+            None
+        );
+    }
+
+    #[test]
+    fn scan_paths_merges_every_folder() {
+        // A fase de disco recebe a lista inteira de pastas e devolve um único
+        // resultado — é ela que roda fora do mutex do banco.
+        let a = tmpdir("merge-a");
+        let b = tmpdir("merge-b");
+        write_old(&a, "a.ofx", "CONTEUDO A");
+        write_old(&b, "b.ofx", "CONTEUDO B");
+        write_old(&b, ".Nubank.ofx.icloud", "stub");
+
+        let paths = vec![a.to_string_lossy().to_string(), b.to_string_lossy().to_string()];
+        let outcome = scan_paths(&paths, later());
+
+        assert_eq!(outcome.candidates.len(), 2);
+        assert_eq!(outcome.icloud_pending, 1);
     }
 
     #[test]

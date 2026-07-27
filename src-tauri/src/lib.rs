@@ -56,7 +56,6 @@ pub fn run() {
         commands::watch::ensure_dir,
         commands::watch::dir_exists,
         commands::watch::scan_watched_folders,
-        commands::watch::list_pending_files,
         commands::watch::mark_file,
         locale::list_locales,
         locale::get_active_locale,
