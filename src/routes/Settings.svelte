@@ -13,6 +13,7 @@
     ensureDir,
     getAppSetting,
     ICLOUD_PENDING_KEY,
+    LAST_SCAN_KEY,
     listWatchedFolders,
     removeWatchedFolder,
     updateWatchedFolderPath,
@@ -31,10 +32,33 @@
   let menuOpen = $state(false);
   let menuWrapperEl: HTMLDivElement | undefined = $state();
   let icloudWaiting = $state(0);
+  let lastScanAt = $state<string | null>(null);
 
   async function loadFolders() {
     folders = await listWatchedFolders();
     icloudWaiting = Number((await getAppSetting(ICLOUD_PENDING_KEY)) ?? "0");
+    lastScanAt = await getAppSetting(LAST_SCAN_KEY);
+  }
+
+  /** O carimbo vem do SQLite em UTC e sem sufixo de fuso; o "Z" faz o `Date`
+   *  interpretar como UTC pra exibir na hora local de quem está lendo. */
+  function formatScan(stamp: string): string {
+    const d = new Date(`${stamp.replace(" ", "T")}Z`);
+    if (Number.isNaN(d.getTime())) return stamp;
+    return d.toLocaleString(locale.dateLocale, { dateStyle: "short", timeStyle: "short" });
+  }
+
+  /** O Rust devolve mensagem de desenvolvedor, em inglês, como no resto dos
+   *  comandos — nada disso pode ir cru pra tela. Aqui vira texto traduzido, e
+   *  o caso que o usuário de fato encontra (apontar pra uma pasta que já está
+   *  na lista) ganha frase própria em vez de "UNIQUE constraint failed". */
+  function folderError(e: unknown, fallbackKey: string): string {
+    const raw = e instanceof Error ? e.message : String(e);
+    if (raw.includes("watched_folders.path")) return t("watch.error_duplicate");
+    if (raw.includes("failed to resolve path") || raw.includes("is not a directory")) {
+      return t("watch.error_unreachable");
+    }
+    return t(fallbackKey);
   }
 
   onMount(async () => {
@@ -100,7 +124,7 @@
       await loadFolders();
       await watch.refresh({ force: true });
     } catch (e) {
-      error = e instanceof Error ? e.message : String(e);
+      error = folderError(e, "watch.error_add");
     }
   }
 
@@ -116,19 +140,30 @@
       try {
         await ensureDir(target);
       } catch (e) {
-        error = e instanceof Error ? e.message : String(e);
+        error = folderError(e, "watch.error_create_icloud");
         return;
       }
     }
     await addFrom(target);
   }
 
+  // Os presets `await` o `addFrom` (como o do iCloud já fazia): sem isso, uma
+  // falha antes do picker — `homeDir`/`join` — viraria rejeição sem dono e a
+  // tela não mostraria nada.
   async function addDownloads() {
-    addFrom(await join(await homeDir(), "Downloads"));
+    try {
+      await addFrom(await join(await homeDir(), "Downloads"));
+    } catch (e) {
+      error = folderError(e, "watch.error_add");
+    }
   }
 
   async function addDesktop() {
-    addFrom(await join(await homeDir(), "Desktop"));
+    try {
+      await addFrom(await join(await homeDir(), "Desktop"));
+    } catch (e) {
+      error = folderError(e, "watch.error_add");
+    }
   }
 
   async function enableWatch() {
@@ -140,7 +175,7 @@
       await watch.setEnabled(true);
       await loadFolders();
     } catch (e) {
-      error = e instanceof Error ? e.message : String(e);
+      error = folderError(e, "watch.error_toggle");
     }
   }
 
@@ -149,7 +184,7 @@
     try {
       await watch.setEnabled(false); // mantém a lista de pastas
     } catch (e) {
-      error = e instanceof Error ? e.message : String(e);
+      error = folderError(e, "watch.error_toggle");
     }
   }
 
@@ -162,7 +197,7 @@
       await loadFolders();
       await watch.refresh({ force: true });
     } catch (e) {
-      error = e instanceof Error ? e.message : String(e);
+      error = folderError(e, "watch.error_relocate");
     }
   }
 
@@ -172,15 +207,31 @@
       await removeWatchedFolder(folder.id);
       await loadFolders();
     } catch (e) {
-      error = e instanceof Error ? e.message : String(e);
+      error = folderError(e, "watch.error_remove");
+    }
+  }
+
+  /** Abrir no Finder pode falhar (pasta desmontada entre o render e o clique)
+   *  — mesmo cuidado que o botão do banco de dados já tinha. */
+  async function revealFolder(folder: WatchedFolder) {
+    error = null;
+    try {
+      await revealItemInDir(folder.path);
+    } catch (e) {
+      error = folderError(e, "watch.error_reveal");
     }
   }
 
   // Varredura manual — o terceiro gatilho previsto na spec §5.1, ao lado da
   // abertura do app e do foco da janela.
   async function scanNow() {
-    await watch.refresh({ force: true });
-    await loadFolders();
+    error = null;
+    try {
+      await watch.refresh({ force: true });
+      await loadFolders();
+    } catch (e) {
+      error = folderError(e, "watch.error_scan");
+    }
   }
 
   async function doExport() {
@@ -327,7 +378,7 @@
               <div class="flex gap-1 shrink-0">
                 <button
                   type="button"
-                  onclick={() => revealItemInDir(f.path)}
+                  onclick={() => revealFolder(f)}
                   title={t("watch.folder_menu_reveal")}
                   class="text-[11px] text-fg-muted hover:text-fg px-1.5 py-0.5 rounded hover:bg-hover"
                 >
@@ -384,7 +435,13 @@
       {/if}
 
       <div class="flex items-center justify-between pt-1 border-t border-border-subtle">
-        <span class="text-[10.5px] text-fg-faint">{t("watch.last_scan")}</span>
+        <!-- Evidência, não status genérico (spec §4.2): a hora real da última
+             varredura, ou o reconhecimento de que ainda não houve nenhuma. -->
+        <span class="text-[10.5px] text-fg-faint">
+          {lastScanAt
+            ? t("watch.last_scan_at", { time: formatScan(lastScanAt) })
+            : t("watch.last_scan_never")}
+        </span>
         <button
           type="button"
           onclick={scanNow}
