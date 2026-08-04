@@ -44,6 +44,12 @@ check "escopo é reconhecido"               0.2.0 "0.3.0" 0 'feat(watch): pasta 
 check "feat! sobe major"                   0.2.0 "1.0.0" 0 'feat!: remove import legado\n\0'
 check "feat(escopo)! sobe major"           0.2.0 "1.0.0" 0 'feat(ofx)!: remove parser antigo\n\0'
 check "BREAKING CHANGE no corpo sobe major" 0.2.0 "1.0.0" 0 'feat: muda algo\n\nBREAKING CHANGE: o formato mudou\n\0'
+# O rodapé só vale dentro de um commit conventional: num commit fora do
+# padrão a marca pode ser texto citado (changelog colado, nota de release).
+check "BREAKING CHANGE em commit malformado é ignorado" 0.2.0 ""      0 'arrumei umas coisas\n\nBREAKING CHANGE: citado de um changelog\n\0'
+check "malformado com marca não contamina os outros"    0.2.0 "0.2.1" 0 'arrumei coisas\n\nBREAKING CHANGE: citado\n\0fix: real\n\0'
+# ...mas num commit conventional de qualquer tipo, a marca vale (spec).
+check "BREAKING CHANGE em chore sobe major"             0.2.0 "1.0.0" 0 'chore: mexe em algo\n\nBREAKING CHANGE: de verdade\n\0'
 check "maior bump vence: feat + fix"       0.2.0 "0.3.0" 0 'fix: a\n\0feat: b\n\0'
 check "maior bump vence: ordem inversa"    0.2.0 "0.3.0" 0 'feat: b\n\0fix: a\n\0'
 check "maior bump vence: breaking + feat"  0.2.0 "1.0.0" 0 'feat: b\n\0feat!: c\n\0'
