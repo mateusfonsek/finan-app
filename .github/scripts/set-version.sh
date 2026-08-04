@@ -7,17 +7,35 @@ set -euo pipefail
 
 v=${1:?uso: set-version.sh <versao>}
 
+# Valida a versão de entrada antes de qualquer substituição. Sem isso,
+# um `v` na frente (forma mais comum de passar uma tag de git por engano)
+# ou um "X.Y" incompleto passam pelo node e produzem JSON inválido em
+# silêncio. Rejeitar aqui, alto e claro, é a única defesa.
+if [[ ! $v =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+  printf 'erro: versão inválida: "%s" (esperado X.Y.Z, sem "v" na frente)\n' "$v" >&2
+  exit 1
+fi
+
 # Troca só o valor do campo "version" via regex de texto, sem fazer
 # JSON.parse + stringify: re-serializar reformata o arquivo inteiro (o
 # tauri.conf.json tem arrays escritos em uma linha só, tipo
 # ["app", "dmg"], e o stringify do Node quebra cada item em uma linha —
 # dezenas de linhas de diff por causa de UMA versão).
+#
+# Guarda cada substituição para garantir que a chave foi encontrada: se
+# o `replace` não mudar nada, o arquivo sai intocado e a versão errada
+# fica silenciosamente no lugar. O mesmo risco que o perl previne com o
+# flag `$done` abaixo — deixar descoberto aqui seria repetir o mesmo bug.
 node -e '
   const fs = require("fs");
   const v = process.argv[1];
   for (const f of ["package.json", "src-tauri/tauri.conf.json"]) {
     const content = fs.readFileSync(f, "utf8");
     const updated = content.replace(/"version":\s*"[^"]*"/, `"version": "${v}"`);
+    if (updated === content) {
+      console.error(`erro: chave "version" não encontrada em ${f}`);
+      process.exit(1);
+    }
     fs.writeFileSync(f, updated);
   }
 ' "$v"
