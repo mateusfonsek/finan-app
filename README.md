@@ -95,6 +95,8 @@ pnpm tauri build --target universal-apple-darwin
 
 O `.app` e o `.dmg` saem em `src-tauri/target/universal-apple-darwin/release/bundle/`.
 
+Para contribuir (formato de commit e como as releases funcionam), veja [CONTRIBUTING.md](CONTRIBUTING.md).
+
 ## 🧱 Stack
 
 [Tauri 2](https://tauri.app) (Rust) · [Svelte 5](https://svelte.dev) · SQLite (rusqlite). Sem backend, sem telemetria.
