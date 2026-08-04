@@ -398,6 +398,8 @@
     "toast_meta_many": "{n} transações · {from} → {to}",
     "toast_review": "Revisar",
     "toast_ignore": "ignorar",
+    "toast_collapse": "Encolher",
+    "toast_expand": "Ver o extrato encontrado",
     "queue_next": "Próximo extrato ({n} na fila)",
     "badge_pending_one": "{n} extrato novo aguardando revisão",
     "badge_pending_many": "{n} extratos novos aguardando revisão",
