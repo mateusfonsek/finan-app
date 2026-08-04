@@ -1,0 +1,27 @@
+name: ci
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  test:
+    uses: ./.github/workflows/test.yml
+
+  commit-format:
+    # Ubuntu aqui: é só git + grep, não precisa de macOS.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Precisa do histórico pra comparar base..head.
+          fetch-depth: 0
+
+      - name: Validar título da PR e commits
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          git log --format=%s "$BASE_SHA..$HEAD_SHA" \
+            | .github/scripts/check-commit-format.sh
