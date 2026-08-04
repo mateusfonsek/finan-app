@@ -64,13 +64,6 @@ while IFS= read -r -d '' record || [ -n "$record" ]; do
     body=${record#*$'\n'}
   fi
 
-  # BREAKING CHANGE pode estar em qualquer linha do corpo/rodapé, sozinha.
-  while IFS= read -r body_line || [ -n "$body_line" ]; do
-    if [[ $body_line =~ ^BREAKING[[:space:]-]CHANGE: ]]; then
-      bump=major
-    fi
-  done <<< "$body"
-
   # Cabeçalho conventional: tipo(escopo opcional)(! opcional): descrição.
   # O tipo aceita dígito porque `i18n` é um tipo real neste repo — com
   # `[a-z]+` o validador reprovaria commits que já estão no main.
@@ -78,6 +71,20 @@ while IFS= read -r -d '' record || [ -n "$record" ]; do
 
   type=${BASH_REMATCH[1]}
   breaking=${BASH_REMATCH[3]}
+
+  # BREAKING CHANGE pode estar em qualquer linha do corpo/rodapé, sozinha.
+  #
+  # A varredura vem DEPOIS da validação do cabeçalho de propósito: o rodapé
+  # só tem significado dentro de um commit conventional. Varrer antes fazia
+  # um commit fora do padrão ("arrumei umas coisas") cujo corpo citasse a
+  # marca — num changelog colado, numa nota de release — subir a major
+  # sozinho. É a mesma classe de bug que o split por NUL fechou pros
+  # cabeçalhos, que tinha ficado aberta pro rodapé.
+  while IFS= read -r body_line || [ -n "$body_line" ]; do
+    if [[ $body_line =~ ^BREAKING[[:space:]-]CHANGE: ]]; then
+      bump=major
+    fi
+  done <<< "$body"
 
   if [ -n "$breaking" ]; then
     bump=major
