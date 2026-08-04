@@ -261,5 +261,45 @@ EOF
   cleanup_fixture "$fixture"
 }
 
+# Test 9: versão pedida é IGUAL à de uma dependência, e a linha [package] não
+# casa com o perl (indentada) => tem que reprovar mesmo assim.
+#
+# Este teste existe pra discriminar a âncora `^` da guarda. O teste 8 sozinho
+# não pega isso: seu fixture pede "3.0.0" contra uma dependência em "1.0", que
+# não bate por conteúdo em nenhum jeito de comparação. Aqui a versão pedida é
+# IDÊNTICA à versão da dependência (`tokio = { version = "1.35.0" }`, uma
+# versão real do crate — precisa resolver de verdade pro `cargo metadata`
+# no fim do script não ser o que derruba o teste por um motivo alheio) — uma
+# guarda sem âncora de início de linha (`grep -qF` em vez do `grep -Eq
+# '^version = ...'` atual) encontra "version = \"1.35.0\"" como SUBSTRING
+# dentro da linha da dependência e reporta sucesso, mesmo com [package]
+# intocado. A guarda correta só aceita quando a linha COMEÇA com "version = ".
+{
+  desc="versão pedida igual à de uma dependência não engana a guarda"
+  fixture=$(setup_fixture)
+
+  cat > "$fixture/src-tauri/Cargo.toml" << 'EOF'
+[package]
+  name = "finan"
+  version = "0.2.0"
+  edition = "2021"
+
+[dependencies]
+tokio = { version = "1.35.0", features = ["full"] }
+EOF
+
+  (cd "$fixture" && $set_version_script "1.35.0" 2>/dev/null)
+  ret=$?
+
+  if [ $ret -ne 0 ] && grep -qF 'version = "0.2.0"' "$fixture/src-tauri/Cargo.toml"; then
+    pass=$((pass + 1))
+  else
+    fail=$((fail + 1))
+    printf 'FALHOU: %s (saiu %d)\n' "$desc" "$ret"
+  fi
+
+  cleanup_fixture "$fixture"
+}
+
 printf '\n%d passaram, %d falharam\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]

@@ -54,11 +54,19 @@ perl -pi -e 'if (!$done && s/^version = "[^"]*"/version = "'"$v"'"/) { $done = 1
 # sucesso tendo bumpado só os dois JSON — recriando exatamente a divergência
 # entre os três arquivos que ele existe pra impedir.
 #
-# `-x` (linha inteira) e não uma busca solta: `version = "1.0"` também aparece
-# dentro das linhas de dependência (`serde = { version = "1.0", ... }`), e uma
-# busca solta daria falso-positivo justamente quando `$v` coincidisse com a
-# versão de alguma dep. A linha inteira só casa com o que o perl escreve.
-if ! grep -qxF "version = \"$v\"" src-tauri/Cargo.toml; then
+# Âncora no INÍCIO da linha (`^`) e não uma busca solta: `version = "1.0"`
+# também aparece dentro das linhas de dependência (`serde = { version =
+# "1.0", ... }`), que vêm indentadas ou depois de `{`. Ancorar em `^` já
+# basta pra descartar essas — uma busca solta daria falso-positivo
+# justamente quando `$v` coincidisse com a versão de alguma dep.
+#
+# Mas NÃO usamos `-x` (linha inteira exata): o perl real que roda acima só
+# troca o valor entre aspas, então um comentário ao final da linha
+# (`version = "0.2.0"  # bumped by CI`), espaço sobrando, ou CRLF sobrevivem
+# à substituição e fariam a guarda reportar falha numa troca que na
+# verdade funcionou. `[[:space:]]*(#.*)?$` tolera isso sem abrir mão da
+# âncora em `^version = "..."` que é o que de fato importa aqui.
+if ! grep -Eq '^version = "'"$v"'"[[:space:]]*(#.*)?$' src-tauri/Cargo.toml; then
   printf 'erro: a versão %s não foi escrita em src-tauri/Cargo.toml (linha `version = "..."` da seção [package] não encontrada)\n' "$v" >&2
   exit 1
 fi

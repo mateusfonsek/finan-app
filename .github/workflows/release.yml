@@ -112,21 +112,31 @@ jobs:
           git add package.json src-tauri/tauri.conf.json src-tauri/Cargo.toml src-tauri/Cargo.lock
           git commit -m "chore(release): v${{ steps.version.outputs.next }} [skip ci]"
 
-          # `git tag -a` (ANOTADA) e push EXPLÍCITO da tag, nesta ordem, não é
-          # verbosidade: uma tag leve (`git tag v1.2.3`) é simplesmente
-          # IGNORADA pelo `--follow-tags`, que só empurra tags anotadas. O
-          # push sairia verde, o main ganharia o commit de release e a tag
-          # ficaria só na máquina do runner. O `gh release create` logo abaixo
-          # esconde o estrago criando a tag que faltou — mas na ponta do
-          # branch padrão, não neste commit. E se o `gh` falhar, o main fica
-          # com um `chore(release):` sem tag nenhuma: a próxima execução
-          # recalcula a MESMA versão, rebuilda e morre no `git commit` (nada
-          # staged), exigindo conserto manual. Todo o resto do fluxo — o
-          # `git describe` do cálculo de versão, o guard de "tag já existe",
-          # a prevenção de loop — assume que a tag foi criada AQUI.
+          # Duas invariantes protegem este bloco, e as duas têm que se manter
+          # se alguém for mexer aqui:
+          #
+          # 1. `git tag -a` (ANOTADA), não leve. Uma tag leve (`git tag
+          #    v1.2.3`) é simplesmente IGNORADA por `--follow-tags` — só
+          #    tags anotadas viajam com ele. Isso já foi bug aqui uma vez.
+          #
+          # 2. O push do commit e o push da tag têm que ser UM push atômico
+          #    (`--atomic`, dois refs), não dois `git push` separados. Com
+          #    dois pushes, dá pra o primeiro (o commit em HEAD:main) ir e o
+          #    segundo (a tag) falhar — rede, permissão, o que for. O `gh
+          #    release create` logo abaixo até esconde o estrago criando a
+          #    tag que faltou, mas na ponta do branch padrão, não neste
+          #    commit. E se o `gh` também falhar, o main fica com um
+          #    `chore(release):` sem tag nenhuma: a próxima execução
+          #    recalcula a MESMA versão, builda de novo (~10min de runner
+          #    macOS) e morre no `git commit` (nada staged pra commitar),
+          #    exigindo conserto manual. `--atomic` faz os dois refs se
+          #    moverem juntos ou nenhum se mover — sem o estado intermediário
+          #    "commit foi, tag não". Todo o resto do fluxo — o `git
+          #    describe` do cálculo de versão, o guard de "tag já existe", a
+          #    prevenção de loop — assume que a tag foi criada AQUI, junto
+          #    com o commit.
           git tag -a "v${{ steps.version.outputs.next }}" -m "v${{ steps.version.outputs.next }}"
-          git push origin HEAD:main
-          git push origin "refs/tags/v${{ steps.version.outputs.next }}"
+          git push --atomic origin HEAD:main "refs/tags/v${{ steps.version.outputs.next }}"
 
       - name: Publicar a release
         if: steps.version.outputs.next != ''
@@ -141,13 +151,28 @@ jobs:
           # uma mensagem que não aponta pra causa.
           set -euo pipefail
 
-          dmg=$(ls src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg | head -1)
-          # Checagem explícita: `head -1` também mascara o caso de vários
-          # .dmg, escolhendo um em silêncio.
-          if [ ! -f "$dmg" ]; then
+          # `ls *.dmg | head -1` sob `pipefail` não protege nada: quando o
+          # glob não casa, é a ATRIBUIÇÃO que falha ("ls: ... No such file or
+          # directory"), o `set -e` mata o step ali mesmo e o `[ ! -f ]` nem
+          # chega a rodar — o `::error::` abaixo nunca aparece, só o erro cru
+          # do `ls`. Fora isso, `ls | head -1` pode sair 141 (SIGPIPE) se a
+          # listagem for grande o bastante pra estourar o buffer do pipe.
+          # Um array com glob resolve os dois: a expansão vazia vira um
+          # array vazio (com `nullglob`, sem isso o padrão literal `*.dmg`
+          # sobraria como "arquivo"), testável em shell puro, sem subshell
+          # nem pipe.
+          shopt -s nullglob
+          dmgs=(src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg)
+          if [ ${#dmgs[@]} -eq 0 ]; then
             echo "::error::nenhum .dmg encontrado em src-tauri/target/universal-apple-darwin/release/bundle/dmg/ — o build do Tauri não produziu o bundle esperado"
             exit 1
           fi
+          if [ ${#dmgs[@]} -gt 1 ]; then
+            # Inesperado (o bundler do Tauri produz um único .dmg universal):
+            # avisa em vez de escolher em silêncio.
+            echo "aviso: ${#dmgs[@]} arquivos .dmg encontrados, usando o primeiro: ${dmgs[0]}"
+          fi
+          dmg="${dmgs[0]}"
           echo "Anexando: $dmg"
 
           # Só o .dmg. O .tar.gz que o tauri-action anexava (e que era apagado
