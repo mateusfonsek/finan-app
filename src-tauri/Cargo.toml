@@ -1,6 +1,6 @@
 [package]
 name = "finan"
-version = "0.2.0"
+version = "0.3.0"
 description = "finan — app local de finanças pessoais"
 edition = "2021"
 rust-version = "1.77"
