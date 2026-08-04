@@ -1,52 +1,125 @@
 name: release
 
-# Dispara ao publicar uma tag de versão, ex.: git tag v0.1.0 && git push --tags
+# Dispara no merge pra main. A tag NÃO é mais o gatilho — ela passa a ser
+# consequência: o workflow calcula a versão, builda e cria a tag.
 on:
   push:
-    tags:
-      - "v*"
+    branches: [main]
+
+# Dois merges seguidos não podem correr um sobre o outro: o segundo precisa
+# enxergar a tag criada pelo primeiro pra calcular o bump certo.
+concurrency:
+  group: release-main
+  cancel-in-progress: false
 
 jobs:
-  build-macos:
+  test:
+    uses: ./.github/workflows/test.yml
+
+  release:
+    needs: test
     runs-on: macos-latest
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Histórico completo: `git describe` precisa das tags.
+          fetch-depth: 0
+
+      - name: Calcular a próxima versão
+        id: version
+        run: |
+          current=$(node -p "require('./package.json').version")
+          last_tag=$(git describe --tags --abbrev=0 --match 'v*' 2>/dev/null || true)
+          if [ -n "$last_tag" ]; then range="$last_tag..HEAD"; else range=HEAD; fi
+
+          # %x00 separa os commits: o script trata só a PRIMEIRA linha de cada
+          # registro como cabeçalho. Com `--format=%B` puro, uma linha de corpo
+          # tipo "fix: ..." num commit `chore:` viraria release de patch.
+          next=$(git log --format='%B%x00' "$range" | .github/scripts/next-version.sh "$current")
+
+          echo "next=$next" >> "$GITHUB_OUTPUT"
+          echo "range=$range" >> "$GITHUB_OUTPUT"
+
+          if [ -z "$next" ]; then
+            echo "Nenhum commit releasável desde ${last_tag:-o início do repo}."
+            echo "Encerrando sem release — é o comportamento esperado para merges"
+            echo "de docs/chore/test/ci/refactor."
+          else
+            echo "Versão: $current → $next"
+          fi
+
+      - name: Conferir que a tag ainda não existe
+        if: steps.version.outputs.next != ''
+        run: |
+          if git rev-parse "v${{ steps.version.outputs.next }}" >/dev/null 2>&1; then
+            echo "::error::a tag v${{ steps.version.outputs.next }} já existe"
+            exit 1
+          fi
 
       - uses: pnpm/action-setup@v4
+        if: steps.version.outputs.next != ''
         with:
           version: 11
 
       - uses: actions/setup-node@v4
+        if: steps.version.outputs.next != ''
         with:
           node-version: 22
           cache: pnpm
 
       - uses: dtolnay/rust-toolchain@stable
+        if: steps.version.outputs.next != ''
         with:
           targets: aarch64-apple-darwin,x86_64-apple-darwin
 
-      - name: Install dependencies
+      - uses: Swatinem/rust-cache@v2
+        if: steps.version.outputs.next != ''
+        with:
+          workspaces: src-tauri
+
+      - name: Instalar dependências
+        if: steps.version.outputs.next != ''
         run: pnpm install --frozen-lockfile
 
-      - uses: tauri-apps/tauri-action@v0
+      # A ORDEM daqui pra baixo não é intercambiável: o Tauri assa a versão do
+      # tauri.conf.json dentro do bundle, então buildar antes do bump geraria
+      # um .dmg carimbado com a versão velha. E commitar antes do build
+      # deixaria o main com uma versão que não virou release se o build
+      # quebrasse. Bump no working tree → build → só então commitar.
+      - name: Escrever a versão nos arquivos
+        if: steps.version.outputs.next != ''
+        run: .github/scripts/set-version.sh "${{ steps.version.outputs.next }}"
+
+      - name: Build universal (Apple Silicon + Intel)
+        if: steps.version.outputs.next != ''
+        run: pnpm tauri build --target universal-apple-darwin
+
+      - name: Commit, tag e push
+        if: steps.version.outputs.next != ''
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json src-tauri/tauri.conf.json src-tauri/Cargo.toml src-tauri/Cargo.lock
+          git commit -m "chore(release): v${{ steps.version.outputs.next }} [skip ci]"
+          git tag "v${{ steps.version.outputs.next }}"
+          git push origin HEAD:main --follow-tags
+
+      - name: Publicar a release
+        if: steps.version.outputs.next != ''
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tagName: ${{ github.ref_name }}
-          releaseName: "finan ${{ github.ref_name }}"
-          releaseBody: |
-            ## Instalação (macOS)
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          dmg=$(ls src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg | head -1)
+          echo "Anexando: $dmg"
 
-            1. Baixe o `.dmg` abaixo, abra e arraste o **finan app** para a pasta **Aplicativos**.
-            2. O app **não é assinado** (projeto open-source individual), então o macOS bloqueia na primeira abertura. Remova a quarentena do Gatekeeper no Terminal:
+          # Só o .dmg. O .tar.gz que o tauri-action anexava (e que era apagado
+          # na mão) simplesmente nunca é enviado.
+          git log --format=%s "${{ steps.version.outputs.range }}" \
+            | .github/scripts/release-notes.sh > /tmp/notes.md
 
-               ```
-               xattr -dr com.apple.quarantine "/Applications/finan app.app"
-               ```
-
-            3. Abra normalmente. Tudo **100% local** — seus dados ficam só no seu Mac, em `~/Library/Application Support/app.finan/finan.db`.
-          releaseDraft: false
-          prerelease: false
-          args: --target universal-apple-darwin
+          gh release create "v${{ steps.version.outputs.next }}" \
+            --title "finan v${{ steps.version.outputs.next }}" \
+            --notes-file /tmp/notes.md \
+            "$dmg"
