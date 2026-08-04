@@ -1,0 +1,60 @@
+name: test
+
+# Chamável por outros workflows. A suíte é definida UMA vez aqui e consumida
+# tanto pelo gate da PR quanto pelo release — se cada um tivesse a sua, os
+# dois disparariam em paralelo no merge e uma release poderia sair com a
+# suíte vermelha.
+on:
+  workflow_call:
+
+# Roda scripts de lifecycle do pnpm e build scripts do cargo — código de
+# terceiros. Só leitura, nada mais. (O job de release tem o seu próprio
+# `contents: write`, que continua necessário lá.)
+permissions:
+  contents: read
+
+jobs:
+  test:
+    # macOS e não Linux: o crate `tauri` puxa dependências de sistema no Linux
+    # (webkit2gtk e cia) e o app é macOS-only — testar na plataforma-alvo é
+    # mais fiel. Repo público, então os minutos são gratuitos.
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Instalar dependências
+        run: pnpm install --frozen-lockfile
+
+      - name: Tipos (svelte-check)
+        run: pnpm check
+
+      - name: Testes do frontend
+        run: pnpm test
+
+      - name: Build do frontend
+        run: pnpm build
+
+      - name: Testes do Rust
+        run: cargo test --manifest-path src-tauri/Cargo.toml
+
+      - name: Testes dos scripts de CI
+        run: |
+          .github/scripts/next-version.test.sh
+          .github/scripts/check-commit-format.test.sh
+          .github/scripts/release-notes.test.sh
+          .github/scripts/set-version.test.sh
