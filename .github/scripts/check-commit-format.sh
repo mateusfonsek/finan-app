@@ -16,6 +16,18 @@ set -euo pipefail
 # acoplaria os dois sem ganho real.
 PATTERN='^[a-z][a-z0-9]*(\([^)]+\))?!?: .+'
 
+# Validar só a FORMA não basta: `feet: adiciona pasta observada` (typo de
+# `feat`) casa no padrão, passa no gate, e depois não gera bump nenhum — o
+# autor recebe PR verde e um merge que misteriosamente não lança nada. É o
+# "nenhuma release saiu e ninguém entendeu por quê" do cabeçalho deste
+# arquivo, só que com uma etapa a mais de disfarce. Daí a lista fechada.
+#
+# A lista mora numa variável só, usada tanto pela checagem quanto pelo texto
+# de ajuda lá embaixo: se ficassem em dois lugares, um tipo novo entraria em
+# um e não no outro. Espaço nas pontas pra permitir o teste de pertinência
+# com `case` (bash 3.2: sem arrays associativos).
+TYPES='feat fix perf i18n docs chore test ci refactor build style revert'
+
 fail=0
 
 validate() {
@@ -24,7 +36,21 @@ validate() {
   if ! printf '%s' "$msg" | grep -Eq "$PATTERN"; then
     printf '::error::%s fora do padrão: %s\n' "$what" "$msg" >&2
     fail=1
+    return
   fi
+
+  # Extrai o tipo: tudo antes do primeiro `(`, `!` ou `:`.
+  type=${msg%%:*}
+  type=${type%%\(*}
+  type=${type%%!*}
+
+  case " $TYPES " in
+    *" $type "*) ;;
+    *)
+      printf '::error::%s usa um tipo desconhecido "%s": %s\n' "$what" "$type" "$msg" >&2
+      fail=1
+      ;;
+  esac
 }
 
 # Valida que PR_TITLE foi definido e não está vazio, com erro em formato
@@ -51,7 +77,10 @@ while IFS= read -r subject || [ -n "$subject" ]; do
 done
 
 if [ "$fail" -ne 0 ]; then
-  cat >&2 <<'EOF'
+  # Heredoc SEM aspas no delimitador de propósito: a lista de tipos vem da
+  # mesma variável que a checagem usa. Reescrever a lista aqui na mão faria
+  # a mensagem e o gate divergirem no dia em que um tipo novo entrasse.
+  cat >&2 <<EOF
 
 O formato aceito é:  tipo(escopo opcional): descrição
 
@@ -61,7 +90,9 @@ O formato aceito é:  tipo(escopo opcional): descrição
   i18n: tradução                     → sobe a patch
   feat!: mudança incompatível        → sobe a major  (0.2.0 → 1.0.0)
 
-  docs, chore, test, ci, refactor, build, style, revert → não geram release
+  Os demais tipos aceitos são válidos, mas não geram release.
+
+Tipos aceitos: $TYPES
 
 Detalhes em CONTRIBUTING.md.
 EOF

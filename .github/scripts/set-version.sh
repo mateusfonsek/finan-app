@@ -48,5 +48,20 @@ node -e '
 # intocado, em silêncio.
 perl -pi -e 'if (!$done && s/^version = "[^"]*"/version = "'"$v"'"/) { $done = 1 }' src-tauri/Cargo.toml
 
+# Mesma guarda do bloco node acima, pelo mesmo motivo: o `perl -pi` sai 0
+# mesmo quando não substitui NADA (basta a linha de version estar indentada
+# ou escrita de outro jeito). Sem esta conferência o script terminaria com
+# sucesso tendo bumpado só os dois JSON — recriando exatamente a divergência
+# entre os três arquivos que ele existe pra impedir.
+#
+# `-x` (linha inteira) e não uma busca solta: `version = "1.0"` também aparece
+# dentro das linhas de dependência (`serde = { version = "1.0", ... }`), e uma
+# busca solta daria falso-positivo justamente quando `$v` coincidisse com a
+# versão de alguma dep. A linha inteira só casa com o que o perl escreve.
+if ! grep -qxF "version = \"$v\"" src-tauri/Cargo.toml; then
+  printf 'erro: a versão %s não foi escrita em src-tauri/Cargo.toml (linha `version = "..."` da seção [package] não encontrada)\n' "$v" >&2
+  exit 1
+fi
+
 # Ler o manifesto já reescreve o lock com a versão nova.
 cargo metadata --manifest-path src-tauri/Cargo.toml --format-version 1 >/dev/null
