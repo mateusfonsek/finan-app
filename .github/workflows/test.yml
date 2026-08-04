@@ -7,6 +7,12 @@ name: test
 on:
   workflow_call:
 
+# Roda scripts de lifecycle do pnpm e build scripts do cargo — código de
+# terceiros. Só leitura, nada mais. (O job de release tem o seu próprio
+# `contents: write`, que continua necessário lá.)
+permissions:
+  contents: read
+
 jobs:
   test:
     # macOS e não Linux: o crate `tauri` puxa dependências de sistema no Linux

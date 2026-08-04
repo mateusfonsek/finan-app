@@ -2,7 +2,22 @@ name: ci
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened]
+    # `edited` é obrigatório: este gate valida o TÍTULO da PR, e mudança de
+    # título só gera esse tipo de evento. Sem ele, quem tem o título reprovado
+    # corrige e não acontece nada — o check continua vermelho até empurrar um
+    # commit qualquer ou fechar/reabrir a PR, sem nenhuma pista do motivo.
+    types: [opened, synchronize, reopened, edited]
+
+# Um push novo torna a execução anterior irrelevante. Sem isso, cada push numa
+# PR aberta acumula uma suíte macOS completa rodando em paralelo.
+concurrency:
+  group: "ci-${{ github.ref }}"
+  cancel-in-progress: true
+
+# Estes jobs rodam scripts de lifecycle do pnpm e build scripts do cargo —
+# código de terceiros. Só leitura, nada mais.
+permissions:
+  contents: read
 
 jobs:
   test:
@@ -23,5 +38,14 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
+          # `pipefail` é o que segura este gate de pé: o shell padrão do
+          # Actions é `bash -e {0}`, e num pipeline sem pipefail só o status
+          # do ÚLTIMO comando conta. Se o `git log` falhar (base
+          # force-pushada, SHA inalcançável, clone raso), o script recebe
+          # stdin vazia, valida só o PR_TITLE e sai 0 — o step fica verde com
+          # a metade por-commit do gate nunca tendo rodado, que é exatamente
+          # a falha silenciosa que este job existe pra impedir.
+          set -euo pipefail
+
           git log --format=%s "$BASE_SHA..$HEAD_SHA" \
             | .github/scripts/check-commit-format.sh

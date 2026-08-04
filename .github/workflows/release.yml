@@ -30,6 +30,13 @@ jobs:
       - name: Calcular a próxima versão
         id: version
         run: |
+          # `pipefail`: o shell padrão do Actions é `bash -e {0}`, e sem
+          # pipefail o status de um pipeline é só o do último comando. Se o
+          # `git log` abaixo falhar (SHA inalcançável, clone raso), o
+          # next-version.sh recebe entrada VAZIA, conclui "nada releasável" e
+          # sai 0 — o merge passaria batido sem release e sem erro nenhum.
+          set -euo pipefail
+
           current=$(node -p "require('./package.json').version")
           last_tag=$(git describe --tags --abbrev=0 --match 'v*' 2>/dev/null || true)
           if [ -n "$last_tag" ]; then range="$last_tag..HEAD"; else range=HEAD; fi
@@ -99,19 +106,48 @@ jobs:
       - name: Commit, tag e push
         if: steps.version.outputs.next != ''
         run: |
+          set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add package.json src-tauri/tauri.conf.json src-tauri/Cargo.toml src-tauri/Cargo.lock
           git commit -m "chore(release): v${{ steps.version.outputs.next }} [skip ci]"
-          git tag "v${{ steps.version.outputs.next }}"
-          git push origin HEAD:main --follow-tags
+
+          # `git tag -a` (ANOTADA) e push EXPLÍCITO da tag, nesta ordem, não é
+          # verbosidade: uma tag leve (`git tag v1.2.3`) é simplesmente
+          # IGNORADA pelo `--follow-tags`, que só empurra tags anotadas. O
+          # push sairia verde, o main ganharia o commit de release e a tag
+          # ficaria só na máquina do runner. O `gh release create` logo abaixo
+          # esconde o estrago criando a tag que faltou — mas na ponta do
+          # branch padrão, não neste commit. E se o `gh` falhar, o main fica
+          # com um `chore(release):` sem tag nenhuma: a próxima execução
+          # recalcula a MESMA versão, rebuilda e morre no `git commit` (nada
+          # staged), exigindo conserto manual. Todo o resto do fluxo — o
+          # `git describe` do cálculo de versão, o guard de "tag já existe",
+          # a prevenção de loop — assume que a tag foi criada AQUI.
+          git tag -a "v${{ steps.version.outputs.next }}" -m "v${{ steps.version.outputs.next }}"
+          git push origin HEAD:main
+          git push origin "refs/tags/v${{ steps.version.outputs.next }}"
 
       - name: Publicar a release
         if: steps.version.outputs.next != ''
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          # `pipefail` porque o shell padrão do Actions é `bash -e {0}`, SEM
+          # ele: num pipeline, o status que conta é o do ÚLTIMO comando. Sem
+          # pipefail, um `git log` que falha (ou um glob de .dmg que não casa)
+          # é engolido pelo `head`/pelo script seguinte, a variável sai vazia
+          # e o `set -e` nunca dispara — a falha só reaparece lá no `gh`, com
+          # uma mensagem que não aponta pra causa.
+          set -euo pipefail
+
           dmg=$(ls src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg | head -1)
+          # Checagem explícita: `head -1` também mascara o caso de vários
+          # .dmg, escolhendo um em silêncio.
+          if [ ! -f "$dmg" ]; then
+            echo "::error::nenhum .dmg encontrado em src-tauri/target/universal-apple-darwin/release/bundle/dmg/ — o build do Tauri não produziu o bundle esperado"
+            exit 1
+          fi
           echo "Anexando: $dmg"
 
           # Só o .dmg. O .tar.gz que o tauri-action anexava (e que era apagado
