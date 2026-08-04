@@ -230,5 +230,36 @@ cleanup_fixture() {
   cleanup_fixture "$fixture"
 }
 
+# Test 8: Cargo.toml cuja linha de version não casa com o perl => erro
+# (o `^version = ` não bate numa linha indentada). O modo de falha que este
+# teste tranca é o SILENCIOSO: sem a guarda no script, o perl não substitui
+# nada, sai 0, e o script termina com sucesso tendo bumpado só os JSON.
+{
+  desc="Cargo.toml não substituído reprova (não fica em silêncio)"
+  fixture=$(setup_fixture)
+
+  cat > "$fixture/src-tauri/Cargo.toml" << 'EOF'
+[package]
+  name = "finan"
+  version = "0.2.0"
+  edition = "2021"
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+EOF
+
+  (cd "$fixture" && $set_version_script "3.0.0" 2>/dev/null)
+  ret=$?
+
+  if [ $ret -ne 0 ] && grep -qF 'version = "0.2.0"' "$fixture/src-tauri/Cargo.toml"; then
+    pass=$((pass + 1))
+  else
+    fail=$((fail + 1))
+    printf 'FALHOU: %s (saiu %d)\n' "$desc" "$ret"
+  fi
+
+  cleanup_fixture "$fixture"
+}
+
 printf '\n%d passaram, %d falharam\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]

@@ -49,4 +49,5 @@ cargo test --manifest-path src-tauri/Cargo.toml
 .github/scripts/next-version.test.sh          # testes dos scripts de CI
 .github/scripts/check-commit-format.test.sh
 .github/scripts/release-notes.test.sh
+.github/scripts/set-version.test.sh
 ```

@@ -43,6 +43,27 @@ check "Merge malformado reprova"        erro 'feat: x'          'Merge stuff wit
 check "linha vazia é ignorada"          ok   'feat: x'          'feat: a\n\n'
 check "sem commits, só título válido"   ok   'feat: x'          ''
 
+# Tipo desconhecido: casa na FORMA mas não é um tipo real. Sem essa checagem
+# o PR fica verde e o merge não gera release nenhuma.
+check "typo de tipo no título reprova"  erro 'feet: adiciona pasta observada' 'feat: x\n'
+check "typo de tipo no commit reprova"  erro 'feat: x'          'feet: adiciona pasta observada\n'
+check "tipo inventado reprova"          erro 'feat: x'          'wip: coisa\n'
+check "typo com escopo reprova"         erro 'fixx(ofx): x'     'feat: x\n'
+
+# Cada tipo aceito continua passando.
+check "tipo feat aceito"                ok   'feat: x'          'feat: x\n'
+check "tipo fix aceito"                 ok   'fix: x'           'fix: x\n'
+check "tipo perf aceito"                ok   'perf: x'          'perf: x\n'
+check "tipo i18n aceito"                ok   'i18n: x'          'i18n: x\n'
+check "tipo docs aceito"                ok   'docs: x'          'docs: x\n'
+check "tipo chore aceito"               ok   'chore: x'         'chore: x\n'
+check "tipo test aceito"                ok   'test: x'          'test: x\n'
+check "tipo ci aceito"                  ok   'ci: x'            'ci: x\n'
+check "tipo refactor aceito"            ok   'refactor: x'      'refactor: x\n'
+check "tipo build aceito"               ok   'build: x'         'build: x\n'
+check "tipo style aceito"               ok   'style: x'         'style: x\n'
+check "tipo revert aceito"              ok   'revert: x'        'revert: x\n'
+
 # Testes para PR_TITLE ausente ou vazio (requerem tratamento especial)
 if printf 'feat: x\n' | ./check-commit-format.sh >/dev/null 2>&1; then
   got=ok
