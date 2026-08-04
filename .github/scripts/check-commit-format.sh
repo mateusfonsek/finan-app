@@ -27,13 +27,25 @@ validate() {
   fi
 }
 
-validate "título da PR" "${PR_TITLE:?PR_TITLE não definido}"
+# Valida que PR_TITLE foi definido e não está vazio, com erro em formato
+# esperado pelo GitHub Actions, não bash bruto (:? falharia silenciosamente
+# para ferramentas que não leem bash errors).
+if [ -z "${PR_TITLE:-}" ]; then
+  printf '::error::PR_TITLE não foi definido ou está vazio\n' >&2
+  exit 1
+fi
+
+validate "título da PR" "$PR_TITLE"
 
 while IFS= read -r subject || [ -n "$subject" ]; do
   [ -z "$subject" ] && continue
-  # Merges que o próprio GitHub cria não seguem o padrão e não são autorais.
+  # Pula apenas merges gerados automaticamente por git/GitHub que não seguem
+  # o padrão: são artefatos do workflow, não commits autorais. Qualquer outro
+  # texto que comece com "Merge" (ex: "Merge stuff") deve falhar normalmente.
   case $subject in
-    Merge\ *) continue ;;
+    "Merge pull request #"*) continue ;;
+    "Merge branch "*)        continue ;;
+    "Merge remote-tracking branch "*)  continue ;;
   esac
   validate "commit" "$subject"
 done

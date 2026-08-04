@@ -37,8 +37,36 @@ check "título com tipo maiúsculo reprova" erro 'Feat: x'        'feat: x\n'
 check "commit inválido reprova"         erro 'feat: x'          'arrumei coisas\n'
 check "um commit inválido no meio reprova" erro 'feat: x'       'feat: a\nlixo\nfix: b\n'
 check "merge commit é ignorado"         ok   'feat: x'          'Merge branch main into feat/x\nfeat: a\n'
+check "Merge pull request é ignorado"   ok   'feat: x'          'Merge pull request #12 from user/branch\nfeat: a\n'
+check "Merge remote-tracking é ignorado" ok   'feat: x'          'Merge remote-tracking branch '\''origin/main'\''\nfeat: a\n'
+check "Merge malformado reprova"        erro 'feat: x'          'Merge stuff without a proper type\n'
 check "linha vazia é ignorada"          ok   'feat: x'          'feat: a\n\n'
 check "sem commits, só título válido"   ok   'feat: x'          ''
+
+# Testes para PR_TITLE ausente ou vazio (requerem tratamento especial)
+if printf 'feat: x\n' | ./check-commit-format.sh >/dev/null 2>&1; then
+  got=ok
+else
+  got=erro
+fi
+if [ "$got" = "erro" ]; then
+  pass=$((pass + 1))
+else
+  fail=$((fail + 1))
+  printf 'FALHOU: PR_TITLE não definido reprova\n  esperado: erro\n  obtido:   %s\n' "$got"
+fi
+
+if printf 'feat: x\n' | PR_TITLE="" ./check-commit-format.sh >/dev/null 2>&1; then
+  got=ok
+else
+  got=erro
+fi
+if [ "$got" = "erro" ]; then
+  pass=$((pass + 1))
+else
+  fail=$((fail + 1))
+  printf 'FALHOU: PR_TITLE vazio reprova\n  esperado: erro\n  obtido:   %s\n' "$got"
+fi
 
 printf '\n%d passaram, %d falharam\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]
