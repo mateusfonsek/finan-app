@@ -19,16 +19,14 @@
   import { checkExistingTxKeys, insertTransactions, txKeyString } from "$lib/api/transactions";
   import { listCategories } from "$lib/api/categories";
   import { createRule, deleteRuleWithCleanup, updateRule } from "$lib/api/rules";
-  import { autoClassifyWithCnpj } from "$lib/api/suggestions";
-  import { enrichmentStatus } from "$lib/api/enrichment";
   import type { ParsedOfx } from "$lib/ofx/types";
   import { takeStashed } from "$lib/ofx/open";
+  import { activity } from "$lib/stores/activity.svelte";
   import { watch, type Discovery } from "$lib/stores/watch.svelte";
   import { loadOfxFromPath } from "$lib/ofx/load";
   import { detectReversalPairs, type ReversalInfo } from "$lib/ofx/reversals";
   import type {
     Account,
-    AutoClassifyReport,
     Category,
     InsertResult,
     NewTransaction,
@@ -49,7 +47,11 @@
 
   // Post-import state
   let importResult = $state<InsertResult | null>(null);
-  let autoReport = $state<AutoClassifyReport | null>(null);
+  /** O relatório é do store, não desta tela: o enriquecimento continua rodando
+   *  depois que a pessoa navega para outro lugar, e um `$state` local seria
+   *  apagado no desmonte — voltar para cá mostraria uma tela vazia no meio de
+   *  um trabalho em andamento. */
+  let autoReport = $derived(activity.enrich.report);
   let categories = $state<Category[]>([]);
   /** category chosen per unresolved CNPJ (keyed by cnpj) */
   let chosen = $state<Record<string, number | null>>({});
@@ -154,13 +156,6 @@
         }));
       busyMsg = t("import.importing");
       importResult = await insertTransactions(account.id, toInsert);
-      // The real gate is in the backend; this only avoids announcing a step
-      // that will not happen.
-      const enrich = await enrichmentStatus().catch(() => null);
-      if (enrich?.available && enrich.enabled) {
-        busyMsg = t("import.resolving_cnpj", { taxId: enrich.tax_id_name });
-        autoReport = await autoClassifyWithCnpj(account.id);
-      }
       if (watchHash) await watch.resolve(watchHash, "imported");
     } catch (e) {
       error = e instanceof Error ? e.message : String(e);
@@ -168,16 +163,25 @@
       busy = false;
       busyMsg = "";
     }
+
+    // Depois do `finally`, e sem `await`: a tela de resultado já pode aparecer.
+    // O backend decide sozinho se há o que fazer — com o enriquecimento
+    // desligado o job termina na hora com relatório vazio, o que elimina a ida
+    // ao backend que este trecho fazia só para perguntar se valia a pena.
+    if (!error && account) {
+      activity.clear();
+      void activity.start(account.id);
+    }
   }
 
   function replaceRule(updated: Rule) {
     if (!autoReport) return;
-    autoReport = {
+    activity.patchReport({
       ...autoReport,
       created_rules: autoReport.created_rules.map((r) =>
         r.id === updated.id ? updated : r,
       ),
-    };
+    });
   }
 
   async function onChangeRuleCategory(rule: Rule, newCategoryId: number) {
@@ -233,10 +237,10 @@
     busyKey = `rule:${rule.id}`;
     try {
       await deleteRuleWithCleanup(rule.id);
-      autoReport = {
+      activity.patchReport({
         ...autoReport,
         created_rules: autoReport.created_rules.filter((r) => r.id !== rule.id),
-      };
+      });
     } catch (e) {
       error = e instanceof Error ? e.message : String(e);
     } finally {
@@ -269,11 +273,11 @@
         due_day: null,
         display_name: u?.razao_social ?? u?.nome_fantasia ?? null,
       });
-      autoReport = {
+      activity.patchReport({
         ...autoReport,
         created_rules: [...autoReport.created_rules, rule],
         unresolved: autoReport.unresolved.filter((x) => x.cnpj !== cnpj),
-      };
+      });
       delete chosen[cnpj];
     } catch (e) {
       error = e instanceof Error ? e.message : String(e);
@@ -289,7 +293,8 @@
     duplicateKeys = new Set();
     reversalMap = new Map();
     importResult = null;
-    autoReport = null;
+    // Um import novo não herda o relatório do anterior.
+    activity.clear();
     chosen = {};
     // Sem isso, "importar outro" com um arquivo solto (DropZone) herdaria o
     // hash do extrato anterior vindo da pasta observada.
@@ -354,7 +359,7 @@
       {/if}
       <DropZone {onparsed} {onerror} />
     </div>
-  {:else if importResult && autoReport}
+  {:else if importResult}
     <!-- ============ After the import ============ -->
     <!-- Explicit conclusion: what went in, what was skipped, what the app
          categorized on its own. Confirming the result is part of the job. -->
@@ -375,8 +380,14 @@
           {importResult.inserted === 1 ? t("import.imported_one") : t("import.imported_many")}
         </div>
         <div class="text-sub text-fg-muted">
-          <span class="text-fg font-medium">{autoReport.txs_classified}</span>
-          {autoReport.txs_classified === 1 ? t("import.classified_one") : t("import.classified_many")}
+          <!-- O relatório chega depois do import: até ele existir, esta linha
+               mostra só o que já é verdade. -->
+          {#if autoReport}
+            <span class="text-fg font-medium">{autoReport.txs_classified}</span>
+            {autoReport.txs_classified === 1
+              ? t("import.classified_one")
+              : t("import.classified_many")}
+          {/if}
           {#if importResult.skipped_duplicates > 0}
             <span class="text-fg-subtle">
               · {t("import.skipped_dups", { n: importResult.skipped_duplicates })}
@@ -386,7 +397,7 @@
       </div>
     </div>
 
-    {#if autoReport.created_rules.length > 0}
+    {#if autoReport && autoReport.created_rules.length > 0}
       <Card
         title={t("import.rules_created_title", { n: autoReport.created_rules.length })}
         note={t("import.rules_created_hint")}
@@ -451,7 +462,7 @@
       </Card>
     {/if}
 
-    {#if autoReport.unresolved.length > 0}
+    {#if autoReport && autoReport.unresolved.length > 0}
       <Card
         title={t("import.unresolved_title", { n: autoReport.unresolved.length })}
         note={t("import.unresolved_hint")}
