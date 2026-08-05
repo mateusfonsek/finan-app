@@ -72,7 +72,7 @@
     </span>
   {/if}
 
-  <!-- Limpar tudo só existe quando há algo pra limpar. -->
+  <!-- Clear-all only exists when there is something to clear. -->
   {#if filtering}
     <button
       type="button"

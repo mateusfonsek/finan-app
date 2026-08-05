@@ -108,17 +108,21 @@ pub fn run() {
         .setup(|app| {
             let locale_state = locale::LocaleState::init(app.handle());
 
-            // Native menu, localized from the active pack. Built here (not via
-            // `.menu()`) because the path resolver used to load the pack isn't
-            // ready until setup. The event handler is registered on the builder
-            // above and fires regardless of when the menu is created.
+            // Native menu, localized from the active pack. The literals below are
+            // last-resort fallbacks for a pack missing the key — Portuguese UI
+            // text lives in locales/pt-BR/strings.json, never here.
+            //
+            // Built here (not via `.menu()`) because the path resolver used to
+            // load the pack isn't ready until setup. The event handler is
+            // registered on the builder above and fires regardless of when the
+            // menu is created.
             {
                 let handle = app.handle().clone();
                 let pack = locale_state.pack.lock().expect("locale mutex poisoned");
                 let app_menu = SubmenuBuilder::new(&handle, pack.menu_str("app_name", "finan app"))
-                    .text("about", pack.menu_str("about", "Sobre o finan app"))
+                    .text("about", pack.menu_str("about", "About finan app"))
                     .separator()
-                    .text("settings", pack.menu_str("settings", "Configurações…"))
+                    .text("settings", pack.menu_str("settings", "Settings…"))
                     .separator()
                     .services()
                     .separator()
@@ -128,7 +132,7 @@ pub fn run() {
                     .separator()
                     .quit()
                     .build()?;
-                let edit_menu = SubmenuBuilder::new(&handle, pack.menu_str("edit", "Editar"))
+                let edit_menu = SubmenuBuilder::new(&handle, pack.menu_str("edit", "Edit"))
                     .undo()
                     .redo()
                     .separator()
@@ -137,7 +141,7 @@ pub fn run() {
                     .paste()
                     .select_all()
                     .build()?;
-                let window_menu = SubmenuBuilder::new(&handle, pack.menu_str("window", "Janela"))
+                let window_menu = SubmenuBuilder::new(&handle, pack.menu_str("window", "Window"))
                     .minimize()
                     .maximize()
                     .separator()
@@ -145,8 +149,8 @@ pub fn run() {
                     .separator()
                     .close_window()
                     .build()?;
-                let help_menu = SubmenuBuilder::new(&handle, pack.menu_str("help", "Ajuda"))
-                    .text("github", pack.menu_str("github", "finan app no GitHub"))
+                let help_menu = SubmenuBuilder::new(&handle, pack.menu_str("help", "Help"))
+                    .text("github", pack.menu_str("github", "finan app on GitHub"))
                     .build()?;
                 let menu = MenuBuilder::new(&handle)
                     .items(&[&app_menu, &edit_menu, &window_menu, &help_menu])
@@ -171,8 +175,8 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
         .run(|app_handle, event| {
-            // Arquivo .ofx aberto via Finder ("Abrir com finan"). Pode chegar no
-            // cold start (antes do frontend); guardamos na fila e avisamos o front.
+            // An .ofx opened via Finder. May arrive during cold start, before
+            // the frontend exists, so it is queued and announced.
             if let tauri::RunEvent::Opened { urls } = event {
                 let paths: Vec<String> = urls
                     .iter()

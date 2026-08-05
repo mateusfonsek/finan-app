@@ -1,7 +1,7 @@
 <script module lang="ts">
-  /** A paleta das categorias. Vive aqui porque duas superfícies escolhem cor —
-   *  o formulário de criar e o painel de editar — e uma lista duplicada
-   *  divergiria na primeira cor nova. */
+  /** The category palette. Lives here because two surfaces pick colours — the
+   *  create form and the edit panel — and a duplicated list would diverge on the
+   *  first new colour. */
   export const COLOR_TOKENS = [
     "--color-cat-mercado",
     "--color-cat-transporte",
@@ -18,7 +18,7 @@
     "--color-cat-investimento",
   ];
 
-  /** Cor de quem não escolheu nada ainda. */
+  /** Colour for anything not yet chosen. */
   export const DEFAULT_COLOR = "--color-cat-outros";
 </script>
 
@@ -36,8 +36,8 @@
   let { value, onChange }: Props = $props();
 </script>
 
-<!-- O selecionado ganha um anel externo E um visto por dentro: a marca não
-     depende só da cor pra ser vista. -->
+<!-- The selected one gets an outer ring AND an inner check: the mark does not
+     rely on colour alone to be seen. -->
 <div class="flex gap-2 flex-wrap" role="radiogroup" aria-label={t("categories.color")}>
   {#each COLOR_TOKENS as token (token)}
     {@const selected = value === token}

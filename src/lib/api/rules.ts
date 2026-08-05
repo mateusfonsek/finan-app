@@ -19,8 +19,8 @@ export async function listRules(): Promise<Rule[]> {
   return unwrap(await commands.listRules());
 }
 
-/** Regras + quantas transações cada uma alcança. Só a tela de Regras precisa
- *  da contagem, que varre as transações. */
+/** Rules plus how many transactions each reaches. Only the Rules screen needs
+ *  the count, which scans transactions. */
 export async function listRulesWithCount(): Promise<RuleWithCount[]> {
   return unwrap(await commands.listRulesWithCount());
 }
@@ -48,20 +48,20 @@ export async function applyRulesToUncategorized(
   return unwrap(await commands.applyRulesToUncategorized(accountId));
 }
 
-/** As transações que a regra alcança, com o total. Mesmo critério da contagem
- *  mostrada na tabela de regras. */
+/** The transactions a rule reaches, with the total. Same criterion as the
+ *  count shown in the rules table. */
 export async function transactionsMatchingRule(ruleId: number): Promise<RuleMatches> {
   return unwrap(await commands.transactionsMatchingRule(ruleId));
 }
 
-/** Tudo que aplicar as regras mudaria — sem gravar nada. Alimenta a revisão. */
+/** Everything applying the rules would change, writing nothing. */
 export async function previewRuleApplication(
   accountId: number | null = null,
 ): Promise<RulePreviewRow[]> {
   return unwrap(await commands.previewRuleApplication(accountId));
 }
 
-/** Grava só o que o usuário marcou na revisão. */
+/** Writes only what the user ticked in the review. */
 export async function applyRuleChoices(choices: RuleChoice[]): Promise<number> {
   return unwrap(await commands.applyRuleChoices(choices));
 }

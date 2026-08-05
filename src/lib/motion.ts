@@ -1,18 +1,18 @@
 /**
  * Movimento da interface.
  *
- * Duas regras da HIG guiam este arquivo:
+ * Two HIG rules drive this file:
  *
- * 1. Entrada e saída percorrem o MESMO caminho. O que entra pela direita sai
- *    pela direita; o que cresce a partir de um ponto encolhe de volta pra ele.
- *    Por isso tudo aqui é uma transição só, usada nos dois sentidos.
- * 2. "Reduzir movimento" não é ausência de resposta — é resposta sem
- *    deslocamento. Cada transição degrada pra um esmaecer curto.
+ * 1. Enter and exit follow the SAME path. What slides in from the right leaves
+ *    to the right; what grows from a point shrinks back into it. That is why
+ *    each transition here is one function used in both directions.
+ * 2. "Reduce motion" is not the absence of response, it is response without
+ *    displacement. Every transition degrades to a short fade.
  */
 import { cubicOut } from "svelte/easing";
 import type { TransitionConfig } from "svelte/transition";
 
-/** Curva de mola criticamente amortecida (sem overshoot) — o padrão da casa. */
+/** Critically damped spring curve (no overshoot) — the house default. */
 export const SNAP = cubicOut;
 
 export const DUR = {
@@ -31,15 +31,15 @@ function fadeOnly(duration: number): TransitionConfig {
   return { duration, easing: SNAP, css: (t) => `opacity: ${t}` };
 }
 
-/** Véu que escurece o fundo de uma tarefa modal. */
+/** Scrim dimming the background of a modal task. */
 export function scrim(_node: Element): TransitionConfig {
   return fadeOnly(DUR.base);
 }
 
 /**
- * Popover/menu: cresce a partir da origem, não do próprio centro — a relação
- * espacial entre o botão e o que ele abriu fica óbvia.
- * `origin` é um `transform-origin` CSS.
+ * Popover/menu: grows from its origin rather than its own centre, making the
+ * spatial relationship between trigger and content obvious. `origin` is a CSS
+ * `transform-origin`.
  */
 export function popover(
   node: Element,
@@ -54,7 +54,7 @@ export function popover(
   };
 }
 
-/** Diálogo modal: materializa no centro, sem deslizar. */
+/** Modal dialog: materializes in place, no sliding. */
 export function dialog(_node: Element): TransitionConfig {
   if (reducedMotion()) return fadeOnly(DUR.base);
   return {
@@ -64,7 +64,7 @@ export function dialog(_node: Element): TransitionConfig {
   };
 }
 
-/** Painel lateral: entra pela borda e sai pela mesma borda. */
+/** Side panel: enters from an edge and leaves by the same edge. */
 export function sheet(
   _node: Element,
   { side = "right" }: { side?: "right" | "left" } = {},
@@ -78,7 +78,7 @@ export function sheet(
   };
 }
 
-/** Notificação: sobe do canto inferior com um leve crescimento. */
+/** Notification: rises from the bottom corner with a slight grow. */
 export function toast(_node: Element): TransitionConfig {
   if (reducedMotion()) return fadeOnly(DUR.base);
   return {
@@ -88,7 +88,7 @@ export function toast(_node: Element): TransitionConfig {
   };
 }
 
-/** Bloco que aparece no fluxo da página (resultado, formulário expandido). */
+/** A block appearing in page flow (a result, an expanded form). */
 export function rise(_node: Element, { delay = 0 } = {}): TransitionConfig {
   if (reducedMotion()) return { ...fadeOnly(DUR.base), delay };
   return {

@@ -1,14 +1,14 @@
 /**
- * Move o nó para o fim do `<body>`.
+ * Moves the node to the end of `<body>`.
  *
- * Existe por causa de uma regra do CSS que morde silenciosamente: um ancestral
- * com `backdrop-filter` (ou `transform`, `filter`, `perspective`) vira o bloco
- * de contenção dos descendentes `position: fixed`. O cabeçalho de cada tela é
- * material translúcido — então um popover fixo declarado lá dentro passa a se
- * posicionar em relação AO CABEÇALHO, e as coordenadas calculadas a partir da
- * viewport saem deslocadas pela largura da barra lateral.
+ * Exists because of a CSS rule that bites silently: an ancestor with
+ * `backdrop-filter` (or `transform`, `filter`, `perspective`) becomes the
+ * containing block for `position: fixed` descendants. Each screen's header is
+ * translucent material, so a fixed popover declared inside it positions itself
+ * against THE HEADER, and viewport-derived coordinates come out offset by the
+ * sidebar's width.
  *
- * Levar o nó pro `body` devolve a viewport como referência.
+ * Moving the node to `body` restores the viewport as the reference.
  */
 export function portal(node: HTMLElement) {
   document.body.appendChild(node);

@@ -3,11 +3,11 @@
 	import type { HTMLAnchorAttributes, HTMLButtonAttributes } from "svelte/elements";
 	import { type VariantProps, tv } from "tailwind-variants";
 
-	// Botão no espírito do macOS: altura de controle padrão (28px), raio de
-	// controle (7px), tipografia do corpo do app — e o realce de toque acontece
-	// na PRESSÃO, não na soltura (HIG: latência mata a sensação de direto).
-	// O recuo é uma escala sutil, não um deslocamento de 1px — objetos reais
-	// afundam sob o dedo, não pulam pra baixo.
+	// A button in the macOS spirit: standard control height (28px), control
+	// radius (7px), the app's body type — and the press highlight happens on
+	// PRESS, not on release (HIG: latency kills the sense of directness).
+	// The recoil is a subtle scale, not a 1px offset — real objects sink under
+	// the finger, they do not jump down.
 	export const buttonVariants = tv({
 		base: [
 			"relative inline-flex shrink-0 items-center justify-center whitespace-nowrap select-none",
@@ -20,13 +20,13 @@
 		],
 		variants: {
 			variant: {
-				// Ação principal: preenchida com o acento. Uma por tela.
+				// Primary action: filled with the accent. One per screen.
 				default: "bg-accent text-accent-on hover:bg-accent-hi shadow-[var(--shadow-raised)]",
-				// Ação secundária: o push button padrão do macOS.
+				// Secondary action: the standard macOS push button.
 				outline:
 					"border-border bg-surface-2 text-fg hover:bg-hover shadow-[var(--shadow-raised)]",
 				secondary: "bg-surface-2 text-fg-muted hover:bg-hover hover:text-fg",
-				// Terciária: sem moldura até ser tocada.
+				// Tertiary: no frame until touched.
 				ghost: "text-fg-muted hover:bg-hover hover:text-fg",
 				destructive: "bg-neg/10 text-neg hover:bg-neg/18",
 				link: "text-accent underline-offset-4 hover:underline",

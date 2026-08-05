@@ -1,26 +1,26 @@
 /**
- * Máquina de estados da notificação de extrato encontrado.
+ * State machine for the "statement found" notification.
  *
- * Vive fora do `.svelte` porque é a única parte com regra de verdade — e
- * porque a versão anterior desta tela tinha um bug que nenhum teste pegava:
- * a notificação sumia sozinha depois de 8s e a descoberta ficava
- * inalcançável, já que o badge da sidebar só conta, não reabre nada. Quem
- * perdesse a janela precisava fechar e reabrir o app.
+ * Lives outside the `.svelte` because it is the only part with real rules — and
+ * because the previous version had a bug no test caught: the notification
+ * vanished on its own after 8s and the discovery became unreachable, since the
+ * sidebar badge only counts and reopens nothing. Missing the window meant
+ * restarting the app.
  *
- * A regra central, portanto: **isto nunca se esconde por conta própria**. Ela
- * encolhe. Só sai da tela quando a descoberta é resolvida (Revisar/ignorar,
- * o que a tira da store) ou quando um import está em andamento.
+ * The core rule: **this never hides on its own**. It shrinks. It leaves the
+ * screen only when the discovery is resolved (review/ignore, which removes it
+ * from the store) or while an import is running.
  */
 
-/** `hidden` só acontece por ausência de descoberta ou por import em curso. */
+/** `hidden` happens only with no discovery or during an import. */
 export type ToastPhase = "expanded" | "collapsed" | "hidden";
 
 export type ToastState = {
-  /** Descoberta a que este estado pertence. Trocou, reseta. */
+  /** The discovery this state belongs to. Changing it resets. */
   hash: string | null;
-  /** O que o usuário escolheu para ESTA descoberta. `null` = não mexeu. */
+  /** What the user chose for THIS discovery. `null` means untouched. */
   manual: "expanded" | "collapsed" | null;
-  /** O encolhimento automático já aconteceu para esta descoberta. */
+  /** The automatic shrink already happened for this discovery. */
   autoCollapsed: boolean;
 };
 
@@ -31,30 +31,30 @@ export const initialToastState: ToastState = {
 };
 
 /**
- * Alinha o estado com a descoberta em foco. Descoberta diferente começa do
- * zero — expandida —, porque é outro arquivo, com outro nome e outra
- * contagem: informação nova merece ser mostrada, não herdar a pastilha que o
- * usuário fechou para a anterior.
+ * Aligns state with the focused discovery. A different discovery starts from
+ * scratch — expanded — because it is another file with another name and count:
+ * new information deserves to be shown, not to inherit the pill the user
+ * collapsed for the previous one.
  *
- * Mesma descoberta é no-op de propósito: o componente chama isto a cada
- * render, e resetar aqui reabriria sozinha a pastilha recém-fechada.
+ * The same discovery is a deliberate no-op: the component calls this on every
+ * render, and resetting here would reopen a just-collapsed pill on its own.
  */
 export function syncHash(state: ToastState, hash: string | null): ToastState {
   if (state.hash === hash) return state;
   return { hash, manual: null, autoCollapsed: false };
 }
 
-/** Usuário encolheu no controle da própria notificação. */
+/** The user collapsed it using the notification's own control. */
 export function collapse(state: ToastState): ToastState {
   return { ...state, manual: "collapsed" };
 }
 
-/** Usuário clicou na pastilha para reabrir. */
+/** The user clicked the pill to reopen. */
 export function expand(state: ToastState): ToastState {
   return { ...state, manual: "expanded" };
 }
 
-/** O tempo acabou sem interação. */
+/** Time ran out with no interaction. */
 export function autoCollapse(state: ToastState): ToastState {
   return { ...state, autoCollapsed: true };
 }
@@ -66,11 +66,11 @@ export function phaseOf(state: ToastState, suppressed: boolean): ToastPhase {
 }
 
 /**
- * O encolhimento automático vale só para a primeira aparição, que é quando o
- * app está *avisando*. Depois que o usuário mexeu, a forma é escolha dele.
+ * The automatic shrink applies only to the first appearance, when the app is
+ * *notifying*. After the user interacts, the shape is their choice.
  *
- * `hovering` desarma: encolher debaixo do cursor, no meio da leitura, é o
- * defeito mais comum de notificação.
+ * `hovering` disarms it: collapsing under the cursor mid-read is the most
+ * common notification defect.
  */
 export function autoCollapseArmed(
   state: ToastState,

@@ -1,15 +1,15 @@
 <script module lang="ts">
   /**
-   * Uma linha da lista de trechos. O `id` existe porque o valor não serve de
-   * chave: dois trechos podem ficar momentaneamente iguais enquanto se digita,
-   * e aí o `{#each}` embaralharia os campos debaixo do cursor.
+   * One row of the snippet list. The `id` exists because the value cannot be
+   * the key: two snippets can briefly match while typing, and `{#each}` would
+   * then shuffle the fields under the cursor.
    */
   export type PatternRow = { id: number; value: string };
 
   let nextId = 0;
 
-  /** Converte a lista vinda do backend em linhas. Lista vazia vira um campo
-   *  vazio: uma regra sem nenhum trecho não casaria nada. */
+  /** Turns the backend list into rows. An empty list becomes one empty field:
+   *  a rule with no snippets would match nothing. */
   export function rowsFrom(values: string[]): PatternRow[] {
     const list = values.length > 0 ? values : [""];
     return list.map((value) => ({ id: nextId++, value }));
@@ -35,10 +35,10 @@
 
   type Props = {
     rows: PatternRow[];
-    /** O pai é dono da lista; aqui só devolvemos a próxima versão dela. */
+    /** The parent owns the list; this only returns its next version. */
     onChange: (rows: PatternRow[]) => void;
-    /** Coloca o cursor no primeiro campo assim que a lista aparece — usado
-     *  pelo painel de edição, onde digitar é a primeira coisa que se faz. */
+    /** Puts the cursor in the first field as soon as the list appears — used
+     *  by the edit panel, where typing is the first thing that happens. */
     autofocus?: boolean;
   };
 
@@ -50,8 +50,8 @@
     onChange(rows.map((r) => (r.id === id ? { ...r, value } : r)));
   }
 
-  /** A última linha nunca some — ela só esvazia. Uma lista vazia esconderia
-   *  que a regra precisa de pelo menos um trecho pra existir. */
+  /** The last row never disappears, it only empties. An empty list would hide
+   *  that a rule needs at least one snippet to exist. */
   function remove(id: number) {
     if (rows.length === 1) {
       onChange([{ ...rows[0], value: "" }]);
@@ -61,7 +61,7 @@
     onChange(rows.filter((r) => r.id !== id));
   }
 
-  /** O foco vai pro campo novo: digitar nele é a próxima coisa que acontece. */
+  /** Focus moves to the new field: typing in it is what happens next. */
   async function add() {
     const row = blankRow();
     onChange([...rows, row]);
@@ -69,8 +69,8 @@
     inputs[row.id]?.focus();
   }
 
-  /** ↩ no último campo adiciona outro, em vez de submeter o formulário meio
-   *  preenchido — a lista se comporta como lista. */
+  /** Enter on the last field adds another instead of submitting a half-filled
+   *  form — the list behaves like a list. */
   function onkeydown(e: KeyboardEvent, index: number) {
     if (e.key !== "Enter" || e.metaKey || e.ctrlKey) return;
     if (index !== rows.length - 1) return;
@@ -83,8 +83,8 @@
     reducedMotion() ? { duration: 0 } : { duration: DUR.fast, easing: SNAP },
   );
 
-  // Só na montagem: um $effect leria `rows` e roubaria o cursor de volta pro
-  // primeiro campo a cada tecla digitada em qualquer um dos outros.
+  // Mount only: an $effect would read `rows` and steal the cursor back to the
+  // first field on every keystroke in any of the others.
   onMount(async () => {
     if (!autofocus) return;
     await tick();
@@ -107,8 +107,8 @@
           : t("rule_form.pattern_placeholder_more")}
         class="field font-mono flex-1 min-w-0"
       />
-      <!-- O ✕ some (mas guarda o lugar) quando não há o que remover, pra lista
-           não pular de largura entre um estado e outro. -->
+      <!-- The ✕ hides (but keeps its space) when there is nothing to remove,
+           so the list does not jump width between states. -->
       <button
         type="button"
         onclick={() => remove(row.id)}

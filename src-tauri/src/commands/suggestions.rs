@@ -13,14 +13,14 @@ use crate::domain::rule::Rule;
 use crate::error::AppResult;
 use crate::locale::{LocalePack, LocaleState};
 
-/// Reduz uma descrição livre a (chave de agrupamento, label legível, padrão sugerido),
-/// usando as regras de normalização do locale ativo (`rules.normalization`).
+/// Reduces a free-form description to (grouping key, readable label, suggested
+/// pattern) using the active locale's `rules.normalization`.
 ///
-/// A chave precisa ser estável entre repetições da mesma contraparte.
-/// O padrão é o que vai virar `rules.pattern` (LIKE substring).
+/// The key must be stable across repeats of the same counterparty. The pattern
+/// becomes a rule snippet (LIKE substring).
 ///
-/// Pública pra ser reusada por `income_sources` (mesmo modelo de agrupamento
-/// por contraparte, mas pra entradas em vez de regras).
+/// Public so `income_sources` can reuse it — same counterparty grouping, but
+/// for inflows instead of rules.
 pub fn normalize(description: &str, pack: &LocalePack) -> (String, String, String) {
     let norm = &pack.rules.normalization;
     let sep = if norm.field_separator.is_empty() {
@@ -29,7 +29,7 @@ pub fn normalize(description: &str, pack: &LocalePack) -> (String, String, Strin
         norm.field_separator.as_str()
     };
 
-    // 1. Tax id (CNPJ) tem precedência: label = texto depois do 1º separador.
+    // 1. A tax id wins: the label is the text after the first separator.
     if let Some(cnpj) = extract_cnpj(pack, description) {
         let label = description
             .split_once(sep)
@@ -83,7 +83,7 @@ pub fn normalize(description: &str, pack: &LocalePack) -> (String, String, Strin
         }
     }
 
-    // 3. Fallback: descrição inteira (cada tx vira seu próprio grupo).
+    // 3. Fallback: the whole description (each tx becomes its own group).
     (
         format!("raw:{description}"),
         description.to_string(),
@@ -91,8 +91,8 @@ pub fn normalize(description: &str, pack: &LocalePack) -> (String, String, Strin
     )
 }
 
-/// Extrai o nome da contraparte de descrições Pix do Nubank.
-/// Formato: `Transferência (enviada|recebida) pelo Pix - NOME - CPF_MASK - BANCO ...`
+/// Extracts the counterparty name from Nubank Pix descriptions.
+/// Format: `Transferência (enviada|recebida) pelo Pix - NAME - CPF_MASK - BANK ...`
 fn pix_name(description: &str, sep: &str) -> Option<String> {
     let after_prefix = description.splitn(2, sep).nth(1)?.splitn(2, sep).next()?;
     Some(after_prefix.trim().to_string())
@@ -112,9 +112,8 @@ pub struct RuleSuggestion {
 /// Returns groups of uncategorized OUTFLOW transactions whose normalized key
 /// repeats at least `min_count` times. Sorted by absolute total descending.
 ///
-/// **Importante**: só considera tx com `amount < 0` (saídas). Entradas não
-/// precisam de categoria — renda é rastreada por contraparte no painel
-/// "Fontes de Renda" do Dashboard.
+/// Only considers `amount < 0` (outflows). Inflows need no category — income is
+/// tracked by counterparty in the Dashboard's income sources panel.
 #[tauri::command]
 #[specta::specta]
 pub fn suggest_rules(
@@ -183,9 +182,8 @@ pub fn suggest_rules(
     Ok(out)
 }
 
-/// Pattern sugerido (LIKE substring) pra uma única descrição — mesma lógica
-/// da aba de Sugestões, exposta pra criar uma regra direto do painel de detalhe
-/// de uma transação.
+/// Suggested pattern for a single description — same logic as the Suggestions
+/// tab, exposed so a rule can be created from a transaction's detail panel.
 #[tauri::command]
 #[specta::specta]
 pub fn suggest_pattern_for(locale: State<'_, LocaleState>, description: String) -> String {
@@ -206,9 +204,9 @@ pub struct AutoClassifyReport {
 /// 3. If CNAE maps to a category → create rule (priority 10) and apply.
 /// 4. Else collect into `unresolved` for the UI to handle manually.
 ///
-/// **Importante**: só considera tx com `amount < 0` (saídas). Categorizar entradas
-/// (salário/freela vindos de um CNPJ) não faz sentido — entradas são rastreadas
-/// por contraparte no painel "Fontes de Renda", não por categoria.
+/// Only considers `amount < 0` (outflows). Categorizing inflows (salary or
+/// freelance paid by a company) makes no sense — those are tracked by
+/// counterparty in the income sources panel, not by category.
 #[tauri::command]
 #[specta::specta]
 pub fn auto_classify_with_cnpj(
@@ -309,7 +307,7 @@ pub fn auto_classify_with_cnpj(
                     params![cat_id, display],
                 )?;
                 let id = conn.last_insert_rowid();
-                // A regra nasce com o CNPJ como único trecho.
+                // The rule starts with the tax id as its only snippet.
                 conn.execute(
                     "INSERT INTO rule_patterns (rule_id, pattern) VALUES (?1, ?2)",
                     params![id, cnpj],

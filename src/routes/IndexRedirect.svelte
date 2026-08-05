@@ -25,8 +25,8 @@
 </script>
 
 {#if checking}
-  <!-- Rota de decisão: some em milissegundos. Um indicador centrado evita o
-       flash de texto solto no canto que existia antes. -->
+  <!-- A decision route: gone in milliseconds. A centred indicator avoids the
+       flash of stray corner text this used to show. -->
   <div class="h-full grid place-items-center">
     <Loading />
   </div>

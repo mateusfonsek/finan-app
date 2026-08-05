@@ -5,20 +5,20 @@
 
   type Props = {
     label: string;
-    /** Esta coluna é a que está ordenando agora? */
+    /** Is this the column currently sorting? */
     active: boolean;
-    /** Sentido atual — só desenhado quando `active`. */
+    /** Current direction — only drawn when `active`. */
     dir: SortDir;
-    /** O que o próximo clique vai fazer, em palavras. Vira o `title`. */
+    /** What the next click will do, in words. Becomes the `title`. */
     hint?: string;
     align?: "left" | "right";
-    /** Recuo menor, pras colunas estreitas de número. A célula do corpo tem que
-     *  usar o MESMO recuo, senão o rótulo e os números saem do prumo. */
+    /** Tighter padding for narrow numeric columns. Body cells must use the
+     *  SAME padding or the label and the numbers fall out of alignment. */
     dense?: boolean;
     /**
-     * Desenha um símbolo no lugar do rótulo, pra coluna estreita cujo nome não
-     * caberia. O `label` continua obrigatório: ele vira o nome acessível e a
-     * primeira linha do `title`, porque um símbolo sozinho não se explica.
+     * Draws a symbol instead of the label, for a narrow column whose name
+     * would not fit. `label` stays required: it becomes the accessible name and
+     * the first line of the `title`, because a symbol alone explains nothing.
      */
     symbol?: IconName;
     onclick: () => void;
@@ -35,8 +35,8 @@
     onclick,
   }: Props = $props();
 
-  /** Com símbolo, o `title` abre com o nome da coluna — é a única forma de
-   *  descobrir o que ela é. */
+  /** With a symbol, the `title` leads with the column name — the only way to
+   *  discover what it is. */
   let tip = $derived(symbol && hint ? `${label} — ${hint}` : (hint ?? label));
 
   let icon = $derived<IconName>(
@@ -64,7 +64,7 @@
          {align === 'right' ? 'flex-row-reverse justify-start text-right' : 'text-left'}"
 >
   {#if symbol}
-    <!-- Traço um pouco mais firme: o símbolo carrega o significado sozinho. -->
+    <!-- Slightly heavier stroke: the symbol carries the meaning alone. -->
     <Icon name={symbol} size={13.5} stroke={1.9} />
   {:else}
     <span class="truncate">{label}</span>

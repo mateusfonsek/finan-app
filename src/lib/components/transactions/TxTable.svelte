@@ -31,27 +31,27 @@
     selectedId,
   }: Props = $props();
 
-  /** "2026-08-14" → "14 ago 2026". Data por extenso curta lê mais rápido que
-   *  ISO e ocupa quase o mesmo espaço. */
+  /** "2026-08-14" becomes "14 ago 2026". A short spelled-out date reads faster
+   *  than ISO and takes nearly the same space. */
   function fmtDate(iso: string): string {
     const mo = Number(iso.slice(5, 7)) - 1;
     return `${iso.slice(8, 10)} ${(locale.monthsShort[mo] ?? "").toLowerCase()} ${iso.slice(0, 4)}`;
   }
 
-  // ── Ordenação ────────────────────────────────────────────────────────────
-  // Reordena no cliente: a lista já está toda em memória, então o clique
-  // responde no mesmo quadro — nenhuma ida ao backend entre o dedo e o
-  // resultado.
+  // ── Sorting ──────────────────────────────────────────────────────────────
+  // Reorders on the client: the whole list is already in memory, so the click
+  // responds in the same frame — no backend round-trip between finger and
+  // result.
   type SortKey = "date" | "amount";
 
-  /** Primeiro clique de cada coluna cai no sentido mais útil dela: data começa
-   *  pela mais recente; valor começa pela maior saída (gastos são negativos,
-   *  logo o mais negativo vem primeiro em ordem crescente). */
+  /** First click per column in its most useful direction: date starts newest;
+   *  amount starts with the largest outflow (expenses are negative, so the most
+   *  negative comes first ascending). */
   const sort = createSort<SortKey>({ date: "desc", amount: "asc" }, { key: "date", dir: "desc" });
 
   let sorted = $derived.by(() => {
     const sign = sort.sign;
-    // Cópia: `transactions` é prop, ordenar no lugar mutaria o pai.
+    // Copy: `transactions` is a prop, sorting in place would mutate the parent.
     return [...transactions].sort((a, b) => {
       let d = 0;
       if (sort.key === "date") {
@@ -59,14 +59,14 @@
       } else {
         d = Number(a.amount) - Number(b.amount);
       }
-      // Desempate estável por id, no mesmo sentido — duas transações do mesmo
-      // dia (ou do mesmo valor) nunca trocam de lugar sozinhas entre renders.
+      // Stable id tie-break in the same direction — two transactions on the
+      // same day (or of the same amount) never swap places between renders.
       return d !== 0 ? sign * d : sign * (a.id - b.id);
     });
   });
 
-  /** Rótulo do estado que o clique VAI produzir — o title antecipa o resultado
-   *  em vez de descrever o atual. */
+  /** Describes the state the click WILL produce — the title anticipates the
+   *  result rather than describing the current one. */
   function sortHint(key: SortKey, label: string): string {
     const next = sort.next(key);
     if (key === "date") {
@@ -90,9 +90,9 @@
       {/snippet}
     </EmptyState>
   {:else}
-    <!-- Mesmo tratamento da tabela de Regras: `table-fixed` pra uma descrição
-         longa reticenciar em vez de empurrar a coluna, e a rolagem horizontal
-         contida no cartão em vez de vazar pela página. -->
+    <!-- Same treatment as the Rules table: `table-fixed` so a long description
+         ellipsizes instead of pushing the column, and horizontal scrolling
+         contained in the card instead of leaking to the page. -->
     <div class="overflow-x-auto">
       <table class="w-full table-fixed min-w-[560px]">
         <thead>
@@ -123,8 +123,8 @@
       <tbody>
         {#each sorted as t (t.id)}
           {@const selected = selectedId === t.id}
-          <!-- A linha inteira é o alvo do clique (menos a célula de categoria,
-               que tem controle próprio) — alvo grande, como em listas do macOS. -->
+          <!-- The whole row is the click target (except the category cell,
+               which has its own control) — a large target, as in macOS lists. -->
           <tr
             animate:flip={flipParams}
             class="row border-t border-border-subtle first:border-t-0 cursor-default
@@ -135,9 +135,9 @@
               {fmtDate(t.date)}
             </td>
             <td class="px-4 py-2 text-callout text-fg min-w-0" onclick={() => onRowClick?.(t)}>
-              <!-- Duas linhas e para: descrição de extrato pode ter 200
-                   caracteres, e uma linha de tabela alta demais desalinha a
-                   leitura das vizinhas. O `title` devolve o resto. -->
+              <!-- Two lines and stop: a statement description can run 200
+                   characters, and an over-tall row breaks the scan of its
+                   neighbours. The `title` gives back the rest. -->
               <span class="line-clamp-2 break-words" title={t.description}>{t.description}</span>
             </td>
             <td class="px-4 py-2">

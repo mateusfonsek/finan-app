@@ -82,7 +82,7 @@
     return formatMoney(String(Math.abs(Number(amount))));
   }
 
-  /** Tipo do agrupamento, derivado da chave estável vinda do backend. */
+  /** Grouping type, derived from the stable key the backend returns. */
   function badgeFor(key: string): { text: string; tone: string } {
     if (key.startsWith("cnpj:")) return { text: t("suggestions.badge_cnpj"), tone: "indigo" };
     if (key.startsWith("debito:")) return { text: t("suggestions.badge_debito"), tone: "neutral" };
@@ -136,7 +136,7 @@
             {@const badge = badgeFor(s.key)}
             {@const tone = toneColor(badge.tone)}
             <article class="card-inset p-3 flex flex-col gap-2.5 min-w-0">
-              <!-- Cabeçalho: tipo + rótulo + métricas -->
+              <!-- Header: type, label and metrics -->
               <div class="flex items-start gap-2.5 min-w-0">
                 <span
                   class="text-cap2 font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap shrink-0 mt-px"
@@ -160,7 +160,7 @@
                 </div>
               </div>
 
-              <!-- Rodapé: pattern + categoria + ação -->
+              <!-- Footer: pattern, category and action -->
               <div class="flex gap-2 items-center min-w-0">
                 <label class="flex-1 min-w-0 flex items-center gap-2">
                   <span class="text-foot text-fg-subtle shrink-0">

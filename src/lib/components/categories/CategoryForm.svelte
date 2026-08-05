@@ -7,9 +7,9 @@
 
   const t = locale.t;
 
-  /** Só cria. Editar acontece no painel lateral (`CategoryPanel`), aberto pela
-   *  linha da lista — um formulário que troca de identidade no meio do uso
-   *  esconde de qual categoria ele está falando. */
+  /** Create only. Editing happens in the side panel (`CategoryPanel`), opened
+   *  from the list row — a form that changes identity mid-use hides which
+   *  category it is talking about. */
   type Props = {
     onSave: (data: { name: string; colorToken: string; kind: string }) => Promise<void>;
   };

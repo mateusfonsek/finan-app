@@ -34,8 +34,8 @@
   let applying = $state(false);
   let previewRows = $state<RulePreviewRow[]>([]);
   let previewOpen = $state(false);
-  /** Regra cuja lista de transações está aberta. O painel de edição continua
-   *  montado atrás — fechar aqui devolve você pra regra que estava editando. */
+  /** The rule whose transaction list is open. The edit panel stays mounted
+   *  behind, so closing here returns to the rule being edited. */
   let matchesFor = $state<RuleWithCount | null>(null);
 
   async function refresh() {
@@ -82,14 +82,14 @@
       category_id: data.categoryId,
       priority: data.priority,
       due_day: data.dueDay,
-      // O backend faz `SET display_name = ?` sempre; sem reenviar, o rótulo
-      // vindo do import seria apagado a cada edição.
+      // The backend always does `SET display_name = ?`; without resending, the
+      // label from import would be wiped on every edit.
       display_name: data.displayName,
     });
     await refresh();
   }
 
-  /** Alerta NATIVO do macOS — apagar uma regra descategoriza transações. */
+  /** Native macOS alert — deleting a rule uncategorizes transactions. */
   async function onDelete(rule: RuleWithCount) {
     const label = rule.display_name ?? rule.patterns[0] ?? "";
     const ok = await confirm(t("rules_page.delete_confirm", { pattern: label }), {
@@ -104,12 +104,12 @@
   }
 
   /**
-   * "Revisar e aplicar" não grava nada: ele consulta o que MUDARIA e abre a
-   * revisão. Quem grava é a escolha do usuário lá dentro.
+   * "Review and apply" writes nothing: it queries what WOULD change and opens
+   * the review. The user's choice in there is what writes.
    *
-   * Quando não há nada a mudar, não abre janela nenhuma — um modal só pra dizer
-   * "nada a fazer" é uma cerimônia que cobra um clique de volta sem entregar
-   * nada. A resposta vai na mesma faixa de sempre, junto do botão que a causou.
+   * With nothing to change, no dialog opens — a modal that only says "nothing to
+   * do" charges a click to dismiss and delivers nothing. The answer goes in the
+   * usual banner, next to the button that caused it.
    */
   async function onApply() {
     applying = true;
@@ -136,14 +136,14 @@
     previewRows = [];
     applyMsg =
       n === 1 ? t("rule_apply.applied_one") : t("rule_apply.applied_many", { n });
-    // As contagens de alcance da tabela não mudam com isso (alcance independe
-    // de categoria), mas a lista é barata e assim nada fica velho na tela.
+    // The table's reach counts do not change (reach is category-independent),
+    // but the list is cheap and this keeps nothing stale on screen.
     await refresh();
   }
 </script>
 
-<!-- `wide`: seis colunas não cabem na coluna padrão sem espremer o trecho da
-     descrição, que é a informação principal da tela. -->
+<!-- `wide`: six columns do not fit the default column without squeezing the
+     snippet, which is this screen's primary information. -->
 <Page title={t("nav.rules")} subtitle={t("rules_page.desc")} width="wide">
   {#snippet toolbar()}
     <Button variant="outline" onclick={onApply} disabled={applying || rules.length === 0}>
@@ -159,14 +159,14 @@
       <ErrorNote message={error} />
     {/if}
 
-    <!-- Resultado de "aplicar" fica junto do botão que o causou, não numa
-         faixa genérica no topo. -->
+    <!-- The apply result sits next to the button that caused it, not in a
+         generic banner at the top. -->
     {#if applyMsg}
       <ErrorNote message={applyMsg} tone="success" />
     {/if}
 
-    <!-- O formulário da página cria; editar acontece no painel lateral. Assim o
-         "novo" nunca muda de identidade no meio do caminho. -->
+    <!-- The page form creates; editing happens in the side panel, so "new"
+         never changes identity halfway through. -->
     <RuleForm {categories} onSave={onCreate} />
 
     <RulesList

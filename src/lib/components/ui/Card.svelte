@@ -2,13 +2,13 @@
   import type { Snippet } from "svelte";
 
   type Props = {
-    /** Título da seção. Frase normal — caixa alta é tique de dashboard. */
+    /** Section title. Sentence case — all caps is a dashboard tic. */
     title?: string;
-    /** Contexto discreto à direita do título (contagem, unidade, ressalva). */
+    /** Quiet context right of the title (a count, unit or caveat). */
     note?: string;
-    /** Controles à direita do título. Substitui `note` quando presente. */
+    /** Controls right of the title. Replaces `note` when present. */
     actions?: Snippet;
-    /** Ponto colorido antes do título, para seções com identidade própria. */
+    /** Colour dot before the title, for sections with their own identity. */
     accent?: string;
     padded?: boolean;
     class?: string;

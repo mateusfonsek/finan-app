@@ -10,11 +10,10 @@
   let { transactions }: Props = $props();
 
   /**
-   * OFX brasileiro entrega descrições de Pix/TED prefixadas com cabeçalho
-   * tipo "Transferência enviada pelo Pix - <beneficiário> - <cnpj> - <banco>...".
-   * Pra exibir mais limpo no widget, mostramos só o que vem depois do primeiro
-   * hífen (que normalmente é o nome do beneficiário em diante). Descrições sem
-   * hífen passam inalteradas.
+   * Brazilian OFX prefixes Pix/TED descriptions with a header like
+   * "Transferencia enviada pelo Pix - <payee> - <tax id> - <bank>...". For a
+   * cleaner widget, only what follows the first hyphen is shown (usually the
+   * payee onward). Descriptions without a hyphen pass through unchanged.
    */
   function displayDescription(raw: string): string {
     const idx = raw.indexOf("-");
@@ -23,8 +22,8 @@
     return after || raw;
   }
 
-  /** "2026-08-14" → "14 ago" — a data completa não cabe nem é necessária num
-   *  widget que já está preso a um mês. */
+  /** "2026-08-14" becomes "14 ago" — the full date neither fits nor is needed
+   *  in a widget already scoped to one month. */
   function shortDate(iso: string): string {
     const mo = Number(iso.slice(5, 7)) - 1;
     return `${iso.slice(8, 10)} ${(locale.monthsShort[mo] ?? "").toLowerCase()}`;

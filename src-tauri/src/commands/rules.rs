@@ -16,16 +16,16 @@ fn validate_due_day(d: Option<i32>) -> AppResult<()> {
     if let Some(day) = d {
         if !(1..=31).contains(&day) {
             return Err(AppError::Invalid(format!(
-                "due_day deve estar entre 1 e 31 (recebido: {day})"
+                "due_day must be between 1 and 31 (got: {day})"
             )));
         }
     }
     Ok(())
 }
 
-/// Normaliza a lista de trechos vinda da UI: apara espaços, descarta vazios e
-/// remove duplicatas (comparando sem caixa, que é como o casamento funciona).
-/// A ordem que o usuário digitou é preservada.
+/// Normalizes the snippet list from the UI: trims, drops empties and removes
+/// duplicates (case-insensitively, which is how matching works). Preserves the
+/// order the user typed.
 fn clean_patterns(raw: &[String]) -> AppResult<Vec<String>> {
     let mut out: Vec<String> = Vec::with_capacity(raw.len());
     for p in raw {
@@ -44,8 +44,8 @@ fn clean_patterns(raw: &[String]) -> AppResult<Vec<String>> {
     Ok(out)
 }
 
-/// Regrava os trechos de uma regra. Substitui em bloco em vez de fazer diff:
-/// a lista é curta e a ordem importa, então recriar é mais simples de acertar.
+/// Rewrites a rule's snippets. Replaces wholesale instead of diffing: the list
+/// is short and order matters, so recreating is simpler to get right.
 fn replace_patterns(tx: &rusqlite::Transaction, rule_id: i64, patterns: &[String]) -> AppResult<()> {
     tx.execute("DELETE FROM rule_patterns WHERE rule_id = ?1", params![rule_id])?;
     let mut stmt = tx.prepare("INSERT INTO rule_patterns (rule_id, pattern) VALUES (?1, ?2)")?;
@@ -55,7 +55,7 @@ fn replace_patterns(tx: &rusqlite::Transaction, rule_id: i64, patterns: &[String
     Ok(())
 }
 
-/// Trechos de uma regra, na ordem em que foram gravados.
+/// A rule's snippets, in the order they were written.
 fn patterns_of(conn: &rusqlite::Connection, rule_id: i64) -> rusqlite::Result<Vec<String>> {
     let mut stmt =
         conn.prepare("SELECT pattern FROM rule_patterns WHERE rule_id = ?1 ORDER BY id")?;
@@ -88,9 +88,9 @@ pub fn list_rules(db: State<'_, Db>) -> AppResult<Vec<Rule>> {
         .map_err(AppError::from)
 }
 
-/// Como `list_rules`, mas com o alcance de cada regra. Comando separado porque
-/// a contagem varre as transações — quem só precisa das regras (import,
-/// sugestões, calendário) não deve pagar por ela.
+/// Like `list_rules` but with each rule's reach. A separate command because
+/// the count scans transactions — callers that only need the rules (import,
+/// suggestions, calendar) should not pay for it.
 #[tauri::command]
 #[specta::specta]
 pub fn list_rules_with_count(db: State<'_, Db>) -> AppResult<Vec<RuleWithCount>> {
@@ -216,8 +216,8 @@ pub fn delete_rule_with_cleanup(db: State<'_, Db>, rule_id: i64) -> AppResult<u3
     let patterns = patterns_of(&conn, rule_id)?;
 
     let tx = conn.transaction()?;
-    // Limpa antes de apagar: o ON DELETE CASCADE levaria os patterns junto e a
-    // consulta abaixo não teria mais como saber o que essa regra categorizou.
+    // Clear before deleting: ON DELETE CASCADE would take the patterns with it
+    // and the query below could no longer tell what this rule categorized.
     let mut cleared = 0usize;
     for p in &patterns {
         cleared += tx.execute(
@@ -236,11 +236,11 @@ pub fn delete_rule_with_cleanup(db: State<'_, Db>, rule_id: i64) -> AppResult<u3
     Ok(cleared as u32)
 }
 
-/// As transações que uma regra alcança, mais recentes primeiro.
+/// The transactions a rule reaches, newest first.
 ///
-/// Usa o MESMO `EXISTS` sobre `rule_patterns` da contagem em
-/// `list_rules_with_count`: o número que a tabela mostra é a promessa do que
-/// esta lista contém, e as duas divergindo seria uma mentira silenciosa.
+/// Uses the SAME `EXISTS` over `rule_patterns` as the count in
+/// `list_rules_with_count`: the number the table shows promises what this list
+/// contains, and the two diverging would be a silent lie.
 #[tauri::command]
 #[specta::specta]
 pub fn transactions_matching_rule(db: State<'_, Db>, rule_id: i64) -> AppResult<RuleMatches> {
@@ -283,16 +283,16 @@ pub fn transactions_matching_rule(db: State<'_, Db>, rule_id: i64) -> AppResult<
     })
 }
 
-/// Tudo que aplicar as regras MUDARIA, sem gravar nada.
+/// Everything applying the rules WOULD change, without writing anything.
 ///
-/// Diferente de `apply_rules_to_uncategorized`, que só toca no que está sem
-/// categoria, aqui entram também as transações que já têm categoria e cuja
-/// regra vencedora aponta pra outra — são elas que a tela de revisão precisa
-/// mostrar antes de sobrescrever qualquer coisa.
+/// Unlike `apply_rules_to_uncategorized`, which only touches uncategorized
+/// rows, this also includes transactions that already have a category whose
+/// winning rule points elsewhere — the ones the review screen must show before
+/// overwriting anything.
 ///
-/// Transações onde a regra vencedora já concorda com a categoria atual ficam
-/// de fora: não são mudança nenhuma, e listá-las só faria a revisão parecer
-/// maior do que é.
+/// Transactions where the winning rule already agrees with the current category
+/// are left out: they are not changes, and listing them would only make the
+/// review look bigger than it is.
 #[tauri::command]
 #[specta::specta]
 pub fn preview_rule_application(
@@ -304,9 +304,9 @@ pub fn preview_rule_application(
         Some(_) => "AND t.account_id = ?1",
         None => "",
     };
-    // A subconsulta correlacionada escolhe a MESMA regra vencedora que
-    // `apply_rules_internal` usaria — prioridade desc, empate pelo mais novo.
-    // Se as duas divergissem, a revisão mentiria sobre o resultado.
+    // The correlated subquery picks the SAME winning rule `apply_rules_internal`
+    // would — priority desc, ties by newest. If the two diverged, the review
+    // would lie about the outcome.
     let sql = format!(
         "SELECT t.id, t.date, t.amount, t.description, t.category_id,
                 r.id, r.category_id, r.display_name
@@ -347,8 +347,8 @@ pub fn preview_rule_application(
 
     let mut out = Vec::with_capacity(raw.len());
     for (tx_id, date, amount, description, current, rule_id, new_cat, display_name) in raw {
-        // Sem `display_name`, o rótulo é o trecho que casou ESTA descrição — e
-        // não o primeiro da regra, que pode não ter nada a ver com esta linha.
+        // Without `display_name`, the label is the snippet that matched THIS
+        // description, not the rule's first one, which may be unrelated here.
         let rule_label = match display_name {
             Some(name) => name,
             None => {
@@ -373,11 +373,10 @@ pub fn preview_rule_application(
     Ok(out)
 }
 
-/// Grava só as mudanças que o usuário marcou na revisão.
+/// Writes only the changes the user ticked in the review.
 ///
-/// Recebe a categoria de destino junto, em vez de reconsultar as regras: o que
-/// é gravado é exatamente o que foi mostrado na tela, mesmo que uma regra tenha
-/// mudado nesse meio-tempo.
+/// Takes the target category along rather than re-querying the rules: what gets
+/// written is exactly what was shown, even if a rule changed meanwhile.
 #[tauri::command]
 #[specta::specta]
 pub fn apply_rule_choices(db: State<'_, Db>, choices: Vec<RuleChoice>) -> AppResult<u32> {
@@ -391,8 +390,8 @@ pub fn apply_rule_choices(db: State<'_, Db>, choices: Vec<RuleChoice>) -> AppRes
         let mut stmt =
             tx.prepare("UPDATE transactions SET category_id = ?1 WHERE id = ?2")?;
         for c in &choices {
-            // Categoria inexistente viraria FK órfã: falha alto em vez de
-            // gravar lixo silenciosamente.
+            // A missing category would orphan the FK: fail loudly rather than
+            // write garbage silently.
             let exists: bool = tx
                 .query_row(
                     "SELECT 1 FROM categories WHERE id = ?1",
@@ -433,7 +432,7 @@ pub fn apply_rules_internal(
         Some(_) => "AND account_id = ?1",
         None => "",
     };
-    // Uma regra casa quando QUALQUER um dos seus trechos aparece na descrição.
+    // A rule matches when ANY of its snippets appears in the description.
     let sql = format!(
         "UPDATE transactions
          SET category_id = (
@@ -483,23 +482,22 @@ fn fetch_rule(conn: &rusqlite::Connection, id: i64) -> AppResult<Rule> {
     .map_err(AppError::from)
 }
 
-/// Cruza regras × transações do mês pra montar eventos do calendário.
+/// Crosses rules with the month's transactions to build calendar events.
 ///
-/// Para cada regra:
-/// - Se `due_day` set: gera evento com vencimento (mesmo sem casar transação)
-/// - Se houver transação no mês cujo description casa o pattern: enriquece
-///   o evento com paid_day + paid_amount + paid_transaction_id
-/// - Se due_day=NULL e sem match: regra NÃO aparece (semântica do usuário:
-///   "só aparece quando paga")
+/// Per rule:
+/// - `due_day` set: emits an event with the due date, even with no match
+/// - a matching transaction in the month: enriches it with paid_day,
+///   paid_amount and paid_transaction_id
+/// - `due_day` NULL and no match: the rule does NOT appear ("only shows when
+///   paid", which is the user's mental model)
 ///
-/// Quando múltiplas transações casam a mesma regra no mesmo mês, pega a
-/// primeira (data ascendente).
+/// With several matches in the same month, the earliest one wins.
 #[tauri::command]
 #[specta::specta]
 pub fn calendar_events(db: State<'_, Db>, month: String) -> AppResult<Vec<CalendarEvent>> {
     if month.len() != 7 || !month.contains('-') {
         return Err(AppError::Invalid(format!(
-            "month deve ser 'YYYY-MM' (recebido: '{month}')"
+            "month must be 'YYYY-MM' (got: '{month}')"
         )));
     }
 
@@ -551,17 +549,17 @@ pub fn calendar_events(db: State<'_, Db>, month: String) -> AppResult<Vec<Calend
     let mut events: Vec<CalendarEvent> = Vec::new();
     for (rule_id, patterns, due_day, cat_name, cat_color) in rule_rows {
         let patterns_lc: Vec<String> = patterns.iter().map(|p| p.to_lowercase()).collect();
-        // Percorre as transações por data: a primeira do mês que casar QUALQUER
-        // trecho é a que paga o evento. Rodar por transação (e não por trecho)
-        // mantém "a mais antiga vence" mesmo com vários trechos.
+        // Walk transactions by date: the month's first one matching ANY
+        // snippet pays the event. Iterating by transaction (not by snippet)
+        // keeps "earliest wins" even with several snippets.
         let matched = tx_rows.iter().find_map(|(tx_id, date, amount, desc)| {
             let desc_lc = desc.to_lowercase();
             let hit = patterns_lc.iter().position(|p| desc_lc.contains(p))?;
             Some((tx_id, date, amount, hit))
         });
 
-        // Rótulo do evento: o trecho que casou, ou o primeiro quando o evento
-        // existe só pelo vencimento.
+        // Event label: the snippet that matched, or the first one when the
+        // event exists only because of the due date.
         let label = match matched {
             Some((_, _, _, hit)) => patterns[hit].clone(),
             None => patterns.first().cloned().unwrap_or_default(),
@@ -575,7 +573,7 @@ pub fn calendar_events(db: State<'_, Db>, month: String) -> AppResult<Vec<Calend
             None => (None, None, None),
         };
 
-        // Mostra a regra se tem due_day OU se casou alguma transação.
+        // Show the rule when it has a due day OR matched a transaction.
         if due_day.is_some() || paid_tx_id.is_some() {
             events.push(CalendarEvent {
                 rule_id,
@@ -864,8 +862,8 @@ mod tests {
         assert_eq!(n, 0);
     }
 
-    /// O caso que motivou os múltiplos trechos: o mesmo débito aparece no
-    /// extrato ora como débito da conta, ora como pagamento de boleto.
+    /// The case that motivated multiple snippets: the same charge shows up
+    /// sometimes as an account debit, sometimes as a bill payment.
     #[test]
     fn any_pattern_of_a_rule_matches() {
         let mut conn = fresh_conn();
@@ -909,8 +907,8 @@ mod tests {
         assert_eq!(untouched, None);
     }
 
-    /// Prioridade continua sendo da REGRA, não do trecho: um trecho genérico
-    /// numa regra de prioridade alta ganha de um específico numa regra baixa.
+    /// Priority belongs to the RULE, not the snippet: a generic snippet in a
+    /// high-priority rule beats a specific one in a low-priority rule.
     #[test]
     fn priority_is_per_rule_not_per_pattern() {
         let mut conn = fresh_conn();
@@ -934,7 +932,7 @@ mod tests {
         assert_eq!(cat, Some(transporte));
     }
 
-    /// Apagar a regra tem que limpar o que QUALQUER um dos trechos categorizou.
+    /// Deleting a rule must clear what ANY of its snippets categorized.
     #[test]
     fn delete_with_cleanup_clears_every_pattern() {
         let mut conn = fresh_conn();
@@ -960,8 +958,8 @@ mod tests {
         }
     }
 
-    /// A contagem é ALCANCE: conta o que a regra casa, mesmo que a transação
-    /// esteja hoje noutra categoria (manual ou por regra de prioridade maior).
+    /// The count is REACH: what the rule matches, even if the transaction now
+    /// sits in another category (manual or via a higher-priority rule).
     #[test]
     fn rule_reach_counts_matches_regardless_of_current_category() {
         let mut conn = fresh_conn();
@@ -972,7 +970,7 @@ mod tests {
 
         insert_tx(&conn, acc, "compra ALPHA 1", None);
         insert_tx(&conn, acc, "compra BETA 2", None);
-        // Categorizada na mão noutra categoria — continua sendo alcance da regra.
+        // Manually put in another category — still within the rule's reach.
         insert_tx(&conn, acc, "compra alpha 3", Some(mercado));
         insert_tx(&conn, acc, "padaria", None);
         apply_rules_internal(&mut conn, None).unwrap();
@@ -990,9 +988,9 @@ mod tests {
         assert_eq!(reach, 3);
     }
 
-    /// Réplica do SQL de `preview_rule_application` (o comando precisa de State,
-    /// que não existe fora do Tauri). Se este SQL divergir do de lá, os testes
-    /// abaixo param de significar alguma coisa.
+    /// Mirrors `preview_rule_application`'s SQL (the command needs State, which
+    /// does not exist outside Tauri). If this drifts from that, the tests below
+    /// stop meaning anything.
     fn preview(conn: &Connection) -> Vec<(i64, Option<i64>, i64)> {
         let mut stmt = conn
             .prepare(
@@ -1018,8 +1016,8 @@ mod tests {
             .unwrap()
     }
 
-    /// O preview mostra as duas classes: sem categoria E já categorizada que
-    /// mudaria. A segunda é justamente a que `apply_rules_internal` ignora.
+    /// The preview shows both classes: uncategorized AND already-categorized
+    /// rows that would change — the second is what `apply_rules_internal` skips.
     #[test]
     fn preview_lists_both_uncategorized_and_overrides() {
         let conn = fresh_conn();
@@ -1030,24 +1028,24 @@ mod tests {
 
         let sem_cat = insert_tx(&conn, acc, "TESTMERCHANT trip 1", None);
         let com_outra = insert_tx(&conn, acc, "TESTMERCHANT trip 2", Some(outros));
-        // Já está na categoria que a regra quer: não é mudança, não entra.
+        // Already in the category the rule wants: not a change, excluded.
         insert_tx(&conn, acc, "TESTMERCHANT trip 3", Some(transporte));
-        // Não casa regra nenhuma.
+        // Matches no rule at all.
         insert_tx(&conn, acc, "padaria do bairro", None);
 
         let rows = preview(&conn);
         let ids: Vec<i64> = rows.iter().map(|(id, _, _)| *id).collect();
-        assert_eq!(ids.len(), 2, "só as duas que mudariam");
+        assert_eq!(ids.len(), 2, "only the two that would change");
         assert!(ids.contains(&sem_cat));
         assert!(ids.contains(&com_outra));
 
         let overrides: Vec<_> = rows.iter().filter(|(_, cur, _)| cur.is_some()).collect();
         assert_eq!(overrides.len(), 1);
-        assert_eq!(overrides[0].2, transporte, "destino é a categoria da regra");
+        assert_eq!(overrides[0].2, transporte, "target is the rule's category");
     }
 
-    /// O preview tem que eleger a MESMA regra que aplicar elegeria — senão a
-    /// tela de revisão promete uma coisa e o banco grava outra.
+    /// The preview must elect the SAME rule apply would — otherwise the review
+    /// promises one thing and the DB writes another.
     #[test]
     fn preview_agrees_with_apply_on_uncategorized() {
         let mut conn = fresh_conn();
@@ -1062,7 +1060,7 @@ mod tests {
         let promised = preview(&conn)
             .into_iter()
             .find(|(id, _, _)| *id == tx_id)
-            .expect("preview deve listar a transação sem categoria")
+            .expect("preview must list the uncategorized transaction")
             .2;
 
         apply_rules_internal(&mut conn, None).unwrap();
@@ -1078,8 +1076,8 @@ mod tests {
         assert_eq!(actual, Some(transporte));
     }
 
-    /// Depois de aplicar, o que estava sem categoria some do preview — só
-    /// sobra o que exige decisão humana.
+    /// After applying, the uncategorized rows drop out of the preview — only
+    /// what needs a human decision remains.
     #[test]
     fn preview_shrinks_to_overrides_after_apply() {
         let mut conn = fresh_conn();
@@ -1101,8 +1099,8 @@ mod tests {
         assert_eq!(rows[0].2, transporte);
     }
 
-    /// A lista do modal e a contagem da tabela vêm do mesmo critério. Se
-    /// divergirem, o número vira uma promessa que a lista não cumpre.
+    /// The dialog's list and the table's count share one criterion. If they
+    /// diverge, the number becomes a promise the list does not keep.
     #[test]
     fn matching_list_agrees_with_reach_count() {
         let conn = fresh_conn();
@@ -1142,7 +1140,7 @@ mod tests {
             .unwrap();
 
         assert_eq!(reach, 3);
-        assert_eq!(listed.len() as i64, reach, "lista e contagem têm que bater");
+        assert_eq!(listed.len() as i64, reach, "list and count must agree");
         assert!(!listed.iter().any(|d| d.contains("padaria")));
     }
 

@@ -24,7 +24,7 @@
   let busy = $state(false);
   let textarea: HTMLTextAreaElement | undefined = $state();
 
-  // Mini-form de criação de regra (expansível).
+  // Expandable mini-form for creating a rule.
   let ruleOpen = $state(false);
   let rulePattern = $state("");
   let ruleCategoryId = $state<number | null>(null);
@@ -101,7 +101,7 @@
       if (ruleOpen) ruleOpen = false;
       else onClose();
     }
-    // ⌘↩ salva — atalho de confirmação padrão do macOS em painéis de edição.
+    // Cmd+Enter saves — the standard macOS confirm shortcut in edit panels.
     if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
       e.preventDefault();
       void save();
@@ -111,8 +111,8 @@
 
 <svelte:window {onkeydown} />
 
-<!-- Painel lateral: entra pela direita e sai pela direita, sempre. O véu é
-     leve porque a tarefa é focada, não bloqueante. -->
+<!-- Side panel: always enters from the right and leaves to the right. The
+     scrim is light because the task is focused, not blocking. -->
 <button
   type="button"
   aria-label={t("common.close")}
@@ -146,7 +146,8 @@
   </header>
 
   <div class="flex-1 overflow-y-auto">
-    <!-- O valor é o assunto do painel: ele abre a leitura, o resto contextualiza. -->
+    <!-- The amount is the panel's subject: it opens the read, the rest gives
+         context. -->
     <div class="px-4 pt-4 pb-3 flex flex-col gap-1">
       <span
         class="text-display font-semibold tabular {Number(transaction.amount) >= 0

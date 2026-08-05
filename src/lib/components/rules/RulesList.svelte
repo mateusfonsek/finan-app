@@ -28,22 +28,22 @@
     return categories.find((c) => c.id === id)?.color_token ?? "--color-cat-outros";
   }
 
-  /** O que a primeira coluna mostra — e portanto por onde ela ordena. Ordenar
-   *  por um valor invisível faria a tabela parecer embaralhada. */
+  /** What the first column shows, and therefore what it sorts by. Sorting by an
+   *  invisible value would make the table look shuffled. */
   function label(r: RuleWithCount): string {
     return r.display_name ?? r.patterns[0] ?? "";
   }
 
-  // ── Ordenação ────────────────────────────────────────────────────────────
+  // ── Sorting ──────────────────────────────────────────────────────────────
   type SortKey = "pattern" | "category" | "due" | "priority" | "count";
 
-  /** Primeiro clique de cada coluna no sentido mais útil dela: texto começa em
-   *  A→Z, vencimento pelo dia 1, e as duas colunas numéricas começam pelo maior
-   *  (a prioridade que vence e as regras que mais pegam). */
+  /** First click per column in its most useful direction: text starts A-Z, due
+   *  date at day 1, and both numeric columns start highest (the priority that
+   *  wins and the rules that catch the most). */
   const sort = createSort<SortKey>(
     { pattern: "asc", category: "asc", due: "asc", priority: "desc", count: "desc" },
-    // Espelha o `ORDER BY priority DESC, created_at DESC` do backend: a tabela
-    // abre exatamente na ordem em que os dados chegaram.
+    // Mirrors the backend's `ORDER BY priority DESC, created_at DESC`: the
+    // table opens in exactly the order the data arrived.
     { key: "priority", dir: "desc" },
   );
 
@@ -60,9 +60,9 @@
           d = compareText(categoryName(a.category_id), categoryName(b.category_id), code);
           break;
         case "due": {
-          // Regra sem vencimento vai pro fim nos dois sentidos. Se as DUAS não
-          // têm, `nullsLast` devolve 0 e a decisão cai no desempate por id lá
-          // embaixo, em vez de sair daqui com uma ordem instável.
+          // A rule with no due date goes last in both directions. When NEITHER
+          // has one, `nullsLast` returns 0 and the decision falls to the id
+          // tie-break below instead of leaving here with an unstable order.
           const empty = nullsLast(a.due_day, b.due_day);
           if (empty !== null && empty !== 0) return empty;
           d = empty === 0 ? 0 : (a.due_day ?? 0) - (b.due_day ?? 0);
@@ -75,8 +75,8 @@
           d = a.transaction_count - b.transaction_count;
           break;
       }
-      // Desempate estável por id — duas regras empatadas nunca trocam de lugar
-      // sozinhas entre um render e outro.
+      // Stable id tie-break — two tied rules never swap places on their own
+      // between renders.
       return d !== 0 ? sign * d : sign * (a.id - b.id);
     });
   });
@@ -90,21 +90,21 @@
   );
 
   /**
-   * Larguras das colunas.
+   * Column widths.
    *
-   * A tabela é `table-fixed`. Sem isso o navegador dimensiona pelo conteúdo, e
-   * um trecho longo — uma linha inteira de extrato, que é exatamente o caso que
-   * a tela precisa suportar — empurra a primeira coluna sem limite até estourar
-   * o cartão. Com `table-fixed` estas larguras valem de verdade e o que sobra
-   * vira reticência.
+   * The table is `table-fixed`. Without it the browser sizes by content, and a
+   * long snippet — a whole statement line, exactly the case this screen must
+   * support — pushes the first column without limit until it overflows the
+   * card. With `table-fixed` these widths hold and the overflow ellipsizes.
    *
-   * Larguras FOLGADAS de propósito: com `table-fixed` esses valores valem mesmo
-   * numa janela larga (toda a sobra vai pro trecho), então apertá-los pro
-   * mínimo do rótulo deixa o cabeçalho reticenciado o tempo todo, não só quando
-   * falta espaço. O custo de folgar é só a coluna do trecho, que tem sobra.
+   * Deliberately generous: with `table-fixed` these values apply even in a wide
+   * window (all slack goes to the snippet column), so trimming them to the
+   * label's minimum would ellipsize the header all the time, not only when
+   * space is short. Being generous costs only the snippet column, which has
+   * slack.
    *
-   * Fixas somam 476px. Com o `min-w` da tabela, a coluna do trecho nunca cai
-   * abaixo de ~180px, que é onde ele ainda diz alguma coisa.
+   * Fixed columns total 476px. With the table's `min-w`, the snippet column
+   * never drops below ~180px, where it still says something.
    */
   const COLUMNS: Array<{
     key: SortKey;
@@ -117,9 +117,9 @@
     { key: "pattern", labelKey: "rules.col_pattern", align: "left", width: "" },
     { key: "category", labelKey: "rules.col_category", align: "left", width: "w-[156px]" },
     { key: "count", labelKey: "rules.col_transactions", align: "right", width: "w-[124px]", dense: true },
-    // "Vence" e "Prioridade" viram símbolo: são as duas colunas mais estreitas
-    // e as que menos mudam de linha pra linha, então o nome por extenso custava
-    // largura que a coluna do trecho aproveita melhor.
+    // Due date and priority become symbols: the two narrowest columns and the
+    // ones that vary least per row, so spelling them out cost width the snippet
+    // column uses better.
     {
       key: "due",
       labelKey: "rules.col_due",
@@ -139,8 +139,8 @@
   ];
 </script>
 
-<!-- A linha mostra o primeiro trecho; os outros viram um contador. Enfileirar
-     todos faria a coluna crescer sem dizer mais nada — quem quer ver abre. -->
+<!-- The row shows the first snippet; the rest become a counter. Listing them
+     all would grow the column without saying more. -->
 {#snippet extra(total: number)}
   {#if total > 1}
     <span
@@ -156,9 +156,9 @@
   {#if rules.length === 0}
     <EmptyState icon="wandSparkles" title={t("rules.empty_title")} description={t("rules.empty")} />
   {:else}
-    <!-- Se a janela ficar estreita demais pras seis colunas, quem rola é a
-         tabela dentro do cartão — nunca a página, e nunca cortando conteúdo no
-         `overflow-hidden` que arredonda os cantos. -->
+    <!-- When the window is too narrow for six columns, the table scrolls inside
+         the card — never the page, and never clipped by the `overflow-hidden`
+         that rounds the corners. -->
     <div class="overflow-x-auto">
       <table class="w-full table-fixed min-w-[660px]">
         <thead>
@@ -183,17 +183,17 @@
       <tbody>
         {#each sorted as r (r.id)}
           {@const selected = selectedId === r.id}
-          <!-- A linha inteira abre o painel de edição — mesmo gesto da tabela de
-               transações. Só a coluna de ações escapa do clique. -->
+          <!-- The whole row opens the edit panel, same gesture as the
+               transactions table. Only the actions column escapes the click. -->
           <tr
             animate:flip={flipParams}
             class="row group border-t border-border-subtle first:border-t-0 cursor-default
                    {selected ? 'bg-accent-soft hover:bg-accent-soft' : ''}"
             aria-selected={selected}
           >
-            <!-- `min-w-0` é o que faz `truncate` valer dentro de uma célula de
-                 tabela: sem ele a caixa cresce com o texto e nada reticencia.
-                 O `title` devolve o que a reticência escondeu. -->
+            <!-- `min-w-0` is what makes `truncate` work inside a table cell:
+                 without it the box grows with the text and nothing ellipsizes.
+                 The `title` gives back what the ellipsis hid. -->
             <td class="px-4 py-2 min-w-0" onclick={() => onEdit(r)}>
               {#if r.display_name}
                 <div class="text-callout text-fg font-medium truncate" title={r.display_name}>
@@ -220,10 +220,9 @@
                 <span class="truncate">{categoryName(r.category_id)}</span>
               </span>
             </td>
-            <!-- Zero é informação, não ausência: a regra existe e não pega
-                 nada. Por isso ele aparece apagado em vez de virar "—".
-                 O recuo acompanha o do cabeçalho (`dense`), senão o número sai
-                 do prumo do rótulo. -->
+            <!-- Zero is information, not absence: the rule exists and catches
+                 nothing, so it is dimmed rather than turned into a dash. The
+                 padding matches the header's (`dense`) to stay aligned. -->
             <td
               class="px-3 py-2 text-right text-sub tabular
                      {r.transaction_count === 0 ? 'text-fg-faint' : 'text-fg-muted'}"

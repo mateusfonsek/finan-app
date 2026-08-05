@@ -16,9 +16,9 @@ describe("loadOfxFromPath", () => {
   });
 
   it("falha de conteúdo NÃO é OfxReadError", async () => {
-    // Quem decide marcar o arquivo como `invalid` (permanente) usa exatamente
-    // essa distinção — se o parse virasse OfxReadError, lixo ficaria pendente
-    // pra sempre; se a leitura virasse erro comum, extrato bom seria enterrado.
+    // Whatever decides to mark a file `invalid` (permanent) relies on exactly
+    // this distinction: if parse threw OfxReadError, junk would stay pending
+    // forever; if a read threw a plain error, a good statement would be buried.
     readFileBytes.mockResolvedValue(new TextEncoder().encode("<OFX>"));
 
     await expect(loadOfxFromPath("/tmp/lixo.ofx")).rejects.toThrow();

@@ -3,12 +3,12 @@
 
   type Props = {
     name: IconName;
-    /** Tamanho em px. Alinhe ao tamanho do texto ao lado, não ao contêiner. */
+    /** Size in px. Match the adjacent text, not the container. */
     size?: number;
-    /** Traço mais firme quando o símbolo carrega significado sozinho. */
+    /** Heavier stroke when the symbol carries meaning on its own. */
     stroke?: number;
     class?: string;
-    /** Símbolo com significado próprio ganha rótulo; decorativo fica oculto. */
+    /** A meaningful symbol gets a label; a decorative one stays hidden. */
     label?: string;
   };
 

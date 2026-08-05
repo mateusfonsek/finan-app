@@ -36,9 +36,9 @@
       <tbody>
         {#each categories as c (c.id)}
           {@const selected = selectedId === c.id}
-          <!-- A linha inteira abre o painel de edição — mesmo gesto das tabelas
-               de regras e de transações. Só a coluna de ações escapa do clique,
-               e nela sobra o que a linha não faz: apagar. -->
+          <!-- The whole row opens the edit panel, same gesture as the rules and
+               transactions tables. Only the actions column escapes the click,
+               holding what the row does not do: delete. -->
           <tr
             class="row group border-t border-border-subtle first:border-t-0 cursor-default
                    {selected ? 'bg-accent-soft hover:bg-accent-soft' : ''}"

@@ -17,21 +17,22 @@
 
   const t = locale.t;
 
-  /** Tempo até encolher sozinha. Ela NÃO some depois disso — vira pastilha. */
+  /** Time until it collapses on its own. It does NOT disappear — it becomes a
+   *  pill. */
   const AUTO_COLLAPSE_MS = 6000;
 
-  // Não chamar de `state`: `$state` seria lido como auto-subscribe da store
-  // `state` (a sintaxe `$` do Svelte), e o compilador reclama de uso antes
-  // da declaração.
+  // Not named `state`: `$state` would read as an auto-subscription to a store
+  // called `state` (Svelte's `$` syntax), and the compiler complains about use
+  // before declaration.
   let toast = $state(initialToastState);
   let hovering = $state(false);
   let timer: ReturnType<typeof setTimeout> | undefined;
 
   let current = $derived(watch.discoveries[0] ?? null);
 
-  // Alinhar com a descoberta em foco é efeito, não derivação: `syncHash`
-  // preserva o estado quando o hash não mudou, então isto é no-op na maioria
-  // dos renders e só reseta quando chega outro arquivo.
+  // Aligning with the focused discovery is an effect, not a derivation:
+  // `syncHash` preserves state when the hash is unchanged, so this is a no-op
+  // on most renders and only resets when another file arrives.
   $effect(() => {
     toast = syncHash(toast, current?.hash ?? null);
   });
@@ -49,14 +50,14 @@
 
   function review() {
     if (!current) return;
-    // Quem carrega o arquivo é a tela de Importar, via sinal na store: daqui
-    // não dá pra navegar pra `/import` estando já em `/import` (o `push` não
-    // dispara `hashchange`, o Import não remonta, e o clique viraria nada).
+    // The Import screen loads the file, via a signal in the store: navigating
+    // to `/import` from `/import` does nothing (`push` fires no `hashchange`,
+    // Import never remounts, and the click would be swallowed).
     watch.requestOpen(current);
     if (router.location !== IMPORT_ROUTE) void push(IMPORT_ROUTE);
-    // Sem esconder nada aqui: resolver a descoberta é o que a tira da store, e
-    // é a store que decide o que esta notificação mostra. Se a abertura falhar
-    // lá no Import, ela continua pendente — que é o correto.
+    // Nothing is hidden here: resolving the discovery is what removes it from
+    // the store, and the store decides what this notification shows. If opening
+    // fails in Import, it stays pending — which is correct.
   }
 
   async function ignore() {
@@ -66,8 +67,8 @@
 </script>
 
 {#if current && phase !== "hidden"}
-  <!-- Notificação paralela, não modal: sem véu escurecendo o fundo, porque ela
-       não interrompe nada — o usuário pode continuar o que estava fazendo. -->
+  <!-- A parallel notification, not modal: no scrim, because it interrupts
+       nothing — the user can carry on with what they were doing. -->
   <div
     class="fixed bottom-5 right-5 z-40 grid"
     onmouseenter={() => (hovering = true)}
@@ -102,7 +103,7 @@
               {current.fileName}
             </span>
           </span>
-          <!-- Encolher na hora, sem esperar o timer. -->
+          <!-- Collapse now, without waiting for the timer. -->
           <button
             type="button"
             onclick={() => (toast = collapse(toast))}

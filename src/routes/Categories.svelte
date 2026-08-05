@@ -55,8 +55,8 @@
     await refresh();
   }
 
-  /** Apagar é irreversível: pede confirmação num alerta NATIVO do macOS (o
-   *  `confirm()` do webview parece web, e num app de desktop isso destoa). */
+  /** Deleting is irreversible, so it confirms via a native macOS alert — the
+   *  webview's `confirm()` looks like the web and clashes in a desktop app. */
   async function onDelete(c: CategoryWithCount) {
     const msg = c.transaction_count > 0
       ? (c.transaction_count === 1
@@ -87,12 +87,12 @@
       <ErrorNote message={error} />
     {/if}
 
-    <!-- Acima do formulário porque a dúvida nasce ao preencher o campo "Tipo",
-         e a resposta tem que estar antes da pergunta. -->
+    <!-- Above the form because the question arises while filling in "kind",
+         and the answer has to come before the question. -->
     <KindGuide />
 
-    <!-- O formulário da página cria; editar acontece no painel lateral. Assim o
-         "novo" nunca muda de identidade no meio do caminho. -->
+    <!-- The page form creates; editing happens in the side panel, so "new"
+         never changes identity halfway through. -->
     <CategoryForm onSave={onCreate} />
 
     <CategoriesList

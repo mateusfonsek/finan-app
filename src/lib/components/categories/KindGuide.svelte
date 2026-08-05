@@ -5,9 +5,9 @@
   const t = locale.t;
 
   /**
-   * Só o que muda a decisão de quem está escolhendo o tipo. Sem cartão e sem
-   * fundo: é texto de apoio, não um bloco de conteúdo disputando atenção com o
-   * formulário logo abaixo.
+   * Only what changes the decision of someone picking a kind. No card and no
+   * background: this is supporting text, not a content block competing with the
+   * form below.
    */
   const KINDS = ["expense", "income", "transfer"] as const;
 </script>

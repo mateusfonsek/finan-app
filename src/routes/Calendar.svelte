@@ -25,8 +25,9 @@
   /** Dia selecionado (1..31). null = nenhum. */
   let selectedDay = $state<number | null>(null);
 
-  /** Hoje no fuso de quem está lendo. `toISOString()` devolve UTC: à noite, a
-   *  oeste de Greenwich, ele já virou o dia — e o calendário destacava amanhã. */
+  /** Today in the reader's timezone. `toISOString()` returns UTC: at night,
+   *  west of Greenwich, it has already rolled over — and the calendar was
+   *  highlighting tomorrow. */
   const today = (() => {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -51,7 +52,8 @@
     selectedDay == null ? null : `${viewMonth}-${String(selectedDay).padStart(2, "0")}`,
   );
 
-  /** Set de category_ids que são kind='transfer' (inclui Investimentos). Heatmap exclui esses. */
+  /** category_ids with kind='transfer' (including investments). The heatmap
+   *  excludes them. */
   let transferCatIds = $derived.by(() => {
     const set = new Set<number>();
     for (const c of categories) if (c.kind === "transfer") set.add(c.id);
@@ -62,7 +64,7 @@
     const map = new Map<number, DayFlow>();
     for (const t of transactions) {
       if (!t.date.startsWith(viewMonth)) continue;
-      // Exclui transferências/investimentos — heatmap mostra apenas movimento "real".
+      // Excludes transfers and investments — the heatmap shows real movement.
       if (t.category_id != null && transferCatIds.has(t.category_id)) continue;
       const d = Number(t.date.slice(8, 10));
       const n = Number(t.amount);
@@ -98,10 +100,9 @@
   });
 
   /**
-   * Carrega categorias UMA VEZ. Separado do fluxo mensal pra não fazer
-   * o $effect que carrega dados do mês rastrear `categories.length` e
-   * disparar de novo após a atribuição (era a causa do piscar do painel
-   * lateral ao clicar num dia).
+   * Loads categories ONCE. Separate from the monthly flow so the $effect that
+   * loads month data does not track `categories.length` and fire again after
+   * the assignment — which was what made the side panel flicker on day click.
    */
   async function loadCategoriesOnce(): Promise<void> {
     if (categories.length > 0) return;
@@ -112,7 +113,7 @@
     }
   }
 
-  /** Função pura: recebe o mês como parâmetro, não lê state reativo. */
+  /** Pure: takes the month as a parameter, reads no reactive state. */
   async function loadMonthData(month: string): Promise<void> {
     loading = true;
     error = null;
@@ -140,7 +141,8 @@
     void loadCategoriesOnce();
   });
 
-  // Único efeito reativo: re-fetch e reset da seleção quando o mês muda.
+  // The only reactive effect: refetch and reset the selection when the month
+  // changes.
   $effect(() => {
     const m = viewMonth;
     const todayMonth = today.slice(0, 7);
@@ -167,7 +169,7 @@
     <ErrorNote message={error} />
   {/if}
 
-  <!-- Resumo do mês compacto (sempre visível, mesmo em mês vazio) -->
+  <!-- Compact month summary, always visible even in an empty month -->
   <div class="card px-4 py-2.5 flex items-center gap-7 text-callout">
     <div class="flex items-center gap-2">
       <span class="text-foot text-fg-subtle">{t("calendar_page.inflows")}</span>

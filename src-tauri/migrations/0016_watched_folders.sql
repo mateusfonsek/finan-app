@@ -1,17 +1,17 @@
--- Importação automática: o usuário escolhe pastas, o app varre à procura de
--- .ofx novos e avisa. Nada é importado sem o preview — estas tabelas guardam
--- só a configuração e o que já foi visto.
+-- Automatic import: the user picks folders, the app scans for new .ofx files
+-- and notifies. Nothing is imported without the preview — these tables hold
+-- only the configuration and what has already been seen.
 
--- Chave/valor genérico pra preferências do app. Nasce aqui por causa de
--- `watch_enabled`, mas serve pra qualquer pref futura.
+-- Generic key/value store for app preferences. Born here for `watch_enabled`,
+-- but usable for any future setting.
 CREATE TABLE app_settings (
   key TEXT PRIMARY KEY,
   value TEXT NOT NULL
 );
 
--- Pastas observadas. `path` é canonicalizado antes do INSERT, então o UNIQUE
--- barra a mesma pasta adicionada duas vezes por caminhos diferentes
--- (symlink, /tmp vs /private/tmp).
+-- Watched folders. `path` is canonicalized before INSERT, so UNIQUE rejects
+-- the same folder added twice via different paths (symlink, /tmp vs
+-- /private/tmp).
 CREATE TABLE watched_folders (
   id INTEGER PRIMARY KEY,
   path TEXT NOT NULL UNIQUE,
@@ -19,15 +19,15 @@ CREATE TABLE watched_folders (
   added_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
--- Arquivos já vistos, chaveados pelo HASH DO CONTEÚDO e não pelo caminho.
--- É isso que resolve de graça: mesmo extrato baixado 2x com nomes diferentes,
--- arquivo renomeado, e arquivo movido entre duas pastas observadas.
+-- Files already seen, keyed by CONTENT HASH rather than path. That handles for
+-- free: the same statement downloaded twice under different names, a renamed
+-- file, and a file moved between two watched folders.
 --
 -- status:
---   pending  — descoberto, alimenta o badge, aguarda decisão do usuário
---   imported — o usuário importou
---   ignored  — o usuário dispensou (definitivo, nunca mais avisa)
---   invalid  — não parseia como OFX (nunca mais avisa, silenciosamente)
+--   pending  - discovered, feeds the badge, awaiting the user's decision
+--   imported - the user imported it
+--   ignored  - the user dismissed it (permanent, never notified again)
+--   invalid  - does not parse as OFX (silently never notified again)
 CREATE TABLE seen_files (
   id INTEGER PRIMARY KEY,
   content_hash TEXT NOT NULL UNIQUE,

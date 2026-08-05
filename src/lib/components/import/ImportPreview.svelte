@@ -10,7 +10,7 @@
 
   type Props = {
     transactions: ParsedTransaction[];
-    /** Chaves compostas `fitid|date|amount` que já existem na DB. */
+    /** Composite `fitid|date|amount` keys already present in the DB. */
     duplicateKeys: Set<string>;
     reversalMap?: Map<string, ReversalInfo>;
     selected: Set<string>;

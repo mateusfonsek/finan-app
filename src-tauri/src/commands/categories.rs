@@ -124,7 +124,7 @@ pub fn update_category(
     .map_err(AppError::from)
 }
 
-/// Apaga uma categoria. Transações que a referenciavam ficam com category_id=NULL.
+/// Deletes a category. Transactions referencing it get category_id=NULL.
 #[tauri::command]
 #[specta::specta]
 pub fn delete_category(db: State<'_, Db>, category_id: i64) -> AppResult<()> {

@@ -39,7 +39,7 @@
 
   let pending = $state<PendingImport | null>(null);
   let account = $state<Account | null>(null);
-  /** Set de chaves compostas `fitid|date|amount` — não confundir com FITID puro. */
+  /** Set of composite `fitid|date|amount` keys — not bare FITIDs. */
   let duplicateKeys = $state<Set<string>>(new Set());
   let selected = $state<Set<string>>(new Set());
   let reversalMap = $state<Map<string, ReversalInfo>>(new Map());
@@ -54,11 +54,11 @@
   /** category chosen per unresolved CNPJ (keyed by cnpj) */
   let chosen = $state<Record<string, number | null>>({});
   let busyKey = $state<string | null>(null);
-  /** Hash do arquivo na pasta observada, quando o import veio de lá — marca o
-   *  arquivo como importado ao final, pra sumir do badge e nunca mais avisar. */
+  /** Content hash when the import came from a watched folder — used to mark the
+   *  file imported at the end so it leaves the badge for good. */
   let watchHash = $state<string | undefined>(undefined);
 
-  // O toast nunca interrompe quem já está revisando um extrato.
+  // The toast never interrupts someone already reviewing a statement.
   $effect(() => {
     watch.suppressToast = pending !== null;
     return () => (watch.suppressToast = false);
@@ -74,10 +74,10 @@
     }
   });
 
-  // "Revisar" no toast só pede pra abrir; quem abre é esta tela. Isso vale pra
-  // quando ela acabou de montar (veio de outra rota) e pra quando o usuário já
-  // estava aqui — nesse segundo caso `push("/import")` não remontaria nada, e
-  // o `onMount` acima nunca rodaria de novo.
+  // "Review" in the toast only asks; this screen opens. That covers both a
+  // fresh mount (arriving from another route) and already being here — in the
+  // second case `push("/import")` would remount nothing and `onMount` above
+  // would never run again.
   $effect(() => {
     if (!watch.openRequest) return;
     const req = watch.takeOpenRequest();
@@ -99,8 +99,8 @@
         .map((t) => ({ ofx_fitid: t.fitid, date: t.date, amount: t.amount }));
       duplicateKeys = await checkExistingTxKeys(account.id, candidates);
       reversalMap = detectReversalPairs(parsed.transactions);
-      // Default: importar tudo MENOS duplicadas e MENOS estornos+revertidos.
-      // Duplicata é por tripla composta (fitid, date, amount); reversal é por fitid.
+      // Default: import everything EXCEPT duplicates and reversal pairs.
+      // Duplicates key on the (fitid, date, amount) triple; reversals on fitid.
       selected = new Set(
         parsed.transactions
           .filter((t) => {
@@ -244,8 +244,8 @@
     }
   }
 
-  /** Regra criada no import nasce com um trecho só (o CNPJ), mas ela pode ter
-   *  ganhado outros depois — o contador evita mostrar só metade da verdade. */
+  /** A rule created during import starts with one snippet (the tax id), but may
+   *  have gained others since — the counter avoids showing half the truth. */
   function patternsLabel(r: Rule): string {
     const first = r.patterns[0] ?? "";
     return r.patterns.length > 1 ? `${first}  +${r.patterns.length - 1}` : first;
@@ -296,25 +296,25 @@
     watchHash = undefined;
   }
 
-  /** Carrega o próximo extrato descoberto direto no preview, reaproveitando a
-   *  tela em que já estamos. */
+  /** Loads the next discovered statement straight into the preview, reusing the
+   *  screen we are already on. */
   async function openNextFromQueue() {
     const next = watch.discoveries[0];
     if (next) await openDiscovery(next);
   }
 
-  /** Carrega uma descoberta específica no preview, sem sair da tela. */
+  /** Loads a specific discovery into the preview without leaving the screen. */
   async function openDiscovery(next: Discovery) {
     error = null;
     busy = true;
     try {
-      // Só tocamos em `pending`/no resto do estado do import depois que o
-      // arquivo novo já foi lido e parseado com sucesso — igual a `onparsed`.
-      // Zerar `pending` antes (como fazia o `reset()` aqui) deixava a tela sem
-      // extrato nenhum durante toda a leitura, e se o load falhasse (arquivo
-      // movido, apagado, ou placeholder do iCloud evictado depois do scan) o
-      // erro caía com `pending` já nulo — a tela voltava pra dropzone vazia,
-      // sem explicação nenhuma.
+      // `pending` and the rest of the import state are only touched after the
+      // new file has been read and parsed successfully, same as `onparsed`.
+      // Clearing `pending` first (as `reset()` used to do here) left the screen
+      // with no statement during the whole read, and if the load failed (file
+      // moved, deleted, or an iCloud placeholder evicted after the scan) the
+      // error landed with `pending` already null — the screen fell back to an
+      // empty dropzone with no explanation.
       const loaded = await loadOfxFromPath(next.path);
       reset();
       pending = { file: loaded.file, parsed: loaded.parsed };
@@ -322,12 +322,12 @@
       await prepareImport(loaded.parsed);
     } catch (e) {
       error = e instanceof Error ? e.message : String(e);
-      // Tira o arquivo da fila pra que ele não trave `discoveries[0]` — sem
-      // isso, todo clique em "Próximo extrato" bateria de novo nele e os
-      // extratos atrás nunca sairiam. *Como* ele sai depende da falha: só
-      // conteúdo que não é OFX vira `invalid` (permanente); não conseguir ler
-      // agora é transitório e apenas some desta rodada, voltando na próxima
-      // varredura (spec §5.4).
+      // Takes the file out of the queue so it cannot block `discoveries[0]`;
+      // otherwise every "next statement" click would hit it again and the ones
+      // behind would never surface. *How* it leaves depends on the failure:
+      // only non-OFX content becomes `invalid` (permanent); failing to read now
+      // is transient and merely drops out of this round, returning on the next
+      // scan.
       await watch.noteLoadFailure(next.hash, e);
     } finally {
       busy = false;
@@ -346,8 +346,8 @@
   {/snippet}
 
   {#if !pending}
-    <!-- Um alvo tem tamanho de alvo: esticado na largura toda da página ele
-         deixa de parecer um objeto e vira uma faixa vazia. -->
+    <!-- A target has the size of a target: stretched across the full page it
+         stops looking like an object and becomes an empty band. -->
     <div class="w-full max-w-xl mx-auto flex flex-col gap-4 pt-4">
       {#if error}
         <ErrorNote message={error} />
@@ -355,9 +355,9 @@
       <DropZone {onparsed} {onerror} />
     </div>
   {:else if importResult && autoReport}
-    <!-- ============ Depois do import ============ -->
-    <!-- Conclusão explícita: o que entrou, o que foi ignorado, o que o app
-         categorizou sozinho. Confirmar o resultado é parte do trabalho. -->
+    <!-- ============ After the import ============ -->
+    <!-- Explicit conclusion: what went in, what was skipped, what the app
+         categorized on its own. Confirming the result is part of the job. -->
     <div
       class="card p-4 flex items-start gap-3"
       style="border-color: color-mix(in oklch, var(--color-pos) 30%, var(--color-border-subtle))"
@@ -398,8 +398,8 @@
                      border-b border-border-subtle last:border-b-0"
             >
               <div class="flex flex-col gap-0.5 min-w-0">
-                <!-- Campo que só parece campo quando tocado: a lista fica calma,
-                     mas tudo continua editável no lugar. -->
+                <!-- A field that only looks like one when touched: the list
+                      stays calm, but everything remains editable in place. -->
                 <input
                   type="text"
                   value={r.display_name ?? ""}
@@ -503,7 +503,7 @@
       <ErrorNote message={error} />
     {/if}
 
-    <!-- Barra de ação fixa: material translúcido, o conteúdo passa por baixo. -->
+    <!-- Fixed action bar: translucent material, content passes underneath. -->
     <div
       class="material-chrome sticky bottom-0 -mx-8 px-8 py-3 mt-1 flex justify-end gap-2
              border-t border-border-subtle"
@@ -517,7 +517,7 @@
       <Button onclick={() => push("/transactions")}>{t("import.view_transactions")}</Button>
     </div>
   {:else}
-    <!-- ============ Revisão antes de importar ============ -->
+    <!-- ============ Review before importing ============ -->
     {@const p = pending.parsed}
     <div class="grid grid-cols-[1fr_280px] gap-4 items-start">
       <div class="flex flex-col gap-3">

@@ -20,8 +20,8 @@
     return yyyymm.slice(2, 4);
   }
 
-  /** Marca a virada de ano — sem isso, doze rótulos de mês não dizem quando
-   *  o ano trocou. */
+  /** Marks the year boundary — without it, twelve month labels never say when
+   *  the year changed. */
   function isYearStart(i: number): boolean {
     if (i === 0) return true;
     return months[i].month.slice(0, 4) !== months[i - 1].month.slice(0, 4);
@@ -49,8 +49,8 @@
   <div class="flex flex-col gap-2">
     <div class="grid grid-cols-12 gap-1.5 items-end h-[132px]">
       {#each months as m, i (m.month)}
-        <!-- Duas barras lado a lado por mês: entradas e saídas comparáveis num
-             relance, em vez de empilhadas (que só mostra o total). -->
+        <!-- Two bars per month side by side: inflow and outflow comparable at a
+             glance, rather than stacked (which only shows the total). -->
         <div
           role="presentation"
           onmouseenter={() => (hovered = m.month)}

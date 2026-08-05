@@ -23,15 +23,15 @@
   let panelEl: HTMLElement | undefined = $state();
   let closeEl: HTMLButtonElement | undefined = $state();
 
-  /** Duas classes de mudança, e elas não são equivalentes: preencher um vazio
-   *  não desfaz decisão de ninguém; trocar uma categoria existente desfaz. */
+  /** Two classes of change, and they are not equivalent: filling a blank undoes
+   *  nobody's decision; replacing an existing category does. */
   let uncategorized = $derived(rows.filter((r) => r.current_category_id === null));
   let overrides = $derived(rows.filter((r) => r.current_category_id !== null));
 
   /**
-   * Seleção por id de transação. Começa com as sem categoria marcadas — que é
-   * exatamente o que o botão sempre fez — e as substituições desmarcadas: o
-   * caminho rápido não pode ser o destrutivo.
+   * Selection by transaction id. Starts with the uncategorized ones ticked —
+   * exactly what the button always did — and the replacements unticked: the
+   * fast path must not be the destructive one.
    */
   let selected = $state(new Set<number>());
   $effect(() => {
@@ -62,8 +62,8 @@
     return id === null ? undefined : categories.find((c) => c.id === id);
   }
 
-  /** "2026-08-14" → "14 ago". O ano só aparece quando não é o corrente: numa
-   *  lista longa ele repete e não ajuda a identificar a transação. */
+  /** "2026-08-14" becomes "14 ago". The year only appears when it is not the
+   *  current one: in a long list it repeats without helping identify the row. */
   function fmtDate(iso: string): string {
     const mo = Number(iso.slice(5, 7)) - 1;
     const year = iso.slice(0, 4);
@@ -94,13 +94,13 @@
       if (!busy) onClose();
       return;
     }
-    // ⌘↩ confirma — mesmo atalho dos painéis de edição.
+    // Cmd+Enter confirms — same shortcut as the edit panels.
     if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
       e.preventDefault();
       if (!busy && selected.size > 0) void apply();
       return;
     }
-    // Tarefa modal: o foco não escapa da janela enquanto ela está aberta.
+    // Modal task: focus does not escape the dialog while it is open.
     if (e.key === "Tab" && panelEl) {
       const focusables = panelEl.querySelectorAll<HTMLElement>(
         "button, [href], input, select, textarea, [tabindex]:not([tabindex='-1'])",
@@ -199,9 +199,9 @@
     <footer
       class="px-6 py-4 border-t border-border-subtle shrink-0 flex items-center justify-between gap-4"
     >
-      <!-- À esquerda, quanto do total está marcado; no botão, o que ele vai
-           fazer. O botão diz o NÚMERO, então "aplicar tudo" nunca é ambíguo —
-           não existe "tudo" implícito em lugar nenhum. -->
+      <!-- Left: how much of the total is ticked. Button: what it will do. The
+           button states the NUMBER, so "apply all" is never ambiguous — there is
+           no implicit "all" anywhere. -->
       <span class="text-foot text-fg-subtle tabular">
         {selected.size === 0
           ? t("rule_apply.selected_none")
@@ -231,10 +231,10 @@
 )}
   <section class="flex flex-col gap-2">
     <div class="flex items-center justify-between gap-3">
-      <!-- A paleta tem só `pos` e `neg`; pintar esta seção de vermelho leria
-           como erro, e ela é uma escolha legítima. Quem sinaliza a atenção é o
-           símbolo mais o texto — que é o que funciona pra quem não distingue
-           as cores de qualquer jeito. -->
+      <!-- The palette only has `pos` and `neg`; painting this section red would
+           read as an error, and it is a legitimate choice. The symbol plus the
+           text carry the caution — which is what works for anyone who cannot
+           distinguish the colours anyway. -->
       <div class="flex items-center gap-2 min-w-0">
         {#if warn}
           <Icon name="triangleAlert" size={12.5} stroke={2} class="text-fg-muted shrink-0" />
@@ -242,8 +242,8 @@
         <span class="section-title">{title}</span>
         <span class="text-foot text-fg-faint tabular">{items.length}</span>
       </div>
-      <!-- "Todas" por seção em vez de um global: as duas classes têm risco
-           diferente, então marcar em massa é uma decisão por classe. -->
+      <!-- Per-section "all" rather than one global: the two classes carry
+           different risk, so bulk-ticking is a decision per class. -->
       <label class="flex items-center gap-1.5 text-foot text-fg-muted cursor-default
                     hover:text-fg transition-colors duration-[var(--dur-fast)]">
         <input
@@ -266,8 +266,8 @@
         {@const to = categoryOf(r.new_category_id)}
         {@const on = selected.has(r.transaction_id)}
         <li>
-          <!-- A linha inteira alterna a marcação: alvo grande, como em listas
-               do macOS. O realce nasce no press, não na soltura. -->
+          <!-- The whole row toggles the tick: a large target, as in macOS
+               lists. The highlight starts on press, not on release. -->
           <label
             class="press-sm flex items-start gap-3 px-3 py-2.5 cursor-default
                    transition-colors duration-[var(--dur-fast)]
@@ -290,8 +290,8 @@
                 {/if}
               </span>
             </span>
-            <!-- A mudança lida da esquerda pra direita: de onde vem → pra onde
-                 vai. A seta carrega o significado, não a cor. -->
+            <!-- The change reads left to right: from where it is to where it
+                 goes. The arrow carries the meaning, not the colour. -->
             <span class="flex items-center gap-2 shrink-0 text-sub">
               {#if from}
                 <span class="chip text-fg-muted">

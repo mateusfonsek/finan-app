@@ -14,17 +14,17 @@
   const t = locale.t;
 
   type Props = {
-    /** `RuleWithCount` e não `Rule`: o painel mostra o alcance da regra no
-     *  botão que abre a lista, e esse número já vem carregado com a tabela. */
+    /** `RuleWithCount`, not `Rule`: the panel shows the rule's reach on the
+     *  button that opens the list, and that number is already loaded. */
     rule: RuleWithCount;
     categories: Category[];
     onClose: () => void;
-    /** Abre a lista das transações que esta regra alcança. Quem monta o modal
-     *  é a página — o painel só diz que o usuário pediu. */
+    /** Opens the list of transactions this rule reaches. The page mounts the
+     *  dialog; the panel only reports that the user asked. */
     onViewMatches: () => void;
-    /** `true` quando um modal está aberto POR CIMA deste painel. Sem isso, o
-     *  `Esc` que fecha o modal fecharia o painel junto — os dois escutam a
-     *  janela, e a tecla chegaria nos dois no mesmo evento. */
+    /** `true` when a dialog is open ON TOP of this panel. Without it, the `Esc`
+     *  that closes the dialog would close the panel too — both listen on the
+     *  window and would see the same event. */
     blocked?: boolean;
     onSave: (
       ruleId: number,
@@ -50,13 +50,13 @@
   let rows = $state<PatternRow[]>([]);
   let categoryId = $state<number | null>(null);
   let priority = $state(0);
-  /** Svelte 5 coage <input type="number"> pra number | null. */
+  /** Svelte 5 coerces <input type="number"> to number | null. */
   let dueDayValue = $state<number | null>(null);
   let busy = $state(false);
   let error = $state<string | null>(null);
 
-  // Recarrega o rascunho quando o painel troca de regra (clicar noutra linha
-  // com o painel aberto).
+  // Reloads the draft when the panel switches rules (clicking another row
+  // while it is open).
   $effect(() => {
     rows = rowsFrom(rule.patterns);
     categoryId = rule.category_id;
@@ -66,7 +66,7 @@
   });
 
   let category = $derived(categories.find((c) => c.id === categoryId));
-  /** Só os trechos que valem alguma coisa — é o que o resumo e o save usam. */
+  /** Only the snippets that carry something — what the summary and save use. */
   let filled = $derived(valuesOf(rows).map((v) => v.trim()).filter((v) => v !== ""));
 
   async function save() {
@@ -92,8 +92,8 @@
         categoryId,
         priority,
         dueDay: dueDayValue,
-        // Preservado: o rótulo vem do import (razão social do CNPJ) e não é
-        // editável aqui — omitir apagaria ele no backend.
+        // Preserved: the label comes from import (legal name from the tax id)
+        // and is not editable here — omitting it would wipe it in the backend.
         displayName: rule.display_name,
       });
       onClose();
@@ -105,13 +105,13 @@
   }
 
   function onkeydown(e: KeyboardEvent) {
-    // Enquanto há algo por cima, o teclado é de quem está na frente.
+    // While something is on top, the keyboard belongs to whatever is in front.
     if (blocked) return;
     if (e.key === "Escape") {
       e.preventDefault();
       onClose();
     }
-    // ⌘↩ salva — mesmo atalho do painel de transação.
+    // Cmd+Enter saves — same shortcut as the transaction panel.
     if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
       e.preventDefault();
       void save();
@@ -121,8 +121,8 @@
 
 <svelte:window {onkeydown} />
 
-<!-- Mesmo par véu + folha do painel de transação: entra pela direita, sai pela
-     direita. Véu leve porque a tarefa é focada, não bloqueante. -->
+<!-- Same scrim + sheet pair as the transaction panel: enters from the right,
+     leaves to the right. Light scrim because the task is focused, not blocking. -->
 <button
   type="button"
   aria-label={t("common.close")}
@@ -156,8 +156,8 @@
   </header>
 
   <div class="flex-1 overflow-y-auto">
-    <!-- O assunto do painel é a frase que a regra representa. Ela acompanha o
-         que está sendo digitado, então dá pra ler o efeito antes de salvar. -->
+    <!-- The panel's subject is the sentence the rule represents. It follows
+         what is being typed, so the effect is readable before saving. -->
     <div class="px-4 pt-4 pb-3 flex flex-col gap-1.5">
       {#if rule.display_name}
         <span class="text-callout font-semibold text-fg">{rule.display_name}</span>
@@ -170,8 +170,8 @@
       {:else if filled.length === 1}
         <span class="text-title2 font-semibold font-mono text-fg break-words">{filled[0]}</span>
       {:else}
-        <!-- Vários trechos: lista com marcador "ou", porque a relação entre
-             eles é alternativa, não sequência. -->
+        <!-- Several snippets: an "or" marker, because the relationship between
+             them is alternative, not sequence. -->
         <ul class="flex flex-col gap-1 mt-0.5">
           {#each filled as p, i (i)}
             <li class="flex gap-2">
@@ -203,8 +203,8 @@
       <div class="flex flex-col gap-1">
         <span class="text-foot text-fg-subtle">{t("rule_form.patterns_label")}</span>
         <PatternListEditor {rows} onChange={(next) => (rows = next)} autofocus />
-        <!-- A dica fica visível: antes ela só existia como tooltip, invisível
-             pra quem não passa o mouse por cima. -->
+        <!-- The hint is visible: it used to exist only as a tooltip, invisible
+             to anyone not hovering. -->
         <span class="text-cap text-fg-faint leading-snug mt-0.5">
           {t("rule_panel.patterns_hint")}
         </span>
@@ -257,10 +257,9 @@
       {t("rule_panel.scope_note")}
     </p>
 
-    <!-- Ação de inspeção, no fim e com peso de link — mesmo tratamento do
-         "adicionar outra descrição" logo acima. Um botão desenhado aqui
-         competiria com Salvar, que é a ação principal do painel; isto não
-         altera nada, só mostra. -->
+    <!-- Inspection action, last and with link weight — same treatment as "add
+         another snippet" above. A drawn button here would compete with Save,
+         the panel's primary action; this changes nothing, it only shows. -->
     <div class="px-4 pb-4">
       <button
         type="button"

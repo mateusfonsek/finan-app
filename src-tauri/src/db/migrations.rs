@@ -122,8 +122,8 @@ mod tests {
         .is_ok()
     }
 
-    /// Aplica só as migrations até `up_to` (inclusive), pra conseguir montar um
-    /// banco no formato antigo e ver o que a migration seguinte faz com ele.
+    /// Applies migrations only up to `up_to`, so a test can build an old-format
+    /// DB and see what the next migration does to it.
     fn apply_through(conn: &Connection, up_to: &str) {
         conn.execute_batch(
             "CREATE TABLE IF NOT EXISTS _migrations (
@@ -143,14 +143,14 @@ mod tests {
         panic!("migration {up_to} not found");
     }
 
-    /// A 0017 move `rules.pattern` pra `rule_patterns`. As regras que o usuário
-    /// já tinha precisam sobreviver como regras de um trecho só.
+    /// 0017 moves `rules.pattern` into `rule_patterns`. Existing rules must
+    /// survive as single-snippet rules.
     #[test]
     fn rule_patterns_migration_preserves_existing_rules() {
         let conn = Connection::open_in_memory().unwrap();
         apply_through(&conn, "0016_watched_folders");
 
-        // Formato antigo: pattern era coluna da própria regra.
+        // Old format: pattern was a column on the rule itself.
         let cat: i64 = conn
             .query_row("SELECT id FROM categories LIMIT 1", [], |r| r.get(0))
             .unwrap();
@@ -172,7 +172,7 @@ mod tests {
             .unwrap();
         assert_eq!(patterns, vec!["legado".to_string()]);
 
-        // O resto da regra fica intacto…
+        // The rest of the rule is untouched...
         let (priority, due_day): (i32, Option<i32>) = conn
             .query_row(
                 "SELECT priority, due_day FROM rules WHERE id = ?1",
@@ -182,7 +182,8 @@ mod tests {
             .unwrap();
         assert_eq!((priority, due_day), (7, Some(5)));
 
-        // …e a coluna antiga some, pra não virar segunda fonte de verdade.
+        // ...and the old column is gone, so it cannot become a second source
+        // of truth.
         assert!(conn
             .query_row("SELECT pattern FROM rules WHERE id = ?1", [rule_id], |r| r
                 .get::<_, String>(0))
@@ -210,7 +211,7 @@ mod tests {
             .unwrap();
         assert_eq!(count, 13);
 
-        // 'Renda' foi removida em 0008. Garantir que não sobrou no final.
+        // 'Renda' was removed in 0008. Make sure nothing is left.
         let renda_exists: i64 = conn
             .query_row(
                 "SELECT COUNT(*) FROM categories WHERE name = 'Renda'",
@@ -218,7 +219,7 @@ mod tests {
                 |row| row.get(0),
             )
             .unwrap();
-        assert_eq!(renda_exists, 0, "Renda foi removida pela migration 0008");
+        assert_eq!(renda_exists, 0, "Renda was removed by migration 0008");
     }
 
     #[test]
@@ -295,7 +296,7 @@ mod tests {
                 |row| row.get(0),
             )
             .unwrap();
-        assert_eq!(missing, 0, "todas as categorias seedadas têm key");
+        assert_eq!(missing, 0, "every seeded category has a key");
 
         let market: String = conn
             .query_row(
@@ -310,8 +311,8 @@ mod tests {
     #[test]
     fn reports_fresh_db_only_on_first_apply() {
         let conn = Connection::open_in_memory().unwrap();
-        assert!(apply(&conn).unwrap(), "primeira aplicação = DB novo");
-        assert!(!apply(&conn).unwrap(), "reaplicar não é DB novo");
+        assert!(apply(&conn).unwrap(), "first apply means a fresh DB");
+        assert!(!apply(&conn).unwrap(), "reapplying is not a fresh DB");
     }
 
     #[test]
@@ -334,7 +335,7 @@ mod tests {
              VALUES ('abc', '/tmp/x.ofx', 'x.ofx', 10, 'garbage')",
             [],
         );
-        assert!(result.is_err(), "CHECK deveria bloquear status inválido");
+        assert!(result.is_err(), "CHECK should reject an invalid status");
     }
 
     #[test]
@@ -348,7 +349,7 @@ mod tests {
             [],
         )
         .unwrap();
-        // Mesmo conteúdo, outro nome/caminho: deve colidir.
+        // Same content under another name/path: must collide.
         let result = conn.execute(
             "INSERT INTO seen_files (content_hash, path, file_name, size, status)
              VALUES ('abc', '/tmp/b.ofx', 'b.ofx', 10, 'pending')",
@@ -371,6 +372,6 @@ mod tests {
             "INSERT INTO watched_folders (path, label) VALUES ('/tmp/finan', 'outro')",
             [],
         );
-        assert!(result.is_err(), "mesma pasta não pode entrar duas vezes");
+        assert!(result.is_err(), "the same folder cannot be added twice");
     }
 }

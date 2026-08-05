@@ -10,9 +10,9 @@
     selectedDate: string | null;
     transactions: Transaction[];
     categories: Category[];
-    /** Eventos de regras do mês (pra mostrar contas vencendo no dia selecionado). */
+    /** The month's rule events, to show bills due on the selected day. */
     events?: CalendarEvent[];
-    /** Hoje YYYY-MM-DD pra decidir overdue vs pending. */
+    /** Today as YYYY-MM-DD, to decide overdue vs pending. */
     today?: string;
   };
 
@@ -30,7 +30,7 @@
   function billState(e: CalendarEvent): BillState {
     if (e.paid_day != null) return "paid";
     if (!selectedDate || !today) return "pending";
-    // Overdue se o dia selecionado é anterior a hoje E não foi paga.
+    // Overdue when the selected day is before today AND it is unpaid.
     return selectedDate < today.slice(0, 10) ? "overdue" : "pending";
   }
 
@@ -126,8 +126,8 @@
       {selectedDate ? t("day_details.selected_day") : t("day_details.select_day")}
     </div>
     {#if selectedDate}
-      <!-- Primeira letra maiúscula: `toLocaleDateString` devolve "sexta-feira, 14
-           de agosto" em pt-BR, e um título começando em minúscula parece erro. -->
+      <!-- Capitalized first letter: `toLocaleDateString` returns a lowercase
+           weekday in pt-BR, and a title starting lowercase reads as a bug. -->
       <div class="text-title3 font-semibold text-fg first-letter:uppercase">
         {formatDateLong(selectedDate)}
       </div>
@@ -205,7 +205,7 @@
         </div>
       </div>
 
-      <!-- Grupos: cada um com cabeçalho colorido + lista de transações -->
+      <!-- Groups: each with a coloured header plus its transactions -->
       <div class="overflow-y-auto">
         {#each groups as g}
           <section class="border-b border-border-subtle last:border-b-0">

@@ -55,7 +55,8 @@
   let menuWrapperEl: HTMLDivElement | undefined = $state();
   let icloudWaiting = $state(0);
   let lastScanAt = $state<string | null>(null);
-  /** A versão vem do binário — literal no template envelhece sem avisar. */
+  /** The version comes from the binary — a literal in the template goes stale
+   *  without warning. */
   let version = $state<string | null>(null);
 
   async function loadEnrich() {
@@ -74,18 +75,18 @@
     lastScanAt = await getAppSetting(LAST_SCAN_KEY);
   }
 
-  /** O carimbo vem do SQLite em UTC e sem sufixo de fuso; o "Z" faz o `Date`
-   *  interpretar como UTC pra exibir na hora local de quem está lendo. */
+  /** The stamp comes from SQLite in UTC with no timezone suffix; the "Z" makes
+   *  `Date` read it as UTC and display it in the reader's local time. */
   function formatScan(stamp: string): string {
     const d = new Date(`${stamp.replace(" ", "T")}Z`);
     if (Number.isNaN(d.getTime())) return stamp;
     return d.toLocaleString(locale.dateLocale, { dateStyle: "short", timeStyle: "short" });
   }
 
-  /** O Rust devolve mensagem de desenvolvedor, em inglês, como no resto dos
-   *  comandos — nada disso pode ir cru pra tela. Aqui vira texto traduzido, e
-   *  o caso que o usuário de fato encontra (apontar pra uma pasta que já está
-   *  na lista) ganha frase própria em vez de "UNIQUE constraint failed". */
+  /** Rust returns developer-facing English, like every other command — none of
+   *  which can reach the screen raw. This turns it into translated text, and the
+   *  case users actually hit (pointing at a folder already in the list) gets its
+   *  own sentence instead of "UNIQUE constraint failed". */
   function folderError(e: unknown, fallbackKey: string): string {
     const raw = e instanceof Error ? e.message : String(e);
     if (raw.includes("watched_folders.path")) return t("watch.error_duplicate");
@@ -107,9 +108,9 @@
     }
   });
 
-  // Fecha o menu "+ Adicionar pasta" por clique fora ou Esc — mesmo padrão do
-  // CategoryPicker: listener único registrado no mount, virando no-op via
-  // guarda `!menuOpen` quando o menu já está fechado, e removido no unmount.
+  // Closes the "add folder" menu on outside click or Esc — same pattern as
+  // CategoryPicker: one listener registered on mount, a no-op via the
+  // `!menuOpen` guard when already closed, removed on unmount.
   onMount(() => {
     function onDocClick(e: MouseEvent) {
       if (!menuOpen) return;
@@ -136,10 +137,10 @@
     }
   }
 
-  /** Todos os presets passam pelo painel do Finder, com `defaultPath` já
-   *  apontado. Não é cerimônia: é assim que o consentimento TCC do macOS pra
-   *  ~/Downloads e ~/Mesa é concedido pelo caminho natural do sistema, em vez
-   *  de um diálogo de permissão surgindo sem contexto no primeiro scan. */
+  /** Every preset goes through the Finder panel with `defaultPath` pre-aimed.
+   *  Not ceremony: this is how macOS TCC consent for ~/Downloads and ~/Desktop
+   *  is granted through the system's own path, instead of a permission dialog
+   *  appearing without context on the first scan. */
   async function pickFolder(defaultPath?: string): Promise<string | null> {
     const picked = await openDialog({
       title: t("watch.picker_title"),
@@ -169,8 +170,8 @@
     error = null;
     const home = await homeDir();
     const target = await join(home, "Library", "Mobile Documents", "com~apple~CloudDocs", "finan");
-    // Criar a pasta é a ÚNICA escrita em disco da feature — por isso pergunta,
-    // e só quando ela realmente não existe.
+    // Creating the folder is the feature's ONLY disk write, so it asks — and
+    // only when the folder really is missing.
     if (!(await dirExists(target))) {
       const ok = await confirm(t("watch.create_icloud_confirm"), {
         title: t("watch.preset_icloud"),
@@ -188,9 +189,9 @@
     await addFrom(target);
   }
 
-  // Os presets `await` o `addFrom` (como o do iCloud já fazia): sem isso, uma
-  // falha antes do picker — `homeDir`/`join` — viraria rejeição sem dono e a
-  // tela não mostraria nada.
+  // The presets `await` `addFrom` (as the iCloud one already did): without it, a
+  // failure before the picker — `homeDir`/`join` — would become an unhandled
+  // rejection and the screen would show nothing.
   async function addDownloads() {
     try {
       await addFrom(await join(await homeDir(), "Downloads"));
@@ -252,8 +253,8 @@
     }
   }
 
-  /** Abrir no Finder pode falhar (pasta desmontada entre o render e o clique)
-   *  — mesmo cuidado que o botão do banco de dados já tinha. */
+  /** Revealing in Finder can fail (folder unmounted between render and click) —
+   *  same care the database button already had. */
   async function revealFolder(folder: WatchedFolder) {
     error = null;
     try {
@@ -306,8 +307,8 @@
     });
     if (!picked || Array.isArray(picked)) return;
 
-    // Restaurar SUBSTITUI o banco — destrutivo e irreversível, então é um dos
-    // poucos lugares que merece um alerta nativo bloqueando o caminho.
+    // Restoring REPLACES the database — destructive and irreversible, one of the
+    // few places that earns a native alert blocking the way.
     const confirmed = await confirm(t("settings.restore_confirm"), {
       title: t("settings.restore_title"),
       kind: "warning",
@@ -385,7 +386,7 @@
     </Card>
   {/if}
 
-  <!-- ── Importação automática ──────────────────────────────────────────── -->
+  <!-- ── Automatic import ───────────────────────────────────────────────── -->
   <Card title={t("watch.section_title")}>
     {#snippet actions()}
       {#if watch.enabled}
@@ -535,8 +536,8 @@
       {/if}
 
       <div class="flex items-center justify-between pt-2.5 border-t border-border-subtle">
-        <!-- Evidência, não status genérico (spec §4.2): a hora real da última
-             varredura, ou o reconhecimento de que ainda não houve nenhuma. -->
+        <!-- Evidence, not a generic status: the real time of the last scan, or
+             an acknowledgement that none has happened yet. -->
         <span class="text-cap text-fg-subtle tabular">
           {lastScanAt
             ? t("watch.last_scan_at", { time: formatScan(lastScanAt) })
@@ -593,7 +594,7 @@
       — {t("settings.about_line")}
     </div>
 
-    <!-- Atalhos numa grade: procurar um atalho numa frase corrida é trabalho. -->
+    <!-- Shortcuts in a grid: hunting one inside running prose is work. -->
     <div class="grid grid-cols-3 gap-x-5 gap-y-1.5 pt-1">
       {#each [["⌘1", t("nav.dashboard")], ["⌘2", t("nav.transactions")], ["⌘3", t("nav.calendar")], ["⌘4", t("sidebar.import")], ["⌘5", t("nav.categories")], ["⌘6", t("nav.rules")], ["⌘7", t("nav.suggestions")], ["⌘F", t("settings.shortcut_search")], ["⌘O", t("settings.shortcut_open_ofx")]] as [key, label]}
         <div class="flex items-center gap-2 min-w-0">

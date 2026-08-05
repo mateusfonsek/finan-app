@@ -5,19 +5,19 @@
 
   const t = locale.t;
 
-  /** Totais por dia, calculados em Calendar.svelte a partir das transações do mês. */
+  /** Per-day totals, computed in Calendar.svelte from the month's transactions. */
   export type DayFlow = { inflow: number; outflow: number };
 
   type Props = {
-    /** "YYYY-MM" do mês exibido */
+    /** "YYYY-MM" of the displayed month */
     month: string;
-    /** Hoje, no formato "YYYY-MM-DD" */
+    /** Today, as "YYYY-MM-DD" */
     today: string;
-    /** Totais por dia (chave = dia do mês, 1..31). */
+    /** Per-day totals (key = day of month, 1..31). */
     dayFlows?: Map<number, DayFlow>;
     maxOut?: number;
     maxIn?: number;
-    /** Eventos de regras com due_day ou paid_day. Usados pra renderizar contas a pagar/pagas. */
+    /** Rule events with a due_day or paid_day, used to render bills. */
     events?: CalendarEvent[];
     selectedDay?: number | null;
     onSelectDay?: (day: number | null) => void;
@@ -62,7 +62,7 @@
     const todayPrefix = todayStr.slice(0, 7);
     const todayDay = todayPrefix === monthStr ? Number(todayStr.slice(8, 10)) : -1;
 
-    // Bucket de eventos por due_day (ancora dia 31 no último dia do mês).
+    // Buckets events by due_day (anchors day 31 to the month's last day).
     const dueByDay = new Map<number, CalendarEvent[]>();
     for (const e of evs) {
       if (e.due_day == null) continue;
@@ -83,8 +83,8 @@
         due: dueByDay.get(d) ?? [],
       });
     }
-    // Completa a última semana: uma grade que termina no meio da linha deixa
-    // um degrau sem borda no canto do cartão.
+    // Fills the last week: a grid ending mid-row leaves an unbordered step in
+    // the card's corner.
     while (out.length % 7 !== 0) {
       out.push({ day: null, isToday: false, due: [] });
     }
@@ -115,7 +115,7 @@
     return state === "paid" ? "✓" : state === "overdue" ? "!" : "•";
   }
 
-  /** Mapeia intensidade [0,1] em opacidade visível [20%, 100%]. */
+  /** Maps intensity [0,1] to visible opacity [20%, 100%]. */
   function intensityPct(value: number, max: number): number {
     if (max <= 0 || value <= 0) return 0;
     const ratio = Math.min(1, value / max);
@@ -165,7 +165,7 @@
       >
         {#if cell.day !== null}
           <div class="flex items-center justify-between gap-1 w-full">
-            <!-- Hoje ganha o disco de acento, como no Calendário do macOS. -->
+            <!-- Today gets the accent disc, as in the macOS Calendar. -->
             <span
               class="grid place-items-center min-w-[19px] h-[19px] px-1 rounded-full text-foot tabular
                      {cell.isToday
@@ -192,7 +192,7 @@
             </div>
           </div>
 
-          <!-- Contas vencendo neste dia (até 2 visíveis, "+N" se passar). -->
+          <!-- Bills due this day (up to 2 visible, "+N" beyond). -->
           {#each cell.due.slice(0, 2) as e (e.rule_id)}
             {@const state = billState(e, todayDayInMonth)}
             <div

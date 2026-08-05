@@ -5,8 +5,8 @@
   let { message, tone = "error" }: Props = $props();
 </script>
 
-<!-- Feedback de erro fica junto do que falhou, não numa faixa no topo da tela.
-     Cor + símbolo juntos: quem não distingue as cores ainda lê o estado. -->
+<!-- Error feedback sits next to what failed, not in a banner at the top.
+     Colour plus symbol: the state still reads without colour vision. -->
 <div
   class="card px-3 py-2.5 flex items-start gap-2.5 text-callout {tone === 'error'
     ? 'text-neg'

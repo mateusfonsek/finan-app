@@ -1,31 +1,31 @@
 /**
- * Estado de ordenação de uma tabela.
+ * Sort state for a table.
  *
- * Vive aqui pra que duas tabelas diferentes não inventem regras diferentes pro
- * mesmo gesto: clicar numa coluna nova cai no sentido mais útil dela, clicar na
- * coluna ativa inverte. É a mesma promessa em toda tabela do app.
+ * Lives here so two tables cannot invent different rules for the same gesture:
+ * clicking a new column adopts its most useful direction, clicking the active
+ * one inverts. Same promise in every table.
  */
 export type SortDir = "asc" | "desc";
 
 export type Sort<K extends string> = {
   readonly key: K;
   readonly dir: SortDir;
-  /** Alterna a coluna: inverte se já ativa, senão adota o sentido inicial dela. */
+  /** Inverts when already active, otherwise adopts the column's first direction. */
   toggle(key: K): void;
-  /** Valor de `aria-sort` pro `<th>`. */
+  /** `aria-sort` value for the `<th>`. */
   aria(key: K): "ascending" | "descending" | "none";
-  /** Sentido que o PRÓXIMO clique nesta coluna vai produzir. */
+  /** The direction the NEXT click on this column will produce. */
   next(key: K): SortDir;
-  /** `1` pra crescente, `-1` pra decrescente — multiplica o comparador. */
+  /** `1` ascending, `-1` descending — multiplies the comparator. */
   readonly sign: 1 | -1;
 };
 
 /**
- * @param firstDir sentido do primeiro clique de cada coluna. Não é uma regra
- *   única porque a coluna decide o que é útil: data começa pela mais recente,
- *   nome começa por A. É o que o Finder faz.
- * @param initial coluna e sentido em que a tabela abre — normalmente espelhando
- *   a ordem que o backend já devolve, pra abrir sem reordenar nada.
+ * @param firstDir first-click direction per column. Not one global rule
+ *   because the column decides what is useful: dates start newest, names start
+ *   at A. Finder behaves the same way.
+ * @param initial the column and direction the table opens with — usually
+ *   mirroring the backend's order, so nothing reorders on load.
  */
 export function createSort<K extends string>(
   firstDir: Record<K, SortDir>,
@@ -64,21 +64,21 @@ export function createSort<K extends string>(
 }
 
 /**
- * Comparador de texto no idioma do usuário — "Água" tem que cair perto de
- * "Agua", não no fim do alfabeto.
+ * Text comparison in the user's language — "Água" must land next to "Agua",
+ * not at the end of the alphabet.
  */
 export function compareText(a: string, b: string, localeCode: string): number {
   return a.localeCompare(b, localeCode, { sensitivity: "base", numeric: true });
 }
 
 /**
- * Desempate para colunas que podem não ter valor (um vencimento em branco).
+ * Tie-break for columns that may have no value (a blank due date).
  *
- * Ausência não é "menor": ela vai pro FIM nos dois sentidos, senão inverter a
- * ordem encheria o topo da tabela de traços.
+ * Absence is not "smaller": it goes LAST in both directions, otherwise
+ * inverting would fill the top of the table with dashes.
  *
- * Devolve o resultado FINAL do comparador (não multiplique por `sign`), ou
- * `null` quando os dois têm valor — aí quem chamou compara normalmente.
+ * Returns the comparator's FINAL result (do not multiply by `sign`), or `null`
+ * when both have values, leaving the comparison to the caller.
  */
 export function nullsLast(a: unknown, b: unknown): number | null {
   const aEmpty = a === null || a === undefined;

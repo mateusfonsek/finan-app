@@ -12,9 +12,9 @@
 
   const t = locale.t;
 
-  /** Só cria. Editar acontece no painel lateral (`RulePanel`), aberto pela
-   *  linha da lista — um formulário que troca de identidade no meio do uso
-   *  esconde de qual regra ele está falando. */
+  /** Create only. Editing happens in the side panel (`RulePanel`), opened from
+   *  the list row — a form that changes identity mid-use hides which rule it is
+   *  talking about. */
   type Props = {
     categories: Category[];
     onSave: (data: {
@@ -30,7 +30,7 @@
   let rows = $state<PatternRow[]>(rowsFrom([]));
   let categoryId = $state<number | null>(null);
   let priority = $state(0);
-  /** Svelte 5 coage <input type="number"> pra number | null; mantemos compatível. */
+  /** Svelte 5 coerces <input type="number"> to number | null. */
   let dueDayValue = $state<number | null>(null);
   let busy = $state(false);
   let error = $state<string | null>(null);
@@ -77,9 +77,8 @@
     <span class="section-title">{t("rule_form.form_new")}</span>
   </div>
 
-  <!-- A lista de trechos cresce pra baixo, então ganha a própria faixa: num
-       grid de uma linha só ela desalinharia os outros campos a cada trecho
-       adicionado. -->
+  <!-- The snippet list grows downward, so it gets its own band: in a
+       single-row grid it would misalign the other fields on every addition. -->
   <div class="flex flex-col gap-1">
     <span class="text-foot text-fg-subtle">{t("rule_form.patterns_label")}</span>
     <PatternListEditor {rows} onChange={(next) => (rows = next)} />

@@ -16,9 +16,9 @@
 
   let hovered = $state<number | null>(null);
 
-  /** Paleta de tons verde/azul-esverdeado pra distinguir fontes visualmente.
-   *  Fontes não têm color_token persistente (são derivadas da contraparte),
-   *  então geramos as cores deterministicamente pelo índice. */
+  /** Green/teal palette to tell sources apart. Sources have no persistent
+   *  color_token (they are derived from the counterparty), so colours are
+   *  generated deterministically from the index. */
   const PALETTE = [
     "oklch(70% 0.13 145)",
     "oklch(72% 0.12 165)",

@@ -19,10 +19,9 @@
 
   let aboutOpen = $state(false);
 
-  // Estado de rolagem do painel de conteúdo. O cabeçalho de cada tela é
-  // material translúcido fixo no topo; a régua que o separa do conteúdo só
-  // aparece quando existe conteúdo passando por baixo — nunca como uma linha
-  // decorativa permanente.
+  // Scroll state of the content pane. Each screen's header is translucent
+  // material pinned to the top; the rule separating it from the content only
+  // appears when content passes beneath — never as permanent decoration.
   let scroller: HTMLElement | undefined = $state();
   let scrolled = $state(false);
 
@@ -31,22 +30,22 @@
     if (next !== scrolled) scrolled = next;
   }
 
-  /** Trocar de tela sempre começa do topo — como um push de navegação. */
+  /** Switching screens always starts at the top, like a navigation push. */
   function resetScroll() {
     scroller?.scrollTo({ top: 0 });
     scrolled = false;
   }
 
-  // "Abrir com finan": drena os .ofx abertos via Finder, carrega e entrega pra
-  // tela de Importar via o mesmo stash que ela já lê no onMount.
+  // "Open with finan": drains the .ofx opened via Finder, loads them and hands
+  // them to the Import screen through the same stash it already reads.
   async function handleOpenedOfx() {
     const paths = await takePendingOfx();
     for (const path of paths) {
       try {
         await openOfxPath(path);
       } catch {
-        // Arquivo inválido aberto pelo Finder: o Import mostra o erro quando
-        // o usuário tenta de novo. Não vale interromper o boot por isso.
+        // An invalid file opened from Finder: Import shows the error on the
+        // next attempt. Not worth interrupting boot.
       }
     }
   }
@@ -109,12 +108,12 @@
     listen<string>("menu:navigate", (e) => push(e.payload)).then((u) => unlisten.push(u));
     listen("menu:github", () => void openUrl(GITHUB_URL)).then((u) => unlisten.push(u));
     listen("open-ofx", () => void handleOpenedOfx()).then((u) => unlisten.push(u));
-    // Cold start: o arquivo pode já estar na fila antes deste listener existir.
+    // Cold start: the file may already be queued before this listener exists.
     void handleOpenedOfx();
 
-    // Gatilhos de varredura: abertura do app e foco da janela. É o foco que
-    // torna o watcher de filesystem desnecessário — o usuário manda o arquivo
-    // do celular e então vem olhar o Mac.
+    // Scan triggers: app launch and window focus. Focus is what makes a
+    // filesystem watcher unnecessary — the user sends the file from their phone
+    // and then comes to look at the Mac.
     void watch.loadEnabled().then(() => watch.refresh({ force: true }));
     const onFocus = () => void watch.refresh();
     window.addEventListener("focus", onFocus);
@@ -126,8 +125,8 @@
 
 <div class="h-screen grid grid-cols-[236px_1fr] overflow-hidden">
   <Sidebar onAbout={() => (aboutOpen = true)} />
-  <!-- `data-scrolled` alimenta o efeito de borda do cabeçalho fixo: a régua de
-       separação só existe quando há conteúdo passando por baixo dele. -->
+  <!-- `data-scrolled` feeds the sticky header's edge effect: the separating
+       rule only exists when content passes beneath it. -->
   <main
     bind:this={scroller}
     onscroll={onMainScroll}

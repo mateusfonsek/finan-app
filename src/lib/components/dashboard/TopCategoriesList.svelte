@@ -13,6 +13,11 @@
 
   let { items, top = 5 }: Props = $props();
 
+  /** The uncategorized bucket has no name from the backend — `category_id` is
+   *  null and the wording comes from the locale pack. */
+  function labelOf(it: CategorySpend): string {
+    return it.category_id === null ? t("dashboard.no_category") : it.name;
+  }
   let shown = $derived(items.slice(0, top));
   let topValue = $derived(
     shown.reduce((acc, i) => Math.max(acc, Number(i.total) || 0), 0),
@@ -37,10 +42,10 @@
             class="w-2.5 h-2.5 rounded-[3px] shrink-0 translate-y-px"
             style="background: {it.color_token ? `var(${it.color_token})` : 'var(--color-cat-outros)'}"
           ></span>
-          <span class="text-callout text-fg font-medium truncate flex-1 min-w-0">{it.name}</span>
+          <span class="text-callout text-fg font-medium truncate flex-1 min-w-0">{labelOf(it)}</span>
           <span class="text-sub text-fg-muted tabular shrink-0">{formatMoney(it.total)}</span>
         </div>
-        <!-- A barra é comparativa, não absoluta: a maior categoria define 100%. -->
+        <!-- The bar is comparative, not absolute: the largest category is 100%. -->
         <div class="h-1.5 bg-surface-2 rounded-full overflow-hidden">
           <span
             class="block h-full rounded-full transition-[width] duration-[var(--dur-slow)] ease-[var(--ease-snap)]"

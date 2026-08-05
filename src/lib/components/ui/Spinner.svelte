@@ -5,9 +5,9 @@
   const SPOKES = 8;
 </script>
 
-<!-- O indicador de atividade do macOS: raios que desvanecem em sequência.
-     Em "reduzir movimento" a animação para — a forma continua legível como
-     marca de "estou trabalhando", sem oscilação vestibular. -->
+<!-- The macOS activity indicator: spokes fading in sequence. Under "reduce
+     motion" the animation stops — the shape still reads as "working", without
+     vestibular oscillation. -->
 <span
   class="inline-block relative shrink-0 {className}"
   style="width: {size}px; height: {size}px"

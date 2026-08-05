@@ -62,8 +62,8 @@ pub fn seed_from_pack(conn: &Connection, pack: &LocalePack) -> AppResult<()> {
     }
 
     for r in &pack.rules.seed_rules {
-        // Regra semeada nasce com um único trecho; o usuário adiciona outros
-        // pela tela de Regras.
+        // A seeded rule starts with a single snippet; more are added from the
+        // Rules screen.
         let inserted = conn.execute(
             "INSERT INTO rules (category_id, priority, due_day, display_name)
              SELECT c.id, ?1, NULL, ?2 FROM categories c

@@ -8,7 +8,7 @@
   const t = locale.t;
 
   type Props = {
-    /** "YYYY-MM" = mês específico, "YYYY" = ano inteiro, null = todos os períodos */
+    /** "YYYY-MM" = one month, "YYYY" = a whole year, null = all periods */
     month: string | null;
     onChange: (m: string | null) => void;
   };
@@ -38,7 +38,8 @@
     !month || month.length === 7 ? "month" : "year",
   );
 
-  // Se a store vier null (legado), normaliza pro mês atual sem expor o "all" no UI.
+  // A null from the store (legacy) normalizes to the current month without
+  // exposing "all" in the UI.
   $effect(() => {
     if (month === null) {
       const y = currentYear();
@@ -54,7 +55,7 @@
     if (mo === "month" && m && m.length === 7) {
       return `${monthShort(Number(m.slice(5, 7)) - 1)} ${m.slice(0, 4)}`;
     }
-    // fallback: mês atual (enquanto $effect ainda não normalizou)
+    // Fallback: current month, while the $effect has not normalized yet.
     return `${monthShort(currentMonth() - 1)} ${currentYear()}`;
   }
 
@@ -87,7 +88,7 @@
   const POPOVER_MARGIN = 8;
   let popoverStyle = $state("");
 
-  /** Calcula a posição do popover relativa ao trigger button. Síncrono. */
+  /** Popover position relative to the trigger button. Synchronous. */
   function computePopoverStyle(): string {
     if (!triggerEl) return "";
     const r = triggerEl.getBoundingClientRect();
@@ -173,7 +174,7 @@
 </script>
 
 <div class="inline-flex items-center gap-1.5 relative">
-  <!-- Controle segmentado do macOS: ‹ rótulo › numa moldura só. -->
+  <!-- macOS segmented control: ‹ label › in a single frame. -->
   <div
     class="inline-flex items-center gap-0.5 h-7 px-0.5 rounded-[var(--radius-md)] border border-border
            bg-surface-2 shadow-[var(--shadow-raised)]"
@@ -214,7 +215,7 @@
   </button>
 
   {#if pickerOpen}
-    <!-- Cresce a partir do botão que o abriu, não do próprio centro. -->
+    <!-- Grows from the button that opened it, not from its own centre. -->
     <div
       bind:this={popoverEl}
       use:portal

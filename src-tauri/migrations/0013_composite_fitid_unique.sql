@@ -1,14 +1,14 @@
--- Migration 0013: chave única composta para transactions.
+-- Composite unique key for transactions.
 --
--- Motivação: Nubank reusa o mesmo FITID em transações semanticamente distintas
--- (compra original num mês, estorno dela no mês seguinte; IOF + valor principal
--- da mesma compra; parcelas N/12 e (N+1)/12 do mesmo plano). A UNIQUE original
--- `(account_id, ofx_fitid)` da migration 0001 trata colisões como duplicatas e
--- impede que ambas as pernas convivam — resultado: extrato fica meio importado,
--- KPIs distorcem (renda fantasma do estorno sem o gasto original, ou vice-versa).
+-- Nubank reuses the same FITID across semantically distinct transactions (a
+-- purchase one month and its refund the next; IOF plus the principal of one
+-- purchase; instalments N/12 and (N+1)/12 of one plan). The original
+-- `(account_id, ofx_fitid)` UNIQUE from 0001 treats those collisions as
+-- duplicates and blocks both legs — leaving a half-imported statement and
+-- skewed KPIs (phantom income from a refund with no original expense).
 --
--- Aqui relaxamos: duas linhas com mesmo FITID mas valor ou data diferentes são
--- transações distintas. SQLite não tem DROP CONSTRAINT, então recriamos a tabela.
+-- Relaxed here: two rows with the same FITID but a different amount or date are
+-- distinct transactions. SQLite has no DROP CONSTRAINT, so the table is rebuilt.
 
 CREATE TABLE transactions_new (
   id INTEGER PRIMARY KEY,

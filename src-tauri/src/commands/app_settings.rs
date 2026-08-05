@@ -1,6 +1,6 @@
-//! Preferências simples do app em chave/valor. Nasceu pro `watch_enabled` da
-//! importação automática, mas é genérico de propósito — prefs futuras entram
-//! aqui em vez de virar coluna nova em algum lugar.
+//! Simple key/value app preferences. Born for automatic import's
+//! `watch_enabled`, but deliberately generic — future preferences land here
+//! instead of becoming a new column somewhere.
 
 use rusqlite::{params, Connection, OptionalExtension};
 use tauri::State;
@@ -80,6 +80,6 @@ mod tests {
         let rows: i64 = conn
             .query_row("SELECT COUNT(*) FROM app_settings", [], |r| r.get(0))
             .unwrap();
-        assert_eq!(rows, 1, "upsert não pode duplicar a chave");
+        assert_eq!(rows, 1, "upsert must not duplicate the key");
     }
 }

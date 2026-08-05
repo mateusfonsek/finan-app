@@ -4,22 +4,22 @@ use specta::Type;
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 pub struct Rule {
     pub id: i64,
-    /// Trechos procurados na descrição, em OR: a regra casa quando a descrição
-    /// contém QUALQUER um deles. Sempre com pelo menos um item.
+    /// Snippets searched in the description, OR'd: the rule matches when the
+    /// description contains ANY of them. Never empty.
     pub patterns: Vec<String>,
     pub category_id: i64,
     pub priority: i32,
-    /// Dia do mês (1-31) em que a obrigação vence. NULL = sem prazo —
-    /// a regra só aparece no calendário quando casa com uma transação.
+    /// Day of month (1-31) the bill is due. NULL means no due date — the rule
+    /// only shows on the calendar when it matches a transaction.
     pub due_day: Option<i32>,
-    /// Rótulo amigável da regra (ex: razão social vinda do CNPJ). NULL
-    /// = nenhum rótulo definido; a UI cai pro primeiro pattern.
+    /// Friendly label (e.g. legal name from a CNPJ lookup). NULL means none,
+    /// and the UI falls back to the first pattern.
     pub display_name: Option<String>,
     pub created_at: String,
 }
 
-/// Uma regra + quantas transações ela alcança. Serve à tela de Regras, onde a
-/// pergunta é "essa regra está pegando alguma coisa?".
+/// A rule plus how many transactions it reaches — for the Rules screen, where
+/// the question is "is this rule catching anything?".
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 pub struct RuleWithCount {
     pub id: i64,
@@ -29,55 +29,53 @@ pub struct RuleWithCount {
     pub due_day: Option<i32>,
     pub display_name: Option<String>,
     pub created_at: String,
-    /// Transações cuja descrição casa QUALQUER trecho da regra, independente
-    /// da categoria em que estão hoje. É alcance, não autoria: uma transação
-    /// que você categorizou na mão continua contando, e uma que outra regra de
-    /// prioridade maior levou também.
+    /// Transactions whose description matches ANY of the rule's snippets,
+    /// regardless of their current category. This is reach, not authorship: a
+    /// manually categorized transaction still counts, and so does one a
+    /// higher-priority rule took.
     pub transaction_count: u32,
 }
 
-/// Uma mudança que aplicar as regras causaria numa transação. É o material da
-/// tela de revisão: nada é gravado até o usuário escolher.
+/// A change applying the rules would cause. Material for the review screen —
+/// nothing is written until the user chooses.
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 pub struct RulePreviewRow {
     pub transaction_id: i64,
     pub date: String,
-    /// Decimal como string, igual ao resto do app. Nunca f64.
+    /// Decimal as string, like everywhere else. Never f64.
     pub amount: String,
     pub description: String,
-    /// `None` = a transação está sem categoria. Qualquer outra coisa significa
-    /// que aplicar a regra SUBSTITUI a categoria atual.
+    /// `None` means uncategorized. Anything else means applying the rule
+    /// REPLACES the current category.
     ///
-    /// Atenção: o banco não registra quem definiu a categoria, então isto não
-    /// distingue "você escolheu na mão" de "uma regra anterior definiu". A UI
-    /// não pode afirmar autoria — só que existe categoria e ela mudaria.
+    /// Note: the DB does not record who set the category, so this cannot tell
+    /// "the user picked it" from "an earlier rule set it". The UI must not
+    /// claim authorship — only that a category exists and would change.
     pub current_category_id: Option<i64>,
     pub new_category_id: i64,
     pub rule_id: i64,
-    /// Rótulo da regra que venceu: `display_name` quando existe, senão o trecho
-    /// que de fato casou esta descrição.
+    /// Label of the winning rule: `display_name` when set, otherwise the
+    /// snippet that actually matched this description.
     pub rule_label: String,
 }
 
-/// As transações que uma regra alcança, com o total somado.
+/// The transactions a rule reaches, plus their total.
 ///
-/// "Alcança" é o mesmo critério da contagem em [`RuleWithCount`]: casa qualquer
-/// trecho da regra, independente da categoria em que a transação está hoje. Os
-/// dois PRECISAM concordar — o número da tabela é o que promete o conteúdo
-/// desta lista.
+/// "Reach" is the same criterion as the count in [`RuleWithCount`], and the two
+/// MUST agree — the number in the table is what promises this list's contents.
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 pub struct RuleMatches {
     pub transactions: Vec<crate::domain::transaction::Transaction>,
-    /// Soma dos valores. Decimal como string, somado com `rust_decimal` — nunca
-    /// em f64, que acumularia erro numa lista longa.
+    /// Sum of the amounts, added with `rust_decimal` — never f64, which would
+    /// accumulate error over a long list.
     pub total: String,
 }
 
-/// Escolha do usuário na tela de revisão: esta transação vai pra esta categoria.
+/// A user's choice on the review screen: this transaction goes to this
+/// category.
 ///
-/// A categoria vem explícita em vez de recalculada no momento de aplicar — se
-/// as regras mudarem entre a revisão e o clique, grava-se o que foi revisado, e
-/// não uma surpresa.
+/// The category is explicit rather than recomputed at apply time — if rules
+/// change between review and click, what was reviewed is what gets written.
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 pub struct RuleChoice {
     pub transaction_id: i64,
@@ -104,13 +102,13 @@ pub struct UpdateRule {
     pub display_name: Option<String>,
 }
 
-/// Evento que aparece no calendário: combinação de uma regra
-/// + (opcional) dia de vencimento + (opcional) transação que casou.
+/// A calendar event: a rule plus an optional due day plus an optional matching
+/// transaction.
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 pub struct CalendarEvent {
     pub rule_id: i64,
-    /// O trecho que de fato casou a transação — ou o primeiro da regra, quando
-    /// o evento existe só pelo `due_day` e nada casou ainda.
+    /// The snippet that actually matched — or the rule's first one, when the
+    /// event exists only because of `due_day` and nothing matched yet.
     pub pattern: String,
     pub category_name: String,
     pub category_color_token: Option<String>,

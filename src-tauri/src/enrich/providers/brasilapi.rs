@@ -35,7 +35,7 @@ impl TaxIdProvider for BrasilApi {
     fn lookup(&self, tax_id_digits: &str) -> AppResult<Company> {
         if tax_id_digits.len() != CNPJ_DIGITS {
             return Err(AppError::Invalid(format!(
-                "CNPJ inválido: {tax_id_digits}"
+                "invalid CNPJ: {tax_id_digits}"
             )));
         }
         let url = format!("{BASE_URL}/{tax_id_digits}");

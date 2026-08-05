@@ -14,8 +14,8 @@
 
   let { items, total, size = 148 }: Props = $props();
 
-  /** Fatia sob o cursor: destacar no anel E na legenda ao mesmo tempo mostra
-   *  que os dois são a mesma coisa vista de dois jeitos. */
+  /** Slice under the cursor: highlighting the ring AND the legend at once
+   *  shows they are the same thing seen two ways. */
   let hovered = $state<number | null>(null);
 
   let gradient = $derived(buildGradient(items));
@@ -39,6 +39,12 @@
 
   function colorOf(it: CategorySpend): string {
     return it.color_token ? `var(${it.color_token})` : "var(--color-cat-outros)";
+  }
+
+  /** The uncategorized bucket has no name from the backend — `category_id` is
+   *  null and the wording comes from the locale pack. */
+  function labelOf(it: CategorySpend): string {
+    return it.category_id === null ? t("dashboard.no_category") : it.name;
   }
 </script>
 
@@ -78,8 +84,8 @@
           ></span>
           <div class="flex-1 min-w-0 flex flex-col">
             <div class="flex items-baseline gap-2">
-              <span class="text-sub text-fg font-medium truncate flex-1 min-w-0" title={it.name}>
-                {it.name}
+              <span class="text-sub text-fg font-medium truncate flex-1 min-w-0" title={labelOf(it)}>
+                {labelOf(it)}
               </span>
               <span class="text-cap tabular text-fg-subtle shrink-0">{it.percent.toFixed(1)}%</span>
             </div>

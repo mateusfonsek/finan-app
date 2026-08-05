@@ -16,8 +16,8 @@
   let closeEl: HTMLButtonElement | undefined = $state();
   let panelEl: HTMLElement | undefined = $state();
 
-  /** A versão vem do binário, não de um literal no template: era daí que vinha
-   *  o "v0.2.0" desatualizado que a janela mostrava. */
+  /** The version comes from the binary, not a literal in the template — that
+   *  is where the stale "v0.2.0" this window used to show came from. */
   let version = $state<string | null>(null);
 
   let specs = $derived(
@@ -31,7 +31,7 @@
       onClose();
       return;
     }
-    // Tarefa modal: o foco não escapa da janela enquanto ela está aberta.
+    // Modal task: focus does not escape the dialog while it is open.
     if (e.key === "Tab" && panelEl) {
       const focusables = panelEl.querySelectorAll<HTMLElement>(
         "button, [href], input, select, textarea, [tabindex]:not([tabindex='-1'])",
@@ -62,9 +62,9 @@
 <svelte:window {onkeydown} />
 
 {#if open}
-  <!-- Tarefa modal: o fundo é escurecido e empurrado pra trás. A janela
-       materializa no centro (escala + opacidade juntas) e desmaterializa pelo
-       mesmo caminho. -->
+  <!-- Modal task: the background is dimmed and pushed back. The window
+       materializes in place (scale and opacity together) and dematerializes by
+       the same path. -->
   <button
     type="button"
     aria-label={t("common.close")}
@@ -120,7 +120,7 @@
 
         <div class="hairline"></div>
 
-        <!-- ficha técnica -->
+        <!-- spec sheet -->
         <dl class="px-10 py-6 grid grid-cols-[auto_1fr] gap-x-6 gap-y-3 items-baseline">
           {#each specs as s}
             <dt class="text-callout font-semibold text-accent whitespace-nowrap">{s.label}</dt>
@@ -130,7 +130,7 @@
 
         <div class="hairline"></div>
 
-        <!-- colofão -->
+        <!-- colophon -->
         <div class="px-10 pt-6 flex flex-col gap-3.5">
           <div class="flex items-baseline justify-between gap-3">
             <span class="text-body font-medium text-fg">Mateus Fonseca</span>

@@ -1,14 +1,14 @@
 use std::sync::Mutex;
 use tauri::State;
 
-/// Fila de caminhos de arquivos `.ofx` abertos via Finder ("Abrir com finan")
-/// que ainda não foram consumidos pelo frontend. Necessária pro cold start: o
-/// arquivo chega no `RunEvent::Opened` antes do frontend montar os listeners.
+/// Queue of `.ofx` paths opened via Finder ("Open with finan") that the
+/// frontend has not consumed yet. Needed for cold start: the file arrives in
+/// `RunEvent::Opened` before the frontend mounts its listeners.
 #[derive(Default)]
 pub struct PendingOpen(pub Mutex<Vec<String>>);
 
-/// Drena (retorna e limpa) os caminhos pendentes. O frontend chama isso ao
-/// montar e a cada evento `open-ofx`.
+/// Drains the pending paths. The frontend calls this on mount and on every
+/// `open-ofx` event.
 #[tauri::command]
 #[specta::specta]
 pub fn take_pending_ofx(pending: State<'_, PendingOpen>) -> Vec<String> {

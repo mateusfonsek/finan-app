@@ -44,8 +44,8 @@
     return id === null ? undefined : categories.find((c) => c.id === id);
   }
 
-  /** "2026-08-14" → "14 ago". O ano só entra quando não é o corrente — numa
-   *  lista longa ele repete sem ajudar a identificar a linha. */
+  /** "2026-08-14" becomes "14 ago". The year only appears when it is not the
+   *  current one: in a long list it repeats without helping identify the row. */
   function fmtDate(iso: string): string {
     const mo = Number(iso.slice(5, 7)) - 1;
     const year = iso.slice(0, 4);
@@ -59,7 +59,7 @@
       onClose();
       return;
     }
-    // Tarefa modal: o foco não escapa da janela enquanto ela está aberta.
+    // Modal task: focus does not escape the dialog while it is open.
     if (e.key === "Tab" && panelEl) {
       const focusables = panelEl.querySelectorAll<HTMLElement>(
         "button, [href], input, select, textarea, [tabindex]:not([tabindex='-1'])",
@@ -80,9 +80,9 @@
 
 <svelte:window {onkeydown} />
 
-<!-- Este modal abre POR CIMA do painel de edição da regra, que continua atrás.
-     Véu próprio e z acima do painel: a pilha fica clara, e fechar aqui devolve
-     você exatamente pra regra que estava editando. -->
+<!-- This dialog opens ON TOP of the rule edit panel, which stays behind. Its
+     own scrim and a higher z: the stack stays clear, and closing here returns
+     you to exactly the rule you were editing. -->
 <button
   type="button"
   aria-label={t("common.close")}
@@ -110,8 +110,8 @@
             {t("rule_matches.title")} “{label}”
           </h2>
           {#if data}
-            <!-- Contagem e total juntos: quantas vezes essa regra pega, e
-                 quanto dinheiro isso representa. -->
+            <!-- Count and total together: how often the rule catches, and how
+                 much money that represents. -->
             <p class="text-sub text-fg-subtle tabular">
               {data.transactions.length === 1
                 ? t("rule_matches.count_one")
@@ -158,8 +158,8 @@
               <span class="flex-1 min-w-0 text-callout text-fg truncate" title={tx.description}>
                 {tx.description}
               </span>
-              <!-- A categoria de cada linha é o que denuncia uma regra pegando
-                   o que não devia. -->
+              <!-- Each row's category is what exposes a rule catching what it
+                   should not. -->
               {#if cat}
                 <span class="chip text-fg-muted shrink-0">
                   <span

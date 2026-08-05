@@ -1,12 +1,12 @@
 /**
- * Conjunto de símbolos da interface.
+ * The interface's symbol set.
  *
- * Desenhos da Lucide (ISC), embutidos como dados em vez de importados do
- * pacote: o app se orgulha de ser leve, e aqui entram só os símbolos que a
- * interface realmente usa — sem árvore de 1.500 componentes atrás.
+ * Lucide drawings (ISC), embedded as data rather than imported from the
+ * package: the app takes pride in being small, and only the symbols the
+ * interface actually uses live here — no 1,500-component tree behind them.
  *
- * Grid de 24, traço variável: peso fino para símbolos decorativos, mais firme
- * quando o símbolo carrega significado sozinho (estado, ação destrutiva).
+ * 24 grid, variable stroke: thin for decorative symbols, firmer when the symbol
+ * carries meaning alone (state, destructive action).
  */
 
 export type IconNode = Array<[string, Record<string, string | number>]>;
@@ -74,9 +74,9 @@ export const ICONS = {
     ["path", {"d":"m7 15 5 5 5-5"}],
     ["path", {"d":"m7 9 5-5 5 5"}],
   ],
-  // Ranking: a seta sobe e as barras crescem. Escolhido em vez de um duplo
-  // chevron porque este último já é o indicador de ordenação — dois glifos
-  // parecidos lado a lado no mesmo cabeçalho não diriam coisas diferentes.
+  // Ranking: the arrow rises and the bars grow. Chosen over a double
+  // chevron, because that is already the sort indicator — two similar glyphs
+  // side by side in one header would not read as different things.
   "arrowUpNarrowWide": [
     ["path", {"d":"m3 8 4-4 4 4"}],
     ["path", {"d":"M7 4v16"}],

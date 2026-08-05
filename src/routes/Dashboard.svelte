@@ -84,7 +84,8 @@
     await refresh();
   }
 
-  /** Movimentação bruta = entradas reais + transferências/investimentos in. Para reconciliar com cálculo manual. */
+  /** Gross movement = real inflows plus incoming transfers and investments, so
+   *  the reconciliation panel can match a manual calculation. */
   let grossInflow = $derived.by(() => {
     if (!kpis || !investments || !transfers) return 0;
     return Number(kpis.income) + Number(investments.resgatado_no_mes) + Number(transfers.total_in);
@@ -112,7 +113,8 @@
     <ErrorNote message={error} />
   {:else}
     {#if kpis}
-      <!-- KPIs principais: só contam gasto/renda REAL. A legenda explica o que NÃO entra. -->
+      <!-- Headline KPIs count only REAL spending and income. The caption says
+           what is left out. -->
       <div class="grid grid-cols-4 gap-3" in:rise>
         <KpiCard
           label={t("dashboard.kpi_income")}
@@ -139,8 +141,8 @@
         />
       </div>
 
-      <!-- Reconciliação: mostra que a matemática fecha. Duas colunas independentes,
-           cada uma com seu próprio fluxo bruto → exclusões → resultado real. -->
+      <!-- Reconciliation: shows the maths adds up. Two independent columns,
+           each with its own gross flow, exclusions and real result. -->
       {#if (transfers && transfers.count > 0) || (investments && (investments.aplicacoes_count + investments.resgates_count) > 0)}
         <details class="card px-4 py-2.5 group">
           <summary class="text-sub text-fg-muted flex items-center gap-2 list-none marker:hidden
@@ -212,8 +214,8 @@
       {/if}
     {/if}
 
-    <!-- Seção dedicada de Investimentos (kind=transfer + is_investment=1).
-         A borda tingida marca que este dinheiro vive fora da conta de gasto/renda. -->
+    <!-- Dedicated investments section (kind=transfer + is_investment=1). The
+         tinted border marks that this money lives outside spending/income. -->
     {#if investments && investments.aplicacoes_count + investments.resgates_count > 0}
       <Card
         title={t("dashboard.investments")}
@@ -255,8 +257,8 @@
       </Card>
     {/if}
 
-    <!-- Donut Gastos + Painel Fontes de Renda lado a lado, visualmente simétricos:
-         um pra onde o dinheiro foi (categorias), outro pra de onde veio (fontes). -->
+    <!-- Spending donut and income sources side by side, visually symmetric:
+         one for where the money went, one for where it came from. -->
     <div class="grid grid-cols-2 gap-4">
       <Card
         title={t("dashboard.spend_by_category")}
@@ -276,7 +278,7 @@
       </Card>
     </div>
 
-    <!-- Tendência mensal: barras dos últimos 12 meses (largura total). -->
+    <!-- Monthly trend: the last 12 months as bars, full width. -->
     <Card title={t("dashboard.last_12m")}>
       {#snippet actions()}
         <div class="text-cap text-fg-subtle flex gap-3 shrink-0">

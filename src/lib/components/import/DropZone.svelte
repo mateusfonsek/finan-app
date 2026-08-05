@@ -36,20 +36,19 @@
     try {
       await setAppSetting(WATCH_HINT_DISMISSED_KEY, "1");
     } catch {
-      // Este componente não tem superfície de erro (não é um fluxo de import
-      // que já mostra `error`) — dispensar a isca é cosmético, não vale um
-      // toast. Mas se a escrita falhar silenciosamente, `hintDismissed` local
-      // ficaria mentindo: a isca reaparece no próximo boot (nunca foi salva)
-      // enquanto o usuário acha que já dispensou. Desfazer o otimismo local
-      // mantém a UI honesta com o disco, sem inventar uma superfície de erro
-      // nova só pra isso.
+      // This component has no error surface (it is not an import flow already
+      // showing `error`), and dismissing the hint is cosmetic — not worth a
+      // toast. But if the write fails silently, a local `hintDismissed` would
+      // lie: the hint returns on the next boot (it was never saved) while the
+      // user believes it was dismissed. Undoing the optimistic update keeps the
+      // UI honest with disk without inventing a new error surface.
       hintDismissed = false;
     }
   }
 
-  // Drag-and-drop nativo: o Tauri intercepta o drop do Finder e entrega só o
-  // caminho (não um File), via evento da webview. Lemos os bytes e reusamos o
-  // mesmo pipeline do file picker construindo um File a partir deles.
+  // Native drag-and-drop: Tauri intercepts the Finder drop and delivers only
+  // the path (not a File), via a webview event. The bytes are read and a File is
+  // built from them so the file-picker pipeline is reused.
   async function handlePath(path: string) {
     try {
       const bytes = await readFileBytes(path);
@@ -118,8 +117,9 @@
   }
 </script>
 
-<!-- A zona reage ao arraste ANTES do drop: a moldura acende, o ícone sobe e a
-     superfície ganha o acento. O alvo confirma que aceitou antes de soltar. -->
+<!-- The zone reacts to the drag BEFORE the drop: the frame lights up, the icon
+     rises and the surface takes the accent. The target confirms it accepts
+     before you let go. -->
 <div
   role="button"
   tabindex="0"
@@ -171,8 +171,9 @@
 </div>
 
 {#if !watch.enabled && !hintDismissed}
-  <!-- Fora da dropzone: o elemento acima tem onclick pro file picker, então a
-       isca precisa ser irmã, não filha, senão o clique nela abriria o picker. -->
+  <!-- Outside the dropzone: the element above has an onclick for the file
+       picker, so the hint must be a sibling, not a child, or clicking it would
+       open the picker. -->
   <div class="flex items-center justify-center gap-1 mt-3 text-sub text-fg-subtle">
     <button
       type="button"

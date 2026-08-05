@@ -12,8 +12,8 @@
 
   type NavItem = { href: string; labelKey: string; sectionKey: string; icon: IconName };
 
-  // Um símbolo por destino: numa barra lateral do macOS o ícone é o que o olho
-  // encontra primeiro; o rótulo confirma.
+  // One symbol per destination: in a macOS sidebar the icon is what the eye
+  // finds first; the label confirms.
   const navItems: NavItem[] = [
     { sectionKey: "overview", href: "/dashboard", labelKey: "dashboard", icon: "chartPie" },
     { sectionKey: "overview", href: "/transactions", labelKey: "transactions", icon: "arrowLeftRight" },
@@ -34,9 +34,9 @@
   let settingsActive = $derived(router.location === "/settings");
 </script>
 
-<!-- A faixa do topo é área de arraste da janela: com `titleBarStyle: Overlay`
-     os semáforos do macOS flutuam sobre esta coluna, como em Mail, Notas e
-     Finder. O padding superior é o espaço reservado pra eles. -->
+<!-- The top strip is the window drag area: with `titleBarStyle: Overlay` the
+     macOS traffic lights float over this column, as in Mail, Notes and Finder.
+     The top padding is the space reserved for them. -->
 <aside
   data-tauri-drag-region="deep"
   class="bg-sidebar border-r border-border-subtle flex flex-col px-2.5 pb-3 select-none overflow-hidden"
@@ -92,8 +92,8 @@
                 watch.pendingCount === 1
                   ? t("watch.badge_pending_one", { n: watch.pendingCount })
                   : t("watch.badge_pending_many", { n: watch.pendingCount })}
-              <!-- Sozinho, o número não diz nada a quem usa leitor de tela: só
-                   um dígito solto no meio do menu. -->
+              <!-- Alone, the number says nothing to a screen reader: just a
+                   loose digit in the middle of the menu. -->
               <span
                 class="min-w-[17px] h-[17px] px-1 rounded-full grid place-items-center tabular text-cap2 font-semibold
                        {active ? 'bg-accent-on/25 text-accent-on' : 'bg-accent text-accent-on'}"

@@ -84,9 +84,9 @@ pub fn list_transactions(
 
 /// Insert a batch of new transactions. Returns counts of inserted vs skipped (duplicates).
 /// Dedup happens via UNIQUE(account_id, ofx_fitid, date, amount) + INSERT OR IGNORE.
-/// A tripla casa transações realmente idênticas — mesmo FITID com valor ou data
-/// diferentes (caso típico do Nubank: compra original + estorno) entra como tx
-/// distinta.
+/// The triple matches genuinely identical transactions — the same FITID with a
+/// different amount or date (typical Nubank case: original purchase plus
+/// refund) is stored as a distinct tx.
 #[tauri::command]
 #[specta::specta]
 pub fn insert_transactions(
@@ -138,11 +138,10 @@ pub fn insert_transactions(
     })
 }
 
-/// Maiores gastos do mês (ou de todo o histórico, se `month` for None).
-/// Filtros: amount < 0 (saídas), categoria com `kind != 'transfer'` (exclui
-/// pagamento de fatura, transferências internas, aplicações em investimento).
-/// Ordem: do mais caro pro mais barato (CAST AS REAL ASC porque amounts são
-/// negativos — quanto menor o número, maior o gasto).
+/// The month's largest expenses (or all-time when `month` is None).
+/// Filters: amount < 0, category `kind != 'transfer'` (excludes bill payments,
+/// internal transfers and investment deposits). Ordered most to least expensive
+/// (CAST AS REAL ASC, since amounts are negative).
 #[tauri::command]
 #[specta::specta]
 pub fn top_expenses(
@@ -181,10 +180,10 @@ pub fn top_expenses(
         .map_err(AppError::from)
 }
 
-/// Dado uma lista de triplas `(fitid, date, amount)`, devolve o subconjunto que
-/// já existe nessa conta. O FE usa a tripla como chave de "duplicada" porque a
-/// UNIQUE da tabela é composta — mesmo FITID com valor/data diferentes é uma
-/// transação distinta (e.g., compra original vs estorno).
+/// Given `(fitid, date, amount)` triples, returns the subset already present in
+/// this account. The frontend uses the triple as the duplicate key because the
+/// table's UNIQUE is composite — the same FITID with a different amount/date is a
+/// distinct transaction (e.g. an original purchase vs its refund).
 #[tauri::command]
 #[specta::specta]
 pub fn check_existing_tx_keys(
@@ -381,8 +380,8 @@ mod tests {
         let txs = vec![mk("F1", "10"), mk("F2", "20"), mk("F3", "30")];
         raw_insert_batch(&mut conn, acc, &txs);
 
-        // Match exata pela tripla (fitid, date, amount). F4 não existe; F1 com
-        // amount errado não casa; F1 com a tripla certa casa.
+        // Exact match on the triple. F4 does not exist; F1 with the wrong
+        // amount does not match; F1 with the right triple does.
         let mut stmt = conn
             .prepare(
                 "SELECT 1 FROM transactions
@@ -405,10 +404,9 @@ mod tests {
 
     #[test]
     fn same_fitid_different_amount_is_not_duplicate() {
-        // Caso real Nubank: compra original (DEBIT -108.14) e estorno dela
-        // (CREDIT +108.14) compartilham o FITID mas têm sinais opostos. Com a
-        // UNIQUE composta `(account_id, ofx_fitid, date, amount)`, ambos devem
-        // entrar — não são duplicatas.
+        // Real Nubank case: a purchase (DEBIT -108.14) and its refund
+        // (CREDIT +108.14) share a FITID but have opposite signs. With the
+        // composite UNIQUE both must be inserted — they are not duplicates.
         let mut conn = fresh_conn();
         let acc = insert_account(&conn, "test", Some("ACC1"));
         let mut original = mk("SHARED", "-108.14");
@@ -422,9 +420,9 @@ mod tests {
 
     #[test]
     fn top_expenses_filters_orders_and_limits() {
-        // 4 saídas + 1 entrada + 1 transferência. Top 2 deve trazer só as duas
-        // maiores saídas (em valor absoluto), em ordem decrescente; exclui a
-        // entrada e a transferência.
+        // 4 outflows + 1 inflow + 1 transfer. Top 2 must return only the two
+        // largest outflows by absolute value, descending; the inflow and the
+        // transfer are excluded.
         let mut conn = fresh_conn();
         let acc = insert_account(&conn, "test", Some("ACC1"));
         let mut e1 = mk("F1", "-50.00");
@@ -476,8 +474,8 @@ mod tests {
 
     #[test]
     fn same_fitid_same_amount_same_date_is_duplicate() {
-        // Duas linhas idênticas em (fitid, date, amount) continuam batendo como
-        // duplicata — INSERT OR IGNORE descarta a segunda.
+        // Two rows identical in (fitid, date, amount) still count as duplicates
+        // — INSERT OR IGNORE drops the second.
         let mut conn = fresh_conn();
         let acc = insert_account(&conn, "test", Some("ACC1"));
         let txs = vec![mk("F1", "10.00"), mk("F1", "10.00")];

@@ -33,8 +33,8 @@ export async function insertTransactions(
   return unwrap(await commands.insertTransactions(accountId, txs));
 }
 
-/** Chave composta usada pra detectar duplicatas. Pipe é seguro porque FITID é
- *  UUID, date é ISO e amount é decimal — nenhum contém `|`. */
+/** Composite key for duplicate detection. The pipe is safe because FITID is a
+ *  UUID, date is ISO and amount is decimal — none contains `|`. */
 export function txKeyString(k: TxKey): string {
   return `${k.ofx_fitid}|${k.date}|${k.amount}`;
 }

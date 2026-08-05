@@ -32,7 +32,7 @@ pub struct InsertResult {
     pub auto_categorized: u32,
 }
 
-/// Tripla usada pra dedup contra a UNIQUE composta
+/// Triple used to dedupe against the composite UNIQUE
 /// `(account_id, ofx_fitid, date, amount)` da tabela `transactions`.
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 pub struct TxKey {
@@ -41,8 +41,8 @@ pub struct TxKey {
     pub amount: String,
 }
 
-/// Linha do widget "Maiores gastos do mês" — transação com categoria
-/// resolvida inline (nome + token de cor) pra evitar segundo round-trip.
+/// A row in the "largest expenses" widget — a transaction with its category
+/// resolved inline (name plus colour token) to avoid a second round-trip.
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 pub struct ExpenseRow {
     pub id: i64,

@@ -4,10 +4,10 @@
   import type { IconName } from "./icons";
 
   type Props = {
-    /** Um símbolo diz o que a frase já disse, mais rápido. */
+    /** A symbol says what the sentence says, faster. */
     icon?: IconName;
     title: string;
-    /** O que fazer a seguir — vazio sem saída é beco sem saída. */
+    /** What to do next — an empty state with no exit is a dead end. */
     description?: string;
     action?: Snippet;
     compact?: boolean;

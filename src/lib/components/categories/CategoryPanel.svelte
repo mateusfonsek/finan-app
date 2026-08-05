@@ -28,8 +28,8 @@
   let error = $state<string | null>(null);
   let nameInput: HTMLInputElement | undefined = $state();
 
-  // Recarrega o rascunho quando o painel troca de categoria (clicar noutra
-  // linha com o painel aberto).
+  // Reloads the draft when the panel switches categories (clicking another row
+  // while it is open).
   $effect(() => {
     name = category.name;
     kind = (category.kind ?? "expense") as "expense" | "income" | "transfer";
@@ -37,8 +37,8 @@
     error = null;
   });
 
-  /** Foco no nome assim que o painel abre: é onde a edição começa, e sem isso
-   *  sobraria um clique intermediário. */
+  /** Focus the name as soon as the panel opens: that is where editing starts,
+   *  and without it an extra click would be needed. */
   $effect(() => {
     void category.id;
     void (async () => {
@@ -72,7 +72,7 @@
       e.preventDefault();
       onClose();
     }
-    // ⌘↩ salva — mesmo atalho dos outros painéis de edição.
+    // Cmd+Enter saves — same shortcut as the other edit panels.
     if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
       e.preventDefault();
       void save();
@@ -82,9 +82,9 @@
 
 <svelte:window {onkeydown} />
 
-<!-- Mesmo par véu + folha dos painéis de regra e de transação: entra pela
-     direita, sai pela direita. Véu leve porque a tarefa é focada, não
-     bloqueante. -->
+<!-- Same scrim + sheet pair as the rule and transaction panels: enters from
+     the right, leaves to the right. Light scrim because the task is focused,
+     not blocking. -->
 <button
   type="button"
   aria-label={t("common.close")}
@@ -118,9 +118,9 @@
   </header>
 
   <div class="flex-1 overflow-y-auto">
-    <!-- O assunto do painel é a categoria como ela aparece no resto do app:
-         a cor e o nome acompanham o que está sendo digitado, então dá pra ver
-         o resultado antes de salvar. -->
+    <!-- The panel's subject is the category as it appears everywhere else: the
+         colour and name follow what is being typed, so the result is visible
+         before saving. -->
     <div class="px-4 pt-4 pb-3 flex flex-col gap-1.5">
       <span class="flex items-center gap-2.5 min-w-0">
         <span
@@ -160,8 +160,8 @@
           <option value="income">{t("kind.income")}</option>
           <option value="transfer">{t("kind.transfer")}</option>
         </select>
-        <!-- Dica visível em vez de tooltip: quem não passa o mouse por cima
-             também precisa entender o que o campo decide. -->
+        <!-- A visible hint rather than a tooltip: anyone not hovering also
+             needs to understand what the field decides. -->
         <span class="text-cap text-fg-faint leading-snug">{t("category_panel.kind_hint")}</span>
       </label>
 

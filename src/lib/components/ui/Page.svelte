@@ -3,11 +3,11 @@
 
   type Props = {
     title: string;
-    /** Uma linha de contexto sob o título. Frase curta, sem jargão. */
+    /** One line of context under the title. Short, no jargon. */
     subtitle?: string;
-    /** Controles da tela, à direita do título. */
+    /** Screen controls, right of the title. */
     toolbar?: Snippet;
-    /** Largura da coluna de conteúdo. O cabeçalho usa a MESMA, sempre. */
+    /** Content column width. The header always uses the SAME one. */
     width?: "narrow" | "regular" | "wide";
     children: Snippet;
   };
@@ -23,10 +23,10 @@
   let col = $derived(WIDTHS[width]);
 </script>
 
-<!-- Cromo fixo: o conteúdo passa POR BAIXO dele (material translúcido) em vez
-     de ser cortado por uma faixa opaca, e a régua só aparece quando há algo
-     passando por baixo. O padding do topo reserva a faixa dos semáforos —
-     com `titleBarStyle: Overlay` a janela não tem barra própria. -->
+<!-- Fixed chrome: content passes UNDERNEATH it (translucent material) rather
+     than being cut off by an opaque strip, and the rule only appears when
+     something is passing below. The top padding reserves the traffic-light
+     strip — with `titleBarStyle: Overlay` the window has no bar of its own. -->
 <header
   data-tauri-drag-region="deep"
   class="material-chrome scroll-edge sticky top-0 z-20"

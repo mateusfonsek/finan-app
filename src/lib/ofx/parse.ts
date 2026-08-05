@@ -9,13 +9,13 @@ import type {
 /**
  * Parse raw OFX text into our normalized shape. Throws on malformed input.
  *
- * Suporta dois layouts:
- *   - Conta corrente: BANKMSGSRSV1 / STMTTRNRS / STMTRS / BANKACCTFROM
- *   - Cartão de crédito: CREDITCARDMSGSRSV1 / CCSTMTTRNRS / CCSTMTRS / CCACCTFROM
+ * Supports two layouts:
+ *   - Checking: BANKMSGSRSV1 / STMTTRNRS / STMTRS / BANKACCTFROM
+ *   - Credit card: CREDITCARDMSGSRSV1 / CCSTMTTRNRS / CCSTMTRS / CCACCTFROM
  *
- * Lib `ofx-data-extractor@1.5.0`:
- *   - `.getBankTransferList()`        — tx do BANK (conta corrente)
- *   - `.getCreditCardTransferList()`  — tx do CC (cartão)
+ * From `ofx-data-extractor@1.5.0`:
+ *   - `.getBankTransferList()`        — checking-account transactions
+ *   - `.getCreditCardTransferList()`  — credit-card transactions
  */
 export function parseOfx(content: string): ParsedOfx {
   const ofx = new Ofx(content);
@@ -27,9 +27,8 @@ export function parseOfx(content: string): ParsedOfx {
   const fid = (fi["FID"] as string | undefined) ?? null;
   const org = (fi["ORG"] as string | undefined) ?? null;
 
-  // Detecta CC pela presença do nó CREDITCARDMSGSRSV1.
-  // Quando ambos existirem por algum motivo, BANK tem prioridade
-  // (caso esperado: OFXs do Nubank vêm com APENAS um dos dois).
+  // Detects a card by the presence of CREDITCARDMSGSRSV1. If both ever exist,
+  // BANK wins (expected case: Nubank OFX carries only one of them).
   const ccNode =
     (ofxNode as Record<string, unknown>)?.CREDITCARDMSGSRSV1 as
       | Record<string, unknown>
@@ -50,7 +49,7 @@ export function parseOfx(content: string): ParsedOfx {
     const ccAcct =
       (ccStmt?.CCACCTFROM as Record<string, unknown> | undefined) ?? {};
     acctid = (ccAcct["ACCTID"] as string | undefined) ?? null;
-    // CC não tem branchid nem bankid em CCACCTFROM.
+    // A card has neither branchid nor bankid in CCACCTFROM.
     try {
       rawTxs = ofx.getCreditCardTransferList() as Array<Record<string, unknown>>;
     } catch {
@@ -77,13 +76,14 @@ export function parseOfx(content: string): ParsedOfx {
     type,
   };
 
-  // Nubank (e outros bancos BR) reusa o mesmo FITID em transações distintas
-  // do mesmo extrato — caso real: IOF + compra principal compartilham FITID,
-  // idem pro par estorno-IOF + estorno-compra. Mantemos o FITID original na
-  // primeira ocorrência e adicionamos sufixo "#2", "#3", ... nas seguintes
-  // pra: (a) não quebrar o `{#each ... (fitid)}` keyed na UI, (b) não violar
-  // a UNIQUE(account_id, ofx_fitid) do banco, (c) permitir seleção individual.
-  // A ordenação é a do arquivo OFX, estável entre re-imports do mesmo extrato.
+  // Nubank (and other Brazilian banks) reuse one FITID across distinct
+  // transactions in the same statement — real case: the IOF fee and the main
+  // purchase share a FITID, as do their two refunds. The original FITID is kept
+  // on the first occurrence and "#2", "#3", ... are appended to the rest so
+  // that: (a) the keyed `{#each ... (fitid)}` does not break, (b) the DB's
+  // UNIQUE(account_id, ofx_fitid) is not violated, (c) each can be selected
+  // individually. Ordering follows the OFX file and is stable across
+  // re-imports.
   const seenFitid = new Map<string, number>();
   const transactions: ParsedTransaction[] = rawTxs.map((t) => {
     const rawDate = (t.DTPOSTED as string | undefined) ?? "";
@@ -146,7 +146,7 @@ function formatDisplayName(
 ): string {
   const bankLabel = bank === "unknown" ? "Conta" : capitalize(bank);
   if (type === "credit_card") {
-    // CC só tem ACCTID (UUID longo). Mostra "Banco · cartão · final XXXX".
+    // A card only has ACCTID (a long UUID). Shows "Bank · card · last XXXX".
     const tail = acctid ? acctid.slice(-4) : null;
     const parts = [bankLabel, "cartão"];
     if (tail) parts.push(`final ${tail}`);

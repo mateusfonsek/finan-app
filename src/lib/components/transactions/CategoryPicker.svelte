@@ -50,8 +50,8 @@
   }
 
   async function openPicker() {
-    // Decide direção antes de abrir: se não cabe abaixo do trigger mas cabe
-    // acima, abre pra cima. Evita o menu sumir fora da tela nas últimas linhas.
+    // Decide the direction before opening: if it does not fit below the trigger
+    // but fits above, open upward. Keeps the menu on screen on the last rows.
     if (triggerEl) {
       const rect = triggerEl.getBoundingClientRect();
       const menuH = Math.min(options.length * 30, 240) + 48; // ul + input
@@ -60,15 +60,15 @@
     }
     open = true;
     query = "";
-    // Abre com a categoria ATUAL destacada, não com "Remover categoria": a
-    // opção sob o Enter tem que ser inócua, nunca a destrutiva.
+    // Opens with the CURRENT category highlighted, not "remove category": the
+    // option under Enter must be harmless, never the destructive one.
     const cur = options.findIndex(
       (o) => o.kind === "category" && o.category.id === currentId,
     );
     highlighted = cur >= 0 ? cur : 0;
     await tick();
     inputEl?.focus();
-    // Traz a linha selecionada pro campo de visão quando a lista é longa.
+    // Scrolls the selected row into view when the list is long.
     menuEl
       ?.querySelector<HTMLElement>('[role="option"][aria-selected="true"]')
       ?.scrollIntoView({ block: "nearest" });
@@ -128,8 +128,8 @@
 </script>
 
 <div class="relative inline-block">
-  <!-- Pastilha da categoria: mostra o estado atual E é o próprio controle —
-       o mapeamento é direto, sem rótulo explicando. -->
+  <!-- The category pill shows the current state AND is the control itself —
+       a direct mapping, with no label to explain it. -->
   <button
     bind:this={triggerEl}
     type="button"

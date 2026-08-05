@@ -23,8 +23,8 @@
   }
 </script>
 
-<!-- Primeira tela do app: uma promessa, um alvo, e nada mais. A área de
-     arraste no topo existe porque aqui não há cabeçalho de página. -->
+<!-- The app's first screen: one promise, one target, nothing else. The drag
+     area at the top exists because there is no page header here. -->
 <div data-tauri-drag-region class="w-full" style="height: var(--titlebar-h)"></div>
 
 <section class="px-8 pb-12 max-w-xl mx-auto flex flex-col gap-7">
