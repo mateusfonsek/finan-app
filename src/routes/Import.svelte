@@ -381,8 +381,10 @@
         </div>
         <div class="text-sub text-fg-muted">
           <!-- O relatório chega depois do import: até ele existir, esta linha
-               mostra só o que já é verdade. -->
-          {#if autoReport}
+               mostra só o que já é verdade. E com o enriquecimento desligado
+               ele chega zerado — anunciar "0 categorizadas" seria ruído sobre
+               uma etapa que nem rodou. -->
+          {#if autoReport && autoReport.txs_classified > 0}
             <span class="text-fg font-medium">{autoReport.txs_classified}</span>
             {autoReport.txs_classified === 1
               ? t("import.classified_one")

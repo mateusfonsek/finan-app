@@ -82,6 +82,41 @@ describe("activity store", () => {
     expect(s.enrich.error).toBe("já em andamento");
   });
 
+  it("com o enriquecimento desligado, nada aparece na tela", async () => {
+    const s = createActivityStore();
+    const ch = captureEmitter();
+
+    // O que o backend emite quando a funcionalidade está off: um par
+    // Started/Finished vazio, só para a tela ter um caminho único.
+    await s.start(1);
+    ch.send({ kind: "Started", total: 0 });
+    ch.send({ kind: "Finished", report: emptyReport });
+
+    expect(s.settled).toBe(true);
+    expect(s.visible).toBe(false);
+  });
+
+  it("um trabalho de verdade que termina continua visível", async () => {
+    const s = createActivityStore();
+    const ch = captureEmitter();
+
+    await s.start(1);
+    ch.send({ kind: "Started", total: 3 });
+    ch.send({ kind: "Finished", report: emptyReport });
+
+    expect(s.visible).toBe(true);
+  });
+
+  it("erro aparece mesmo sem nenhuma consulta ter acontecido", async () => {
+    const s = createActivityStore();
+    api.startCnpjEnrichment.mockRejectedValue(new Error("já em andamento"));
+
+    await s.start(1);
+
+    expect(s.enrich.total).toBe(0);
+    expect(s.visible).toBe(true);
+  });
+
   it("cancel pede parada ao backend", async () => {
     const s = createActivityStore();
     await s.cancel();

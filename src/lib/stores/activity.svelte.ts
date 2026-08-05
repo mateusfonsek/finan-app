@@ -26,9 +26,21 @@ export function createActivityStore() {
     get busy() {
       return enrich.phase === "running";
     },
-    /** Terminou e há algo a mostrar (relatório ou erro). */
     get settled() {
       return isTerminal(enrich.phase);
+    },
+
+    /** Vale ocupar espaço na tela?
+     *
+     *  Terminar não basta. Com o enriquecimento desligado o backend emite
+     *  `Started { total: 0 }` seguido de `Finished` com relatório vazio — para
+     *  a tela ter um caminho só — e sem esta distinção o app anunciaria
+     *  "nenhuma regra nova" depois de todo import, para quem nunca ligou a
+     *  funcionalidade. Erro sempre aparece: falha silenciosa é o que este
+     *  trabalho existe para acabar. */
+    get visible() {
+      if (enrich.phase === "running" || enrich.phase === "failed") return true;
+      return isTerminal(enrich.phase) && enrich.total > 0;
     },
 
     async start(accountId: number | null) {

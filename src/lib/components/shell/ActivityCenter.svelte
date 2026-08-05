@@ -7,7 +7,7 @@
   // Trabalho de fundo empilha aqui. O progresso fica em cima porque é efêmero e
   // sai sozinho; o extrato encontrado fica embaixo, mais perto da mão, porque
   // exige decisão.
-  let hasEnrichment = $derived(activity.busy || activity.settled);
+  let hasEnrichment = $derived(activity.visible);
   let hasDiscovery = $derived(watch.discoveries.length > 0);
 </script>
 
