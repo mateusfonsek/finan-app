@@ -62,13 +62,23 @@ pub fn seed_from_pack(conn: &Connection, pack: &LocalePack) -> AppResult<()> {
     }
 
     for r in &pack.rules.seed_rules {
-        conn.execute(
-            "INSERT INTO rules (pattern, category_id, priority, due_day, display_name)
-             SELECT ?1, c.id, ?2, NULL, ?3 FROM categories c
-             WHERE c.key = ?4
-               AND NOT EXISTS (SELECT 1 FROM rules WHERE pattern = ?1)",
-            params![r.pattern, r.priority, r.display_name, r.category],
+        // Regra semeada nasce com um único trecho; o usuário adiciona outros
+        // pela tela de Regras.
+        let inserted = conn.execute(
+            "INSERT INTO rules (category_id, priority, due_day, display_name)
+             SELECT c.id, ?1, NULL, ?2 FROM categories c
+             WHERE c.key = ?3
+               AND NOT EXISTS (
+                   SELECT 1 FROM rule_patterns WHERE pattern = ?4
+               )",
+            params![r.priority, r.display_name, r.category, r.pattern],
         )?;
+        if inserted > 0 {
+            conn.execute(
+                "INSERT INTO rule_patterns (rule_id, pattern) VALUES (?1, ?2)",
+                params![conn.last_insert_rowid(), r.pattern],
+            )?;
+        }
     }
 
     Ok(())

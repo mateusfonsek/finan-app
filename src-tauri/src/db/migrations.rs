@@ -64,6 +64,10 @@ const MIGRATIONS: &[(&str, &str)] = &[
         "0016_watched_folders",
         include_str!("../../migrations/0016_watched_folders.sql"),
     ),
+    (
+        "0017_rule_patterns",
+        include_str!("../../migrations/0017_rule_patterns.sql"),
+    ),
 ];
 
 /// Applies pending migrations. Returns `true` when this call created a **brand
@@ -118,6 +122,73 @@ mod tests {
         .is_ok()
     }
 
+    /// Aplica só as migrations até `up_to` (inclusive), pra conseguir montar um
+    /// banco no formato antigo e ver o que a migration seguinte faz com ele.
+    fn apply_through(conn: &Connection, up_to: &str) {
+        conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS _migrations (
+                name TEXT PRIMARY KEY,
+                applied_at TEXT NOT NULL DEFAULT (datetime('now'))
+            );",
+        )
+        .unwrap();
+        for (name, sql) in MIGRATIONS {
+            conn.execute_batch(sql).unwrap();
+            conn.execute("INSERT INTO _migrations (name) VALUES (?1)", [name])
+                .unwrap();
+            if *name == up_to {
+                return;
+            }
+        }
+        panic!("migration {up_to} not found");
+    }
+
+    /// A 0017 move `rules.pattern` pra `rule_patterns`. As regras que o usuário
+    /// já tinha precisam sobreviver como regras de um trecho só.
+    #[test]
+    fn rule_patterns_migration_preserves_existing_rules() {
+        let conn = Connection::open_in_memory().unwrap();
+        apply_through(&conn, "0016_watched_folders");
+
+        // Formato antigo: pattern era coluna da própria regra.
+        let cat: i64 = conn
+            .query_row("SELECT id FROM categories LIMIT 1", [], |r| r.get(0))
+            .unwrap();
+        conn.execute(
+            "INSERT INTO rules (pattern, category_id, priority, due_day) VALUES ('legado', ?1, 7, 5)",
+            [cat],
+        )
+        .unwrap();
+        let rule_id = conn.last_insert_rowid();
+
+        apply(&conn).unwrap();
+
+        let patterns: Vec<String> = conn
+            .prepare("SELECT pattern FROM rule_patterns WHERE rule_id = ?1 ORDER BY id")
+            .unwrap()
+            .query_map([rule_id], |r| r.get(0))
+            .unwrap()
+            .collect::<rusqlite::Result<_>>()
+            .unwrap();
+        assert_eq!(patterns, vec!["legado".to_string()]);
+
+        // O resto da regra fica intacto…
+        let (priority, due_day): (i32, Option<i32>) = conn
+            .query_row(
+                "SELECT priority, due_day FROM rules WHERE id = ?1",
+                [rule_id],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .unwrap();
+        assert_eq!((priority, due_day), (7, Some(5)));
+
+        // …e a coluna antiga some, pra não virar segunda fonte de verdade.
+        assert!(conn
+            .query_row("SELECT pattern FROM rules WHERE id = ?1", [rule_id], |r| r
+                .get::<_, String>(0))
+            .is_err());
+    }
+
     #[test]
     fn applies_init_migration() {
         let conn = Connection::open_in_memory().unwrap();
@@ -163,7 +234,7 @@ mod tests {
 
         let rule_count: i64 = conn
             .query_row(
-                "SELECT COUNT(*) FROM rules
+                "SELECT COUNT(*) FROM rule_patterns
                  WHERE pattern IN ('Pagamento de fatura','Aplicação RDB','Resgate RDB')",
                 [],
                 |row| row.get(0),
@@ -206,6 +277,7 @@ mod tests {
                 "0014_category_keys".to_string(),
                 "0015_education_pets_categories".to_string(),
                 "0016_watched_folders".to_string(),
+                "0017_rule_patterns".to_string(),
             ]
         );
     }

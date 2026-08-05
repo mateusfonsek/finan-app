@@ -4,21 +4,23 @@ use specta::Type;
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 pub struct Rule {
     pub id: i64,
-    pub pattern: String,
+    /// Trechos procurados na descrição, em OR: a regra casa quando a descrição
+    /// contém QUALQUER um deles. Sempre com pelo menos um item.
+    pub patterns: Vec<String>,
     pub category_id: i64,
     pub priority: i32,
     /// Dia do mês (1-31) em que a obrigação vence. NULL = sem prazo —
     /// a regra só aparece no calendário quando casa com uma transação.
     pub due_day: Option<i32>,
     /// Rótulo amigável da regra (ex: razão social vinda do CNPJ). NULL
-    /// = nenhum rótulo definido; a UI cai pra `pattern`.
+    /// = nenhum rótulo definido; a UI cai pro primeiro pattern.
     pub display_name: Option<String>,
     pub created_at: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 pub struct NewRule {
-    pub pattern: String,
+    pub patterns: Vec<String>,
     pub category_id: i64,
     pub priority: i32,
     pub due_day: Option<i32>,
@@ -28,7 +30,7 @@ pub struct NewRule {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 pub struct UpdateRule {
-    pub pattern: String,
+    pub patterns: Vec<String>,
     pub category_id: i64,
     pub priority: i32,
     pub due_day: Option<i32>,
@@ -41,6 +43,8 @@ pub struct UpdateRule {
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 pub struct CalendarEvent {
     pub rule_id: i64,
+    /// O trecho que de fato casou a transação — ou o primeiro da regra, quando
+    /// o evento existe só pelo `due_day` e nada casou ainda.
     pub pattern: String,
     pub category_name: String,
     pub category_color_token: Option<String>,

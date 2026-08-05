@@ -259,7 +259,7 @@ pub fn auto_classify_with_cnpj(
         let has_rule: bool = {
             let conn = db.conn.lock().expect("db mutex poisoned");
             conn.query_row(
-                "SELECT 1 FROM rules WHERE pattern = ?1 LIMIT 1",
+                "SELECT 1 FROM rule_patterns WHERE pattern = ?1 LIMIT 1",
                 params![cnpj],
                 |_| Ok(()),
             )
@@ -290,24 +290,29 @@ pub fn auto_classify_with_cnpj(
                     .or_else(|| resolution.nome_fantasia.clone());
                 let conn = db.conn.lock().expect("db mutex poisoned");
                 conn.execute(
-                    "INSERT INTO rules (pattern, category_id, priority, due_day, display_name)
-                     VALUES (?1, ?2, 10, NULL, ?3)",
-                    params![cnpj, cat_id, display],
+                    "INSERT INTO rules (category_id, priority, due_day, display_name)
+                     VALUES (?1, 10, NULL, ?2)",
+                    params![cat_id, display],
                 )?;
                 let id = conn.last_insert_rowid();
+                // A regra nasce com o CNPJ como único trecho.
+                conn.execute(
+                    "INSERT INTO rule_patterns (rule_id, pattern) VALUES (?1, ?2)",
+                    params![id, cnpj],
+                )?;
                 let rule = conn.query_row(
-                    "SELECT id, pattern, category_id, priority, due_day, display_name, created_at
+                    "SELECT id, category_id, priority, due_day, display_name, created_at
                      FROM rules WHERE id = ?1",
                     params![id],
                     |row| {
                         Ok(Rule {
                             id: row.get(0)?,
-                            pattern: row.get(1)?,
-                            category_id: row.get(2)?,
-                            priority: row.get(3)?,
-                            due_day: row.get(4)?,
-                            display_name: row.get(5)?,
-                            created_at: row.get(6)?,
+                            patterns: vec![cnpj.clone()],
+                            category_id: row.get(1)?,
+                            priority: row.get(2)?,
+                            due_day: row.get(3)?,
+                            display_name: row.get(4)?,
+                            created_at: row.get(5)?,
                         })
                     },
                 )?;

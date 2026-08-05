@@ -156,7 +156,12 @@
     "amount": "Valor",
     "empty": "Nenhuma transação ainda",
     "import_link": "Importar um OFX",
-    "empty_desc": "Importe o extrato .ofx do seu banco e as transações aparecem aqui, já categorizadas pelas suas regras."
+    "empty_desc": "Importe o extrato .ofx do seu banco e as transações aparecem aqui, já categorizadas pelas suas regras.",
+    "sort_by": "Ordenar por {col}",
+    "sort_asc": "{col} — do menor pro maior",
+    "sort_desc": "{col} — do maior pro menor",
+    "sort_date_asc": "Data — da mais antiga pra mais recente",
+    "sort_date_desc": "Data — da mais recente pra mais antiga"
   },
   "tx_filter": {
     "all_categories": "Todas as categorias",
@@ -190,6 +195,8 @@
   },
   "rules": {
     "col_pattern": "Trecho da descrição",
+    "more_patterns": "+{n}",
+    "more_patterns_title": "Esta regra tem mais {n} descrição(ões)",
     "col_category": "Categoria",
     "col_due": "Vence",
     "col_priority": "Prioridade",
@@ -203,7 +210,11 @@
     "form_edit": "Editar regra",
     "form_new": "Nova regra",
     "pattern_label": "Trecho da descrição",
+    "patterns_label": "Trechos da descrição",
     "pattern_placeholder": "ex: uber",
+    "pattern_placeholder_more": "outro jeito que o banco descreve",
+    "add_pattern": "Adicionar outra descrição",
+    "remove_pattern": "Remover esta descrição",
     "category": "Categoria",
     "select_placeholder": "— selecione —",
     "priority": "Prioridade",
@@ -349,6 +360,19 @@
     "delete_confirm": "Apagar \"{name}\"?",
     "delete_confirm_one": "Apagar \"{name}\"? {n} transação ficará sem categoria.",
     "delete_confirm_many": "Apagar \"{name}\"? {n} transações ficarão sem categoria."
+  },
+  "rule_panel": {
+    "title": "Editar regra",
+    "if_contains": "Se a descrição contém",
+    "if_contains_any": "Se a descrição contém qualquer uma destas",
+    "or": "ou",
+    "then_use": "usar a categoria",
+    "no_category": "— nenhuma —",
+    "pattern_hint": "Procurado dentro da descrição, em qualquer posição. Não diferencia maiúsculas de minúsculas.",
+    "patterns_hint": "A regra vale quando QUALQUER uma destas aparecer na descrição. Use trechos curtos e estáveis — colar a linha inteira do extrato quebra se o banco mudar um número.",
+    "due_day_hint": "Dia do mês em que a conta vence — é o que coloca a regra no calendário. Vazio = sem prazo fixo.",
+    "priority_hint": "Quando duas regras batem na mesma transação, vale a de maior prioridade.",
+    "scope_note": "Alterar a regra não mexe no que já foi categorizado. Use “Aplicar a existentes” pra reprocessar as transações sem categoria."
   },
   "rules_page": {
     "desc": "Regras \"se descrição contém X, categoria Y\" são aplicadas automaticamente em cada import. Categorização manual nunca é sobrescrita.",

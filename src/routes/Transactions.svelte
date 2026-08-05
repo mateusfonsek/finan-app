@@ -104,7 +104,7 @@
   }
   async function onCreateRule(data: { pattern: string; categoryId: number }) {
     await createRule({
-      pattern: data.pattern,
+      patterns: [data.pattern],
       category_id: data.categoryId,
       priority: 5,
       due_day: null,

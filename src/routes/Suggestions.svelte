@@ -63,7 +63,7 @@
     error = null;
     try {
       await createRule({
-        pattern: finalPattern,
+        patterns: [finalPattern],
         category_id: categoryId,
         priority: 5,
         due_day: null,

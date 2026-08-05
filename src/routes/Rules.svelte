@@ -10,6 +10,7 @@
   import ErrorNote from "$lib/components/ui/ErrorNote.svelte";
   import Icon from "$lib/components/ui/Icon.svelte";
   import RuleForm from "$lib/components/rules/RuleForm.svelte";
+  import RulePanel from "$lib/components/rules/RulePanel.svelte";
   import RulesList from "$lib/components/rules/RulesList.svelte";
   import { listCategories } from "$lib/api/categories";
   import {
@@ -44,13 +45,13 @@
   });
 
   async function onCreate(data: {
-    pattern: string;
+    patterns: string[];
     categoryId: number;
     priority: number;
     dueDay: number | null;
   }) {
     await createRule({
-      pattern: data.pattern,
+      patterns: data.patterns,
       category_id: data.categoryId,
       priority: data.priority,
       due_day: data.dueDay,
@@ -58,26 +59,32 @@
     await refresh();
   }
 
-  async function onUpdate(data: {
-    pattern: string;
-    categoryId: number;
-    priority: number;
-    dueDay: number | null;
-  }) {
-    if (!editing) return;
-    await updateRule(editing.id, {
-      pattern: data.pattern,
+  async function onUpdate(
+    ruleId: number,
+    data: {
+      patterns: string[];
+      categoryId: number;
+      priority: number;
+      dueDay: number | null;
+      displayName: string | null;
+    },
+  ) {
+    await updateRule(ruleId, {
+      patterns: data.patterns,
       category_id: data.categoryId,
       priority: data.priority,
       due_day: data.dueDay,
+      // O backend faz `SET display_name = ?` sempre; sem reenviar, o rótulo
+      // vindo do import seria apagado a cada edição.
+      display_name: data.displayName,
     });
-    editing = null;
     await refresh();
   }
 
   /** Alerta NATIVO do macOS — apagar uma regra descategoriza transações. */
   async function onDelete(rule: Rule) {
-    const ok = await confirm(t("rules_page.delete_confirm", { pattern: rule.pattern }), {
+    const label = rule.display_name ?? rule.patterns[0] ?? "";
+    const ok = await confirm(t("rules_page.delete_confirm", { pattern: label }), {
       title: t("rules.delete"),
       kind: "warning",
       okLabel: t("common.delete"),
@@ -127,23 +134,25 @@
       <ErrorNote message={applyMsg} tone="success" />
     {/if}
 
-    {#if editing}
-      <RuleForm
-        {categories}
-        initial={editing}
-        onSave={onUpdate}
-        onCancel={() => (editing = null)}
-        submitLabel={t("rules_page.save_changes")}
-      />
-    {:else}
-      <RuleForm {categories} onSave={onCreate} />
-    {/if}
+    <!-- O formulário da página cria; editar acontece no painel lateral. Assim o
+         "novo" nunca muda de identidade no meio do caminho. -->
+    <RuleForm {categories} onSave={onCreate} />
 
     <RulesList
       {rules}
       {categories}
       onEdit={(r) => (editing = r)}
       {onDelete}
+      selectedId={editing?.id ?? null}
     />
   {/if}
 </Page>
+
+{#if editing}
+  <RulePanel
+    rule={editing}
+    {categories}
+    onClose={() => (editing = null)}
+    onSave={onUpdate}
+  />
+{/if}

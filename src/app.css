@@ -280,15 +280,16 @@ button,
   cursor: default;
 }
 
-/* Toda a moldura da janela arrasta, menos o que é clicável dentro dela. */
+/* Toda a moldura da janela arrasta, menos o que é clicável dentro dela.
+
+   Quem faz o arraste é o script que o Tauri injeta, lendo o atributo
+   `data-tauri-drag-region="deep"` — ele já ignora botões, links e campos ao
+   subir a árvore, então não existe regra de "no-drag" pra escrever aqui.
+   `-webkit-app-region` é propriedade do Chromium: no WKWebView (que é o
+   webview desta app no macOS) ela não faz nada, e tê-la aqui só dava a
+   impressão de que o arraste estava resolvido no CSS. */
 [data-tauri-drag-region] {
   cursor: default;
-  app-region: drag;
-  -webkit-app-region: drag;
-}
-[data-tauri-drag-region] :is(button, a, input, select, textarea, [role="button"]) {
-  app-region: no-drag;
-  -webkit-app-region: no-drag;
 }
 
 /* ── Foco ────────────────────────────────────────────────────────────────

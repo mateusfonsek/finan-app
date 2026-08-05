@@ -129,7 +129,7 @@
   aria-label={t("tx_notes.detail")}
 >
   <header
-    data-tauri-drag-region
+    data-tauri-drag-region="deep"
     class="flex items-center justify-between px-4 pb-3 border-b border-border-subtle"
     style="padding-top: max(12px, var(--titlebar-h))"
   >

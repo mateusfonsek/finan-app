@@ -16,24 +16,65 @@ fn validate_due_day(d: Option<i32>) -> AppResult<()> {
     Ok(())
 }
 
+/// Normaliza a lista de trechos vinda da UI: apara espaços, descarta vazios e
+/// remove duplicatas (comparando sem caixa, que é como o casamento funciona).
+/// A ordem que o usuário digitou é preservada.
+fn clean_patterns(raw: &[String]) -> AppResult<Vec<String>> {
+    let mut out: Vec<String> = Vec::with_capacity(raw.len());
+    for p in raw {
+        let p = p.trim();
+        if p.is_empty() {
+            continue;
+        }
+        if out.iter().any(|kept| kept.eq_ignore_ascii_case(p)) {
+            continue;
+        }
+        out.push(p.to_string());
+    }
+    if out.is_empty() {
+        return Err(AppError::Invalid("rule must have at least one pattern".into()));
+    }
+    Ok(out)
+}
+
+/// Regrava os trechos de uma regra. Substitui em bloco em vez de fazer diff:
+/// a lista é curta e a ordem importa, então recriar é mais simples de acertar.
+fn replace_patterns(tx: &rusqlite::Transaction, rule_id: i64, patterns: &[String]) -> AppResult<()> {
+    tx.execute("DELETE FROM rule_patterns WHERE rule_id = ?1", params![rule_id])?;
+    let mut stmt = tx.prepare("INSERT INTO rule_patterns (rule_id, pattern) VALUES (?1, ?2)")?;
+    for p in patterns {
+        stmt.execute(params![rule_id, p])?;
+    }
+    Ok(())
+}
+
+/// Trechos de uma regra, na ordem em que foram gravados.
+fn patterns_of(conn: &rusqlite::Connection, rule_id: i64) -> rusqlite::Result<Vec<String>> {
+    let mut stmt =
+        conn.prepare("SELECT pattern FROM rule_patterns WHERE rule_id = ?1 ORDER BY id")?;
+    let rows = stmt.query_map(params![rule_id], |row| row.get::<_, String>(0))?;
+    rows.collect()
+}
+
 #[tauri::command]
 #[specta::specta]
 pub fn list_rules(db: State<'_, Db>) -> AppResult<Vec<Rule>> {
     let conn = db.conn.lock().expect("db mutex poisoned");
     let mut stmt = conn.prepare(
-        "SELECT id, pattern, category_id, priority, due_day, display_name, created_at
+        "SELECT id, category_id, priority, due_day, display_name, created_at
          FROM rules
          ORDER BY priority DESC, created_at DESC",
     )?;
     let rows = stmt.query_map([], |row| {
+        let id: i64 = row.get(0)?;
         Ok(Rule {
-            id: row.get(0)?,
-            pattern: row.get(1)?,
-            category_id: row.get(2)?,
-            priority: row.get(3)?,
-            due_day: row.get(4)?,
-            display_name: row.get(5)?,
-            created_at: row.get(6)?,
+            id,
+            patterns: patterns_of(&conn, id)?,
+            category_id: row.get(1)?,
+            priority: row.get(2)?,
+            due_day: row.get(3)?,
+            display_name: row.get(4)?,
+            created_at: row.get(5)?,
         })
     })?;
     rows.collect::<rusqlite::Result<Vec<_>>>()
@@ -43,23 +84,28 @@ pub fn list_rules(db: State<'_, Db>) -> AppResult<Vec<Rule>> {
 #[tauri::command]
 #[specta::specta]
 pub fn create_rule(db: State<'_, Db>, input: NewRule) -> AppResult<Rule> {
-    if input.pattern.trim().is_empty() {
-        return Err(AppError::Invalid("pattern must not be empty".into()));
-    }
+    let patterns = clean_patterns(&input.patterns)?;
     validate_due_day(input.due_day)?;
     let mut conn = db.conn.lock().expect("db mutex poisoned");
-    conn.execute(
-        "INSERT INTO rules (pattern, category_id, priority, due_day, display_name)
-         VALUES (?1, ?2, ?3, ?4, ?5)",
-        params![
-            input.pattern.trim(),
-            input.category_id,
-            input.priority,
-            input.due_day,
-            input.display_name.as_deref().map(str::trim),
-        ],
-    )?;
-    let id = conn.last_insert_rowid();
+
+    let id = {
+        let tx = conn.transaction()?;
+        tx.execute(
+            "INSERT INTO rules (category_id, priority, due_day, display_name)
+             VALUES (?1, ?2, ?3, ?4)",
+            params![
+                input.category_id,
+                input.priority,
+                input.due_day,
+                input.display_name.as_deref().map(str::trim),
+            ],
+        )?;
+        let id = tx.last_insert_rowid();
+        replace_patterns(&tx, id, &patterns)?;
+        tx.commit()?;
+        id
+    };
+
     apply_rules_internal(&mut conn, None)?;
     fetch_rule(&conn, id)
 }
@@ -67,27 +113,31 @@ pub fn create_rule(db: State<'_, Db>, input: NewRule) -> AppResult<Rule> {
 #[tauri::command]
 #[specta::specta]
 pub fn update_rule(db: State<'_, Db>, rule_id: i64, input: UpdateRule) -> AppResult<Rule> {
-    if input.pattern.trim().is_empty() {
-        return Err(AppError::Invalid("pattern must not be empty".into()));
-    }
+    let patterns = clean_patterns(&input.patterns)?;
     validate_due_day(input.due_day)?;
     let mut conn = db.conn.lock().expect("db mutex poisoned");
-    let changed = conn.execute(
-        "UPDATE rules
-         SET pattern = ?1, category_id = ?2, priority = ?3, due_day = ?4, display_name = ?5
-         WHERE id = ?6",
-        params![
-            input.pattern.trim(),
-            input.category_id,
-            input.priority,
-            input.due_day,
-            input.display_name.as_deref().map(str::trim),
-            rule_id
-        ],
-    )?;
-    if changed == 0 {
-        return Err(AppError::Invalid(format!("rule {rule_id} not found")));
+
+    {
+        let tx = conn.transaction()?;
+        let changed = tx.execute(
+            "UPDATE rules
+             SET category_id = ?1, priority = ?2, due_day = ?3, display_name = ?4
+             WHERE id = ?5",
+            params![
+                input.category_id,
+                input.priority,
+                input.due_day,
+                input.display_name.as_deref().map(str::trim),
+                rule_id
+            ],
+        )?;
+        if changed == 0 {
+            return Err(AppError::Invalid(format!("rule {rule_id} not found")));
+        }
+        replace_patterns(&tx, rule_id, &patterns)?;
+        tx.commit()?;
     }
+
     apply_rules_internal(&mut conn, None)?;
     fetch_rule(&conn, rule_id)
 }
@@ -104,8 +154,9 @@ pub fn delete_rule(db: State<'_, Db>, rule_id: i64) -> AppResult<()> {
 }
 
 /// Deletes a rule AND clears category_id from any transaction that was likely
-/// categorized BY this rule (description matches the pattern + category_id is
-/// this rule's category). Then re-applies remaining rules to pick alternatives.
+/// categorized BY this rule (description matches ANY of its patterns +
+/// category_id is this rule's category). Then re-applies remaining rules to
+/// pick alternatives.
 ///
 /// Used by the import screen when the user wants to undo an auto-created rule.
 /// Returns the count of transactions whose category was cleared.
@@ -113,23 +164,29 @@ pub fn delete_rule(db: State<'_, Db>, rule_id: i64) -> AppResult<()> {
 #[specta::specta]
 pub fn delete_rule_with_cleanup(db: State<'_, Db>, rule_id: i64) -> AppResult<u32> {
     let mut conn = db.conn.lock().expect("db mutex poisoned");
-    let (pattern, category_id): (String, i64) = conn
+    let category_id: i64 = conn
         .query_row(
-            "SELECT pattern, category_id FROM rules WHERE id = ?1",
+            "SELECT category_id FROM rules WHERE id = ?1",
             params![rule_id],
-            |r| Ok((r.get(0)?, r.get(1)?)),
+            |r| r.get(0),
         )
         .map_err(|_| AppError::Invalid(format!("rule {rule_id} not found")))?;
+    let patterns = patterns_of(&conn, rule_id)?;
 
     let tx = conn.transaction()?;
+    // Limpa antes de apagar: o ON DELETE CASCADE levaria os patterns junto e a
+    // consulta abaixo não teria mais como saber o que essa regra categorizou.
+    let mut cleared = 0usize;
+    for p in &patterns {
+        cleared += tx.execute(
+            "UPDATE transactions
+             SET category_id = NULL
+             WHERE category_id = ?1
+               AND LOWER(description) LIKE '%' || LOWER(?2) || '%'",
+            params![category_id, p],
+        )?;
+    }
     tx.execute("DELETE FROM rules WHERE id = ?1", params![rule_id])?;
-    let cleared = tx.execute(
-        "UPDATE transactions
-         SET category_id = NULL
-         WHERE category_id = ?1
-           AND LOWER(description) LIKE '%' || LOWER(?2) || '%'",
-        params![category_id, pattern],
-    )?;
     tx.commit()?;
 
     // Re-apply remaining rules — a previously-shadowed rule may now match.
@@ -157,18 +214,24 @@ pub fn apply_rules_internal(
         Some(_) => "AND account_id = ?1",
         None => "",
     };
+    // Uma regra casa quando QUALQUER um dos seus trechos aparece na descrição.
     let sql = format!(
         "UPDATE transactions
          SET category_id = (
              SELECT r.category_id FROM rules r
-             WHERE LOWER(transactions.description) LIKE '%' || LOWER(r.pattern) || '%'
+             WHERE EXISTS (
+                 SELECT 1 FROM rule_patterns p
+                 WHERE p.rule_id = r.id
+                   AND LOWER(transactions.description) LIKE '%' || LOWER(p.pattern) || '%'
+             )
              ORDER BY r.priority DESC, r.created_at DESC
              LIMIT 1
          )
          WHERE category_id IS NULL
            AND EXISTS (
                SELECT 1 FROM rules r
-               WHERE LOWER(transactions.description) LIKE '%' || LOWER(r.pattern) || '%'
+               JOIN rule_patterns p ON p.rule_id = r.id
+               WHERE LOWER(transactions.description) LIKE '%' || LOWER(p.pattern) || '%'
            )
            {scope_filter}",
     );
@@ -181,19 +244,20 @@ pub fn apply_rules_internal(
 }
 
 fn fetch_rule(conn: &rusqlite::Connection, id: i64) -> AppResult<Rule> {
+    let patterns = patterns_of(conn, id)?;
     conn.query_row(
-        "SELECT id, pattern, category_id, priority, due_day, display_name, created_at
+        "SELECT id, category_id, priority, due_day, display_name, created_at
          FROM rules WHERE id = ?1",
         params![id],
         |row| {
             Ok(Rule {
                 id: row.get(0)?,
-                pattern: row.get(1)?,
-                category_id: row.get(2)?,
-                priority: row.get(3)?,
-                due_day: row.get(4)?,
-                display_name: row.get(5)?,
-                created_at: row.get(6)?,
+                patterns,
+                category_id: row.get(1)?,
+                priority: row.get(2)?,
+                due_day: row.get(3)?,
+                display_name: row.get(4)?,
+                created_at: row.get(5)?,
             })
         },
     )
@@ -223,23 +287,24 @@ pub fn calendar_events(db: State<'_, Db>, month: String) -> AppResult<Vec<Calend
     let conn = db.conn.lock().expect("db mutex poisoned");
     let date_prefix = format!("{month}-%");
 
-    // Step 1: load all rules with category info.
-    type RuleRow = (i64, String, Option<i32>, String, Option<String>);
+    // Step 1: load all rules with category info + their patterns.
+    type RuleRow = (i64, Vec<String>, Option<i32>, String, Option<String>);
     let rule_rows: Vec<RuleRow> = {
         let mut stmt = conn.prepare(
-            "SELECT r.id, r.pattern, r.due_day, c.name, c.color_token
+            "SELECT r.id, r.due_day, c.name, c.color_token
              FROM rules r
              JOIN categories c ON c.id = r.category_id
              ORDER BY r.created_at DESC",
         )?;
         let rows = stmt
             .query_map([], |row| {
+                let id: i64 = row.get(0)?;
                 Ok((
-                    row.get(0)?,
+                    id,
+                    patterns_of(&conn, id)?,
                     row.get(1)?,
                     row.get(2)?,
                     row.get(3)?,
-                    row.get(4)?,
                 ))
             })?
             .collect::<rusqlite::Result<Vec<_>>>()?;
@@ -265,11 +330,23 @@ pub fn calendar_events(db: State<'_, Db>, month: String) -> AppResult<Vec<Calend
 
     // Step 3: for each rule, find first matching tx in the month.
     let mut events: Vec<CalendarEvent> = Vec::new();
-    for (rule_id, pattern, due_day, cat_name, cat_color) in rule_rows {
-        let pattern_lc = pattern.to_lowercase();
-        let matched = tx_rows
-            .iter()
-            .find(|(_, _, _, desc)| desc.to_lowercase().contains(&pattern_lc));
+    for (rule_id, patterns, due_day, cat_name, cat_color) in rule_rows {
+        let patterns_lc: Vec<String> = patterns.iter().map(|p| p.to_lowercase()).collect();
+        // Percorre as transações por data: a primeira do mês que casar QUALQUER
+        // trecho é a que paga o evento. Rodar por transação (e não por trecho)
+        // mantém "a mais antiga vence" mesmo com vários trechos.
+        let matched = tx_rows.iter().find_map(|(tx_id, date, amount, desc)| {
+            let desc_lc = desc.to_lowercase();
+            let hit = patterns_lc.iter().position(|p| desc_lc.contains(p))?;
+            Some((tx_id, date, amount, hit))
+        });
+
+        // Rótulo do evento: o trecho que casou, ou o primeiro quando o evento
+        // existe só pelo vencimento.
+        let label = match matched {
+            Some((_, _, _, hit)) => patterns[hit].clone(),
+            None => patterns.first().cloned().unwrap_or_default(),
+        };
 
         let (paid_day, paid_amount, paid_tx_id) = match matched {
             Some((tx_id, date, amount, _)) => {
@@ -283,7 +360,7 @@ pub fn calendar_events(db: State<'_, Db>, month: String) -> AppResult<Vec<Calend
         if due_day.is_some() || paid_tx_id.is_some() {
             events.push(CalendarEvent {
                 rule_id,
-                pattern,
+                pattern: label,
                 category_name: cat_name,
                 category_color_token: cat_color,
                 due_day,
@@ -343,12 +420,24 @@ mod tests {
     }
 
     fn insert_rule(conn: &Connection, pattern: &str, cat: i64, priority: i32) -> i64 {
+        insert_rule_multi(conn, &[pattern], cat, priority)
+    }
+
+    fn insert_rule_multi(conn: &Connection, patterns: &[&str], cat: i64, priority: i32) -> i64 {
         conn.execute(
-            "INSERT INTO rules (pattern, category_id, priority, due_day) VALUES (?1, ?2, ?3, NULL)",
-            params![pattern, cat, priority],
+            "INSERT INTO rules (category_id, priority, due_day) VALUES (?1, ?2, NULL)",
+            params![cat, priority],
         )
         .unwrap();
-        conn.last_insert_rowid()
+        let id = conn.last_insert_rowid();
+        for p in patterns {
+            conn.execute(
+                "INSERT INTO rule_patterns (rule_id, pattern) VALUES (?1, ?2)",
+                params![id, p],
+            )
+            .unwrap();
+        }
+        id
     }
 
     #[test]
@@ -466,22 +555,26 @@ mod tests {
     /// Simulates delete_rule_with_cleanup logic (the tauri command needs State,
     /// so we replicate the SQL here against a raw connection).
     fn cleanup_after_delete(conn: &mut Connection, rule_id: i64) -> u32 {
-        let (pattern, category_id): (String, i64) = conn
+        let category_id: i64 = conn
             .query_row(
-                "SELECT pattern, category_id FROM rules WHERE id = ?1",
+                "SELECT category_id FROM rules WHERE id = ?1",
                 params![rule_id],
-                |r| Ok((r.get(0)?, r.get(1)?)),
+                |r| r.get(0),
             )
             .unwrap();
+        let patterns = super::patterns_of(conn, rule_id).unwrap();
         let tx = conn.transaction().unwrap();
+        let mut cleared = 0usize;
+        for p in &patterns {
+            cleared += tx
+                .execute(
+                    "UPDATE transactions SET category_id = NULL
+                     WHERE category_id = ?1 AND LOWER(description) LIKE '%' || LOWER(?2) || '%'",
+                    params![category_id, p],
+                )
+                .unwrap();
+        }
         tx.execute("DELETE FROM rules WHERE id = ?1", params![rule_id])
-            .unwrap();
-        let cleared = tx
-            .execute(
-                "UPDATE transactions SET category_id = NULL
-                 WHERE category_id = ?1 AND LOWER(description) LIKE '%' || LOWER(?2) || '%'",
-                params![category_id, pattern],
-            )
             .unwrap();
         tx.commit().unwrap();
         apply_rules_internal(conn, None).unwrap();
@@ -551,4 +644,119 @@ mod tests {
         let n = apply_rules_internal(&mut conn, None).unwrap();
         assert_eq!(n, 0);
     }
+
+    /// O caso que motivou os múltiplos trechos: o mesmo débito aparece no
+    /// extrato ora como débito da conta, ora como pagamento de boleto.
+    #[test]
+    fn any_pattern_of_a_rule_matches() {
+        let mut conn = fresh_conn();
+        let acc = insert_account(&conn);
+        let moradia = category_id(&conn, "Casa");
+        insert_rule_multi(
+            &conn,
+            &["CAIXA ECONOMICA FEDERAL (0104)", "GCI CAIXA - HABITACAO"],
+            moradia,
+            0,
+        );
+        let a = insert_tx(&conn, acc, "CAIXA ECONOMICA FEDERAL (0104) Agencia: 37", None);
+        let b = insert_tx(
+            &conn,
+            acc,
+            "Pagamento de boleto efetuado - GCI CAIXA - HABITACAO",
+            None,
+        );
+        let c = insert_tx(&conn, acc, "padaria do bairro", None);
+
+        let n = apply_rules_internal(&mut conn, None).unwrap();
+        assert_eq!(n, 2, "os dois formatos casam a mesma regra");
+
+        for id in [a, b] {
+            let cat: Option<i64> = conn
+                .query_row(
+                    "SELECT category_id FROM transactions WHERE id = ?1",
+                    params![id],
+                    |r| r.get(0),
+                )
+                .unwrap();
+            assert_eq!(cat, Some(moradia));
+        }
+        let untouched: Option<i64> = conn
+            .query_row(
+                "SELECT category_id FROM transactions WHERE id = ?1",
+                params![c],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(untouched, None);
+    }
+
+    /// Prioridade continua sendo da REGRA, não do trecho: um trecho genérico
+    /// numa regra de prioridade alta ganha de um específico numa regra baixa.
+    #[test]
+    fn priority_is_per_rule_not_per_pattern() {
+        let mut conn = fresh_conn();
+        let acc = insert_account(&conn);
+        let transporte = category_id(&conn, "Transporte");
+        let outros = category_id(&conn, "Outros");
+
+        insert_rule_multi(&conn, &["nunca-casa", "testmerchant"], transporte, 10);
+        insert_rule(&conn, "testmerchant trip", outros, 0);
+
+        let tx_id = insert_tx(&conn, acc, "TESTMERCHANT TRIP 99", None);
+        apply_rules_internal(&mut conn, None).unwrap();
+
+        let cat: Option<i64> = conn
+            .query_row(
+                "SELECT category_id FROM transactions WHERE id = ?1",
+                params![tx_id],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(cat, Some(transporte));
+    }
+
+    /// Apagar a regra tem que limpar o que QUALQUER um dos trechos categorizou.
+    #[test]
+    fn delete_with_cleanup_clears_every_pattern() {
+        let mut conn = fresh_conn();
+        let acc = insert_account(&conn);
+        let moradia = category_id(&conn, "Casa");
+        let rule = insert_rule_multi(&conn, &["alpha-pattern", "beta-pattern"], moradia, 0);
+        let a = insert_tx(&conn, acc, "cobranca ALPHA-PATTERN 1", None);
+        let b = insert_tx(&conn, acc, "cobranca BETA-PATTERN 2", None);
+        apply_rules_internal(&mut conn, None).unwrap();
+
+        let cleared = cleanup_after_delete(&mut conn, rule);
+        assert_eq!(cleared, 2);
+
+        for id in [a, b] {
+            let cat: Option<i64> = conn
+                .query_row(
+                    "SELECT category_id FROM transactions WHERE id = ?1",
+                    params![id],
+                    |r| r.get(0),
+                )
+                .unwrap();
+            assert_eq!(cat, None);
+        }
+    }
+
+    #[test]
+    fn clean_patterns_trims_dedupes_and_rejects_empty() {
+        use super::clean_patterns;
+
+        let out = clean_patterns(&[
+            "  uber  ".into(),
+            "UBER".into(),
+            "".into(),
+            "   ".into(),
+            "99pop".into(),
+        ])
+        .unwrap();
+        assert_eq!(out, vec!["uber".to_string(), "99pop".to_string()]);
+
+        assert!(clean_patterns(&[]).is_err());
+        assert!(clean_patterns(&["   ".into()]).is_err());
+    }
+
 }

@@ -179,8 +179,9 @@ async deleteRule(ruleId: number) : Promise<Result<null, string>> {
 },
 /**
  * Deletes a rule AND clears category_id from any transaction that was likely
- * categorized BY this rule (description matches the pattern + category_id is
- * this rule's category). Then re-applies remaining rules to pick alternatives.
+ * categorized BY this rule (description matches ANY of its patterns +
+ * category_id is this rule's category). Then re-applies remaining rules to
+ * pick alternatives.
  * 
  * Used by the import screen when the user wants to undo an auto-created rule.
  * Returns the count of transactions whose category was cleared.
@@ -518,7 +519,12 @@ export type AutoClassifyReport = { created_rules: Rule[]; txs_classified: number
  * Evento que aparece no calendário: combinação de uma regra
  * + (opcional) dia de vencimento + (opcional) transação que casou.
  */
-export type CalendarEvent = { rule_id: number; pattern: string; category_name: string; category_color_token: string | null; due_day: number | null; paid_day: number | null; paid_amount: string | null; paid_transaction_id: number | null }
+export type CalendarEvent = { rule_id: number; 
+/**
+ * O trecho que de fato casou a transação — ou o primeiro da regra, quando
+ * o evento existe só pelo `due_day` e nada casou ainda.
+ */
+pattern: string; category_name: string; category_color_token: string | null; due_day: number | null; paid_day: number | null; paid_amount: string | null; paid_transaction_id: number | null }
 export type Category = { id: number; name: string; color_token: string | null; kind: string; is_investment: boolean; created_at: string }
 export type CategorySpend = { category_id: number | null; name: string; color_token: string | null; total: string; percent: number }
 export type CategoryWithCount = { id: number; name: string; color_token: string | null; kind: string; created_at: string; transaction_count: number }
@@ -580,13 +586,18 @@ export type NewAccount = { name: string; bank: string | null; ofx_acctid: string
  */
 kind?: string }
 export type NewCategory = { name: string; color_token: string | null; kind: string }
-export type NewRule = { pattern: string; category_id: number; priority: number; due_day: number | null; display_name?: string | null }
+export type NewRule = { patterns: string[]; category_id: number; priority: number; due_day: number | null; display_name?: string | null }
 export type NewTransaction = { date: string; 
 /**
  * Decimal as string. Backend converts via rust_decimal.
  */
 amount: string; description: string; ofx_fitid: string | null }
-export type Rule = { id: number; pattern: string; category_id: number; priority: number; 
+export type Rule = { id: number; 
+/**
+ * Trechos procurados na descrição, em OR: a regra casa quando a descrição
+ * contém QUALQUER um deles. Sempre com pelo menos um item.
+ */
+patterns: string[]; category_id: number; priority: number; 
 /**
  * Dia do mês (1-31) em que a obrigação vence. NULL = sem prazo —
  * a regra só aparece no calendário quando casa com uma transação.
@@ -594,7 +605,7 @@ export type Rule = { id: number; pattern: string; category_id: number; priority:
 due_day: number | null; 
 /**
  * Rótulo amigável da regra (ex: razão social vinda do CNPJ). NULL
- * = nenhum rótulo definido; a UI cai pra `pattern`.
+ * = nenhum rótulo definido; a UI cai pro primeiro pattern.
  */
 display_name: string | null; created_at: string }
 export type RuleSuggestion = { key: string; label: string; suggested_pattern: string; count: number; total: string; sample_description: string; transaction_ids: number[] }
@@ -616,7 +627,7 @@ export type TransferSummary = { total_out: string; total_in: string; count: numb
  */
 export type TxKey = { ofx_fitid: string; date: string; amount: string }
 export type UpdateCategory = { name: string; color_token: string | null; kind: string }
-export type UpdateRule = { pattern: string; category_id: number; priority: number; due_day: number | null; display_name?: string | null }
+export type UpdateRule = { patterns: string[]; category_id: number; priority: number; due_day: number | null; display_name?: string | null }
 export type WatchedFolder = { id: number; path: string; 
 /**
  * Nome curto pra exibir ("finan", "Downloads"). Derivado do último

@@ -3,26 +3,31 @@
   import Icon from "$lib/components/ui/Icon.svelte";
   import ErrorNote from "$lib/components/ui/ErrorNote.svelte";
   import { locale } from "$lib/i18n/locale.svelte";
-  import type { Category, Rule } from "$lib/bindings";
+  import PatternListEditor, {
+    rowsFrom,
+    valuesOf,
+    type PatternRow,
+  } from "./PatternListEditor.svelte";
+  import type { Category } from "$lib/bindings";
 
   const t = locale.t;
 
+  /** Só cria. Editar acontece no painel lateral (`RulePanel`), aberto pela
+   *  linha da lista — um formulário que troca de identidade no meio do uso
+   *  esconde de qual regra ele está falando. */
   type Props = {
     categories: Category[];
-    initial?: Rule | null;
     onSave: (data: {
-      pattern: string;
+      patterns: string[];
       categoryId: number;
       priority: number;
       dueDay: number | null;
     }) => Promise<void>;
-    onCancel?: () => void;
-    submitLabel?: string;
   };
 
-  let { categories, initial = null, onSave, onCancel, submitLabel }: Props = $props();
+  let { categories, onSave }: Props = $props();
 
-  let pattern = $state("");
+  let rows = $state<PatternRow[]>(rowsFrom([]));
   let categoryId = $state<number | null>(null);
   let priority = $state(0);
   /** Svelte 5 coage <input type="number"> pra number | null; mantemos compatível. */
@@ -30,17 +35,12 @@
   let busy = $state(false);
   let error = $state<string | null>(null);
 
-  $effect(() => {
-    pattern = initial?.pattern ?? "";
-    categoryId = initial?.category_id ?? null;
-    priority = initial?.priority ?? 0;
-    dueDayValue = initial?.due_day ?? null;
-  });
+  let filled = $derived(valuesOf(rows).map((v) => v.trim()).filter((v) => v !== ""));
 
   async function submit(e: Event) {
     e.preventDefault();
     error = null;
-    if (pattern.trim().length === 0) {
+    if (filled.length === 0) {
       error = t("rule_form.pattern_required");
       return;
     }
@@ -58,13 +58,11 @@
     }
     busy = true;
     try {
-      await onSave({ pattern: pattern.trim(), categoryId, priority, dueDay });
-      if (!initial) {
-        pattern = "";
-        categoryId = null;
-        priority = 0;
-        dueDayValue = null;
-      }
+      await onSave({ patterns: filled, categoryId, priority, dueDay });
+      rows = rowsFrom([]);
+      categoryId = null;
+      priority = 0;
+      dueDayValue = null;
     } catch (e) {
       error = e instanceof Error ? e.message : String(e);
     } finally {
@@ -73,25 +71,21 @@
   }
 </script>
 
-<form
-  onsubmit={submit}
-  class="card p-4 flex flex-col gap-3.5 {initial ? 'ring-[1.5px] ring-accent ring-inset' : ''}"
->
+<form onsubmit={submit} class="card p-4 flex flex-col gap-3.5">
   <div class="flex items-center gap-2">
-    <Icon name={initial ? "pencil" : "plus"} size={13} class="text-fg-subtle" />
-    <span class="section-title">{initial ? t("rule_form.form_edit") : t("rule_form.form_new")}</span>
+    <Icon name="plus" size={13} class="text-fg-subtle" />
+    <span class="section-title">{t("rule_form.form_new")}</span>
   </div>
 
-  <div class="grid grid-cols-[1fr_178px_84px_96px_auto] gap-2.5 items-end">
-    <label class="flex flex-col gap-1 min-w-0">
-      <span class="text-foot text-fg-subtle">{t("rule_form.pattern_label")}</span>
-      <input
-        bind:value={pattern}
-        placeholder={t("rule_form.pattern_placeholder")}
-        class="field font-mono"
-      />
-    </label>
+  <!-- A lista de trechos cresce pra baixo, então ganha a própria faixa: num
+       grid de uma linha só ela desalinharia os outros campos a cada trecho
+       adicionado. -->
+  <div class="flex flex-col gap-1">
+    <span class="text-foot text-fg-subtle">{t("rule_form.patterns_label")}</span>
+    <PatternListEditor {rows} onChange={(next) => (rows = next)} />
+  </div>
 
+  <div class="grid grid-cols-[1fr_84px_96px_auto] gap-2.5 items-end">
     <label class="flex flex-col gap-1 min-w-0">
       <span class="text-foot text-fg-subtle">{t("rule_form.category")}</span>
       <select
@@ -128,14 +122,9 @@
       />
     </label>
 
-    <div class="flex gap-2">
-      {#if onCancel}
-        <Button variant="ghost" onclick={onCancel} type="button">{t("common.cancel")}</Button>
-      {/if}
-      <Button type="submit" disabled={busy}>
-        {busy ? t("rule_form.saving") : (submitLabel ?? (initial ? t("rule_form.save") : t("rule_form.add")))}
-      </Button>
-    </div>
+    <Button type="submit" disabled={busy}>
+      {busy ? t("rule_form.saving") : t("rule_form.add")}
+    </Button>
   </div>
 
   {#if error}

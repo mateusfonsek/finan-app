@@ -179,7 +179,7 @@
     busyKey = `rule:${rule.id}`;
     try {
       const updated = await updateRule(rule.id, {
-        pattern: rule.pattern,
+        patterns: rule.patterns,
         category_id: newCategoryId,
         priority: rule.priority,
         due_day: rule.due_day,
@@ -200,7 +200,7 @@
     busyKey = `rule:${rule.id}`;
     try {
       const updated = await updateRule(rule.id, {
-        pattern: rule.pattern,
+        patterns: rule.patterns,
         category_id: rule.category_id,
         priority: rule.priority,
         due_day: rule.due_day,
@@ -216,7 +216,8 @@
 
   async function onDeleteRule(rule: Rule) {
     if (!autoReport) return;
-    const ok = await confirm(t("import.delete_rule_confirm", { pattern: rule.pattern }), {
+    const label = rule.display_name ?? rule.patterns[0] ?? "";
+    const ok = await confirm(t("import.delete_rule_confirm", { pattern: label }), {
       title: t("import.delete"),
       kind: "warning",
       okLabel: t("common.delete"),
@@ -237,6 +238,13 @@
     }
   }
 
+  /** Regra criada no import nasce com um trecho só (o CNPJ), mas ela pode ter
+   *  ganhado outros depois — o contador evita mostrar só metade da verdade. */
+  function patternsLabel(r: Rule): string {
+    const first = r.patterns[0] ?? "";
+    return r.patterns.length > 1 ? `${first}  +${r.patterns.length - 1}` : first;
+  }
+
   async function onCreateRuleForCnpj(cnpj: string) {
     if (!autoReport) return;
     const categoryId = chosen[cnpj];
@@ -249,7 +257,7 @@
     error = null;
     try {
       const rule = await createRule({
-        pattern: cnpj,
+        patterns: [cnpj],
         category_id: categoryId,
         priority: 10,
         due_day: null,
@@ -389,7 +397,7 @@
                 <input
                   type="text"
                   value={r.display_name ?? ""}
-                  placeholder={r.pattern}
+                  placeholder={r.patterns[0] ?? ""}
                   onblur={(e) => {
                     void onChangeRuleName(r, (e.currentTarget as HTMLInputElement).value);
                   }}
@@ -400,7 +408,7 @@
                          focus:!bg-surface-2 focus:!border-accent font-medium w-full"
                   title={t("import.rule_name_title")}
                 />
-                <div class="text-cap text-fg-subtle font-mono px-2 truncate">{r.pattern}</div>
+                <div class="text-cap text-fg-subtle font-mono px-2 truncate">{patternsLabel(r)}</div>
               </div>
               <select
                 value={String(r.category_id)}
@@ -422,7 +430,7 @@
                 onclick={() => onDeleteRule(r)}
                 disabled={busyKey === `rule:${r.id}`}
                 title={t("import.delete")}
-                aria-label={`${t("import.delete")} ${r.pattern}`}
+                aria-label={`${t("import.delete")} ${r.display_name ?? r.patterns[0] ?? ""}`}
                 class="hover:text-neg"
               >
                 {#if busyKey === `rule:${r.id}`}

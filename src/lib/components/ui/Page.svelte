@@ -28,7 +28,7 @@
      passando por baixo. O padding do topo reserva a faixa dos semáforos —
      com `titleBarStyle: Overlay` a janela não tem barra própria. -->
 <header
-  data-tauri-drag-region
+  data-tauri-drag-region="deep"
   class="material-chrome scroll-edge sticky top-0 z-20"
   style="padding-top: var(--titlebar-h)"
 >

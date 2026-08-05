@@ -38,7 +38,7 @@
      os semáforos do macOS flutuam sobre esta coluna, como em Mail, Notas e
      Finder. O padding superior é o espaço reservado pra eles. -->
 <aside
-  data-tauri-drag-region
+  data-tauri-drag-region="deep"
   class="bg-sidebar border-r border-border-subtle flex flex-col px-2.5 pb-3 select-none overflow-hidden"
   style="padding-top: var(--titlebar-h)"
 >
