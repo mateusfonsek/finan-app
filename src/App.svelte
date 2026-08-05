@@ -5,7 +5,7 @@
   import { openUrl } from "@tauri-apps/plugin-opener";
   import Sidebar from "$lib/components/shell/Sidebar.svelte";
   import AboutDialog from "$lib/components/shell/AboutDialog.svelte";
-  import WatchToast from "$lib/components/shell/WatchToast.svelte";
+  import ActivityCenter from "$lib/components/shell/ActivityCenter.svelte";
   import { openOfxPath } from "$lib/ofx/open";
   import { takePendingOfx } from "$lib/api/files";
   import { locale } from "$lib/i18n/locale.svelte";
@@ -137,6 +137,6 @@
   </main>
 </div>
 
-<WatchToast />
+<ActivityCenter />
 
 <AboutDialog open={aboutOpen} onClose={() => (aboutOpen = false)} />
