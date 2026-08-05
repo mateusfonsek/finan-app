@@ -1,5 +1,7 @@
 <script lang="ts">
   import { link, router } from "svelte-spa-router";
+  import Icon from "$lib/components/ui/Icon.svelte";
+  import type { IconName } from "$lib/components/ui/icons";
   import logoUrl from "$lib/assets/logo.png";
   import { locale } from "$lib/i18n/locale.svelte";
   import { watch } from "$lib/stores/watch.svelte";
@@ -8,16 +10,18 @@
 
   let { onAbout }: { onAbout: () => void } = $props();
 
-  type NavItem = { href: string; labelKey: string; sectionKey: string };
+  type NavItem = { href: string; labelKey: string; sectionKey: string; icon: IconName };
 
+  // Um símbolo por destino: numa barra lateral do macOS o ícone é o que o olho
+  // encontra primeiro; o rótulo confirma.
   const navItems: NavItem[] = [
-    { sectionKey: "overview", href: "/dashboard", labelKey: "dashboard" },
-    { sectionKey: "overview", href: "/transactions", labelKey: "transactions" },
-    { sectionKey: "overview", href: "/calendar", labelKey: "calendar" },
-    { sectionKey: "import", href: "/import", labelKey: "import" },
-    { sectionKey: "organize", href: "/categories", labelKey: "categories" },
-    { sectionKey: "organize", href: "/rules", labelKey: "rules" },
-    { sectionKey: "organize", href: "/suggestions", labelKey: "suggestions" },
+    { sectionKey: "overview", href: "/dashboard", labelKey: "dashboard", icon: "chartPie" },
+    { sectionKey: "overview", href: "/transactions", labelKey: "transactions", icon: "arrowLeftRight" },
+    { sectionKey: "overview", href: "/calendar", labelKey: "calendar", icon: "calendar" },
+    { sectionKey: "import", href: "/import", labelKey: "import", icon: "fileDown" },
+    { sectionKey: "organize", href: "/categories", labelKey: "categories", icon: "tags" },
+    { sectionKey: "organize", href: "/rules", labelKey: "rules", icon: "wandSparkles" },
+    { sectionKey: "organize", href: "/suggestions", labelKey: "suggestions", icon: "lightbulb" },
   ];
 
   const sections = ["overview", "import", "organize"];
@@ -26,63 +30,99 @@
     if (href === "/dashboard" && (current === "/" || current === "/dashboard")) return true;
     return current === href;
   }
+
+  let settingsActive = $derived(router.location === "/settings");
 </script>
 
-<aside class="bg-surface border-r border-border-subtle flex flex-col py-3 px-2.5 select-none">
+<!-- A faixa do topo é área de arraste da janela: com `titleBarStyle: Overlay`
+     os semáforos do macOS flutuam sobre esta coluna, como em Mail, Notas e
+     Finder. O padding superior é o espaço reservado pra eles. -->
+<aside
+  data-tauri-drag-region
+  class="bg-sidebar border-r border-border-subtle flex flex-col px-2.5 pb-3 select-none overflow-hidden"
+  style="padding-top: var(--titlebar-h)"
+>
   <button
     type="button"
     onclick={onAbout}
     title={t("sidebar.about_title")}
     aria-label={t("sidebar.about_title")}
-    class="flex items-center gap-2.5 px-2 py-1.5 mb-2 rounded-lg text-left hover:bg-hover transition-colors"
+    class="press-sm flex items-center gap-2.5 px-2 py-1.5 mb-1 rounded-[var(--radius-md)] text-left
+           hover:bg-hover transition-colors duration-[var(--dur-fast)]"
   >
     <img
       src={logoUrl}
-      alt="finan app"
-      class="w-7 h-7 rounded-md shrink-0"
+      alt=""
+      class="w-7 h-7 rounded-[7px] shrink-0 shadow-[var(--shadow-raised)]"
       draggable="false"
     />
-    <div>
-      <div class="text-[13.5px] font-semibold tracking-tight" style="font-family: var(--font-display)">finan app</div>
-      <div class="text-[10px] text-fg-faint mt-px">{t("sidebar.tagline")}</div>
-    </div>
+    <span class="flex flex-col min-w-0">
+      <span class="text-callout font-semibold tracking-[-0.012em] text-fg truncate">finan app</span>
+      <span class="text-cap2 text-fg-subtle truncate">{t("sidebar.tagline")}</span>
+    </span>
   </button>
 
-  {#each sections as section}
-    <div class="mt-2.5 flex flex-col gap-px">
-      <div class="text-[10.5px] font-semibold uppercase tracking-wider text-fg-faint px-2 pt-2 pb-1">
-        {t("sidebar." + section)}
+  <nav class="flex-1 overflow-y-auto -mx-0.5 px-0.5">
+    {#each sections as section}
+      <div class="mt-3.5 first:mt-1.5 flex flex-col gap-px">
+        <h2 class="text-cap font-semibold text-fg-subtle px-2 pb-1">
+          {t("sidebar." + section)}
+        </h2>
+        {#each navItems.filter((i) => i.sectionKey === section) as item}
+          {@const active = isActive(item.href, router.location)}
+          <a
+            use:link
+            href={item.href}
+            aria-current={active ? "page" : undefined}
+            class="group flex items-center gap-2.5 px-2 h-7 rounded-[var(--radius-md)] text-callout font-medium
+                   transition-colors duration-[var(--dur-fast)] ease-[var(--ease-snap)]
+                   {active
+              ? 'bg-accent text-accent-on'
+              : 'text-fg-muted hover:bg-hover hover:text-fg'}"
+          >
+            <Icon
+              name={item.icon}
+              size={15}
+              stroke={active ? 2 : 1.7}
+              class={active ? "" : "opacity-75 group-hover:opacity-100"}
+            />
+            <span class="flex-1 truncate">{t("nav." + item.labelKey)}</span>
+            {#if item.labelKey === "import" && watch.pendingCount > 0}
+              {@const badgeLabel =
+                watch.pendingCount === 1
+                  ? t("watch.badge_pending_one", { n: watch.pendingCount })
+                  : t("watch.badge_pending_many", { n: watch.pendingCount })}
+              <!-- Sozinho, o número não diz nada a quem usa leitor de tela: só
+                   um dígito solto no meio do menu. -->
+              <span
+                class="min-w-[17px] h-[17px] px-1 rounded-full grid place-items-center tabular text-cap2 font-semibold
+                       {active ? 'bg-accent-on/25 text-accent-on' : 'bg-accent text-accent-on'}"
+                aria-label={badgeLabel}
+                title={badgeLabel}
+              >
+                {watch.pendingCount}
+              </span>
+            {/if}
+          </a>
+        {/each}
       </div>
-      {#each navItems.filter((i) => i.sectionKey === section) as item}
-        {@const active = isActive(item.href, router.location)}
-        <a use:link
-           href={item.href}
-           class="flex items-center gap-2 px-2 py-1.5 rounded-md text-[12.5px] font-medium transition-colors {active ? 'bg-accent-soft text-fg' : 'text-fg-muted hover:bg-hover hover:text-fg'}">
-          <span class="flex-1">{t("nav." + item.labelKey)}</span>
-          {#if item.labelKey === "import" && watch.pendingCount > 0}
-            {@const badgeLabel =
-              watch.pendingCount === 1
-                ? t("watch.badge_pending_one", { n: watch.pendingCount })
-                : t("watch.badge_pending_many", { n: watch.pendingCount })}
-            <!-- Sozinho, o número não diz nada a quem usa leitor de tela: só um
-                 dígito solto no meio do menu. -->
-            <span
-              class="min-w-[16px] h-4 px-1 rounded-full bg-accent text-[10px] font-semibold text-white grid place-items-center tabular"
-              aria-label={badgeLabel}
-              title={badgeLabel}
-            >
-              {watch.pendingCount}
-            </span>
-          {/if}
-        </a>
-      {/each}
-    </div>
-  {/each}
+    {/each}
+  </nav>
 
-  <div class="flex-1"></div>
-
-  <a use:link href="/settings"
-     class="flex items-center gap-2 px-2 py-1.5 rounded-md text-[12.5px] font-medium text-fg-muted hover:bg-hover hover:text-fg transition-colors">
-    {t("nav.settings")}
+  <a
+    use:link
+    href="/settings"
+    aria-current={settingsActive ? "page" : undefined}
+    class="group flex items-center gap-2.5 px-2 h-7 mt-2 rounded-[var(--radius-md)] text-callout font-medium
+           transition-colors duration-[var(--dur-fast)] ease-[var(--ease-snap)]
+           {settingsActive ? 'bg-accent text-accent-on' : 'text-fg-muted hover:bg-hover hover:text-fg'}"
+  >
+    <Icon
+      name="settings"
+      size={15}
+      stroke={settingsActive ? 2 : 1.7}
+      class={settingsActive ? "" : "opacity-75 group-hover:opacity-100"}
+    />
+    <span class="flex-1 truncate">{t("nav.settings")}</span>
   </a>
 </aside>

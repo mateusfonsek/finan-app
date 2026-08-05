@@ -16,14 +16,15 @@
   );
 </script>
 
-<div class="rounded-xl bg-surface border border-border-subtle p-4 flex flex-col gap-1.5">
-  <div class="text-[10.5px] uppercase tracking-wider font-semibold text-fg-faint">
-    {label}
-  </div>
-  <div class="text-2xl font-semibold tracking-tight tabular {toneClass}" style="font-family: var(--font-display)">
+<!-- O número é o assunto: ele domina o cartão, o rótulo o nomeia e a legenda
+     explica o que NÃO está incluído. Hierarquia por tamanho + peso, não por
+     caixa alta. -->
+<div class="card p-3.5 flex flex-col gap-1">
+  <div class="text-foot font-medium text-fg-muted truncate" title={label}>{label}</div>
+  <div class="text-title1 font-semibold tabular {toneClass}">
     {raw ? value : formatMoney(value)}
   </div>
   {#if caption}
-    <div class="text-[11px] text-fg-faint tabular">{caption}</div>
+    <div class="text-cap text-fg-subtle leading-snug">{caption}</div>
   {/if}
 </div>

@@ -3,6 +3,9 @@
 
   const t = locale.t;
   import { onMount } from "svelte";
+  import Page from "$lib/components/ui/Page.svelte";
+  import Loading from "$lib/components/ui/Loading.svelte";
+  import ErrorNote from "$lib/components/ui/ErrorNote.svelte";
   import TxTable from "$lib/components/transactions/TxTable.svelte";
   import TxFilterBar from "$lib/components/transactions/TxFilterBar.svelte";
   import TxNotesPanel from "$lib/components/transactions/TxNotesPanel.svelte";
@@ -111,17 +114,14 @@
   }
 </script>
 
-<section class="p-8 max-w-5xl mx-auto flex flex-col gap-5">
-  <header class="flex items-baseline justify-between gap-4 flex-wrap">
-    <h2 class="text-xl font-semibold tracking-tight" style="font-family: var(--font-display)">
-      {t("nav.transactions")}
-    </h2>
-    <span class="text-xs text-fg-faint tabular">
+<Page title={t("nav.transactions")}>
+  {#snippet toolbar()}
+    <span class="text-sub text-fg-subtle tabular">
       {transactions.length === 1
         ? t("transactions_page.count_one", { n: transactions.length })
         : t("transactions_page.count_many", { n: transactions.length })}
     </span>
-  </header>
+  {/snippet}
 
   <TxFilterBar
     {categories}
@@ -135,9 +135,9 @@
   />
 
   {#if loading}
-    <div class="text-fg-faint text-sm">{t("common.loading")}</div>
+    <Loading />
   {:else if error}
-    <div class="rounded-lg border border-border bg-surface p-3 text-sm text-neg">{error}</div>
+    <ErrorNote message={error} />
   {:else}
     <TxTable
       {transactions}
@@ -148,7 +148,7 @@
       selectedId={selectedTx?.id ?? null}
     />
   {/if}
-</section>
+</Page>
 
 {#if selectedTx}
   <TxNotesPanel

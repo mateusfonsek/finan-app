@@ -23,7 +23,7 @@ src-tauri/icons/StoreLogo.png
 *.swp
 
 # Claude local settings (per-user)
-.claude/settings.local.json
+.claude/
 
 # Env
 .env

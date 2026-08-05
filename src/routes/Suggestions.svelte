@@ -4,6 +4,11 @@
   const t = locale.t;
   import { onMount } from "svelte";
   import { Button } from "$lib/components/ui/button";
+  import Page from "$lib/components/ui/Page.svelte";
+  import Card from "$lib/components/ui/Card.svelte";
+  import Loading from "$lib/components/ui/Loading.svelte";
+  import ErrorNote from "$lib/components/ui/ErrorNote.svelte";
+  import EmptyState from "$lib/components/ui/EmptyState.svelte";
   import { listCategories } from "$lib/api/categories";
   import { createRule } from "$lib/api/rules";
   import { suggestRules } from "$lib/api/suggestions";
@@ -100,29 +105,17 @@
   }
 </script>
 
-<section class="p-8 max-w-5xl mx-auto flex flex-col gap-5">
-  <header class="flex flex-col gap-1">
-    <h2 class="text-xl font-semibold tracking-tight" style="font-family: var(--font-display)">
-      {t("suggestions.title")}
-    </h2>
-    <p class="text-xs text-fg-faint max-w-xl">
-      <strong>{t("suggestions.desc_strong")}</strong>{t("suggestions.desc")}
-    </p>
-  </header>
-
+<Page title={t("suggestions.title")} subtitle={t("suggestions.subtitle")}>
   {#if loading}
-    <div class="text-fg-faint text-sm">{t("common.loading")}</div>
+    <Loading />
   {:else}
     {#if error}
-      <div class="rounded-lg border border-border bg-surface p-3 text-sm text-neg">{error}</div>
+      <ErrorNote message={error} />
     {/if}
 
-    <div class="rounded-xl bg-surface border border-border-subtle p-4 flex flex-col gap-3">
-      <div class="flex items-baseline justify-between">
-        <div class="text-[10.5px] uppercase tracking-wider font-semibold text-fg-faint">
-          {t("suggestions.recurring_no_category")}
-        </div>
-        <label class="flex items-center gap-2 text-[11px] text-fg-muted">
+    <Card title={t("suggestions.recurring_no_category")}>
+      {#snippet actions()}
+        <label class="flex items-center gap-2 text-foot text-fg-muted shrink-0">
           {t("suggestions.min_occurrences")}
           <input
             type="number"
@@ -130,55 +123,55 @@
             max="50"
             value={minCount}
             onchange={(e) => onMinCountChange(Number((e.currentTarget as HTMLInputElement).value))}
-            class="w-14 rounded-md border border-border bg-surface-2 px-2 py-0.5 text-[12px] text-fg tabular focus:outline-none focus:border-accent"
+            class="field w-14 tabular"
           />
         </label>
-      </div>
+      {/snippet}
 
       {#if suggestions.length === 0}
-        <div class="text-[12px] text-fg-faint py-4">
-          {t("suggestions.empty")}
-        </div>
+        <EmptyState icon="sparkles" title={t("suggestions.empty_title")} description={t("suggestions.empty")} compact />
       {:else}
         <div class="flex flex-col gap-2">
           {#each suggestions as s (s.key)}
             {@const badge = badgeFor(s.key)}
             {@const tone = toneColor(badge.tone)}
-            <article class="rounded-md border border-border-subtle bg-surface-2/50 p-3 flex flex-col gap-2 min-w-0">
-              <!-- Header: tipo + label + métricas -->
-              <div class="flex items-start gap-2 min-w-0">
+            <article class="card-inset p-3 flex flex-col gap-2.5 min-w-0">
+              <!-- Cabeçalho: tipo + rótulo + métricas -->
+              <div class="flex items-start gap-2.5 min-w-0">
                 <span
-                  class="text-[10px] uppercase tracking-wider font-semibold px-1.5 py-0.5 rounded border whitespace-nowrap shrink-0"
-                  style="color: {tone}; border-color: {tone}; opacity: 0.9;"
+                  class="text-cap2 font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap shrink-0 mt-px"
+                  style="color: {tone}; background: color-mix(in oklch, {tone} 15%, transparent);"
                 >
                   {badge.text}
                 </span>
                 <div class="flex-1 min-w-0">
-                  <div class="text-[12.5px] text-fg font-medium truncate" title={s.label}>
+                  <div class="text-callout text-fg font-medium truncate" title={s.label}>
                     {s.label}
                   </div>
-                  <div class="text-[10.5px] text-fg-faint truncate" title={s.sample_description}>
+                  <div class="text-cap text-fg-subtle truncate" title={s.sample_description}>
                     {s.sample_description}
                   </div>
                 </div>
-                <div class="shrink-0 flex items-baseline gap-3 text-[11.5px] tabular">
-                  <span class="text-fg-muted">{s.count}×</span>
+                <div class="shrink-0 flex items-baseline gap-3 text-sub tabular">
+                  <span class="text-fg-subtle">{s.count}×</span>
                   <span class="{Number(s.total) < 0 ? 'text-neg' : 'text-pos'} font-medium">
                     {fmtAbsTotal(s.total)}
                   </span>
                 </div>
               </div>
 
-              <!-- Footer: pattern + categoria + ação -->
+              <!-- Rodapé: pattern + categoria + ação -->
               <div class="flex gap-2 items-center min-w-0">
-                <label class="flex-1 min-w-0 flex items-center gap-1.5">
-                  <span class="text-[10px] uppercase tracking-wider text-fg-faint shrink-0">{t("suggestions.pattern_label")}</span>
+                <label class="flex-1 min-w-0 flex items-center gap-2">
+                  <span class="text-foot text-fg-subtle shrink-0">
+                    {t("suggestions.pattern_label")}
+                  </span>
                   <input
                     value={patternOverride[s.key] ?? s.suggested_pattern}
                     oninput={(e) => {
                       patternOverride[s.key] = (e.currentTarget as HTMLInputElement).value;
                     }}
-                    class="flex-1 min-w-0 rounded-md border border-border bg-surface px-2 py-1 text-[12px] text-fg font-mono focus:outline-none focus:border-accent"
+                    class="field flex-1 min-w-0 font-mono !bg-surface"
                     title={t("tx_notes.pattern_title")}
                   />
                 </label>
@@ -188,7 +181,8 @@
                     const v = (e.currentTarget as HTMLSelectElement).value;
                     chosen[s.key] = v === "" ? null : Number(v);
                   }}
-                  class="w-36 shrink-0 rounded-md border border-border bg-surface px-2 py-1 text-[12px] text-fg"
+                  aria-label={t("import.category_placeholder")}
+                  class="field w-36 shrink-0 !bg-surface"
                 >
                   <option value="">{t("import.category_placeholder")}</option>
                   {#each categories as c}
@@ -199,13 +193,13 @@
                   onclick={() => createRuleFor(s)}
                   disabled={busyKey === s.key || chosen[s.key] == null}
                 >
-                  {busyKey === s.key ? "…" : t("suggestions.create")}
+                  {busyKey === s.key ? t("import.creating") : t("suggestions.create")}
                 </Button>
               </div>
             </article>
           {/each}
         </div>
       {/if}
-    </div>
+    </Card>
   {/if}
-</section>
+</Page>

@@ -3,7 +3,12 @@
 
   const t = locale.t;
   import { onMount } from "svelte";
+  import { confirm } from "@tauri-apps/plugin-dialog";
   import { Button } from "$lib/components/ui/button";
+  import Page from "$lib/components/ui/Page.svelte";
+  import Loading from "$lib/components/ui/Loading.svelte";
+  import ErrorNote from "$lib/components/ui/ErrorNote.svelte";
+  import Icon from "$lib/components/ui/Icon.svelte";
   import RuleForm from "$lib/components/rules/RuleForm.svelte";
   import RulesList from "$lib/components/rules/RulesList.svelte";
   import { listCategories } from "$lib/api/categories";
@@ -70,8 +75,14 @@
     await refresh();
   }
 
+  /** Alerta NATIVO do macOS — apagar uma regra descategoriza transações. */
   async function onDelete(rule: Rule) {
-    const ok = confirm(t("rules_page.delete_confirm", { pattern: rule.pattern }));
+    const ok = await confirm(t("rules_page.delete_confirm", { pattern: rule.pattern }), {
+      title: t("rules.delete"),
+      kind: "warning",
+      okLabel: t("common.delete"),
+      cancelLabel: t("common.cancel"),
+    });
     if (!ok) return;
     await deleteRule(rule.id);
     await refresh();
@@ -95,31 +106,25 @@
   }
 </script>
 
-<section class="p-8 max-w-5xl mx-auto flex flex-col gap-5">
-  <header class="flex items-baseline justify-between gap-4 flex-wrap">
-    <div class="flex flex-col gap-1">
-      <h2 class="text-xl font-semibold tracking-tight" style="font-family: var(--font-display)">
-        {t("nav.rules")}
-      </h2>
-      <p class="text-xs text-fg-faint max-w-xl">
-        {t("rules_page.desc")}
-      </p>
-    </div>
-    <div class="flex items-center gap-2">
-      {#if applyMsg}
-        <span class="text-[11px] text-fg-faint">{applyMsg}</span>
-      {/if}
-      <Button onclick={onApply} disabled={applying || rules.length === 0}>
-        {applying ? t("rules_page.applying") : t("rules_page.apply")}
-      </Button>
-    </div>
-  </header>
+<Page title={t("nav.rules")} subtitle={t("rules_page.desc")}>
+  {#snippet toolbar()}
+    <Button variant="outline" onclick={onApply} disabled={applying || rules.length === 0}>
+      <Icon name="rotateCw" size={12.5} class={applying ? "animate-spin" : ""} />
+      {applying ? t("rules_page.applying") : t("rules_page.apply")}
+    </Button>
+  {/snippet}
 
   {#if loading}
-    <div class="text-fg-faint text-sm">{t("common.loading")}</div>
+    <Loading />
   {:else}
     {#if error}
-      <div class="rounded-lg border border-border bg-surface p-3 text-sm text-neg">{error}</div>
+      <ErrorNote message={error} />
+    {/if}
+
+    <!-- Resultado de "aplicar" fica junto do botão que o causou, não numa
+         faixa genérica no topo. -->
+    {#if applyMsg}
+      <ErrorNote message={applyMsg} tone="success" />
     {/if}
 
     {#if editing}
@@ -141,4 +146,4 @@
       {onDelete}
     />
   {/if}
-</section>
+</Page>

@@ -1,7 +1,41 @@
 {
-  "months": ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"],
-  "months_short": ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"],
-  "weekdays_short": ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"],
+  "months": [
+    "Janeiro",
+    "Fevereiro",
+    "Março",
+    "Abril",
+    "Maio",
+    "Junho",
+    "Julho",
+    "Agosto",
+    "Setembro",
+    "Outubro",
+    "Novembro",
+    "Dezembro"
+  ],
+  "months_short": [
+    "Jan",
+    "Fev",
+    "Mar",
+    "Abr",
+    "Mai",
+    "Jun",
+    "Jul",
+    "Ago",
+    "Set",
+    "Out",
+    "Nov",
+    "Dez"
+  ],
+  "weekdays_short": [
+    "Dom",
+    "Seg",
+    "Ter",
+    "Qua",
+    "Qui",
+    "Sex",
+    "Sáb"
+  ],
   "menu": {
     "app_name": "finan app",
     "about": "Sobre o finan app",
@@ -35,7 +69,10 @@
     "edit": "Editar",
     "close": "Fechar",
     "language": "Idioma",
-    "loading": "Carregando…"
+    "loading": "Carregando…",
+    "actions": "Ações",
+    "create": "Criar",
+    "retry": "Tentar de novo"
   },
   "month_stepper": {
     "prev_year": "Ano anterior",
@@ -50,9 +87,9 @@
   "calendar": {
     "outflow": "Saída",
     "inflow": "Entrada",
-    "legend_pending": "○ pendente",
-    "legend_overdue": "! vencida",
-    "legend_paid": "✓ paga",
+    "legend_pending": "pendente",
+    "legend_overdue": "vencida",
+    "legend_paid": "paga",
     "more": "+{n} mais",
     "day_aria": "Dia {day}",
     "day_aria_flow": "Dia {day} — entradas {inflow}, saídas {outflow}",
@@ -67,7 +104,7 @@
     "selected_day": "Dia selecionado",
     "select_day": "Selecione um dia",
     "empty_select": "Clique em qualquer dia do calendário pra ver as transações desse dia.",
-    "empty_none": "Nenhuma transação nesse dia.",
+    "empty_none": "Nada aconteceu neste dia",
     "due_bills": "Contas com vencimento",
     "income": "Renda",
     "expenses": "Gastos",
@@ -85,10 +122,22 @@
     "promise": "Sem conta, sem nuvem, sem internet. Tudo que você registra fica no seu computador e só você vê.",
     "disclaimer": "Serve pra você organizar suas finanças pessoais. Não dá conselhos de investimento nem funciona como banco.",
     "specs": [
-      { "label": "Sem internet", "value": "Funciona sem precisar de conexão" },
-      { "label": "Sem conta", "value": "Nada de cadastro nem senha" },
-      { "label": "Sem custo", "value": "Grátis e sem anúncios" },
-      { "label": "Sem pegadinha", "value": "Você vê tudo que ele faz" }
+      {
+        "label": "Sem internet",
+        "value": "Funciona sem precisar de conexão"
+      },
+      {
+        "label": "Sem conta",
+        "value": "Nada de cadastro nem senha"
+      },
+      {
+        "label": "Sem custo",
+        "value": "Grátis e sem anúncios"
+      },
+      {
+        "label": "Sem pegadinha",
+        "value": "Você vê tudo que ele faz"
+      }
     ]
   },
   "kind": {
@@ -105,18 +154,20 @@
     "description": "Descrição",
     "category": "Categoria",
     "amount": "Valor",
-    "empty": "Nenhuma transação ainda.",
-    "import_link": "Importar um OFX"
+    "empty": "Nenhuma transação ainda",
+    "import_link": "Importar um OFX",
+    "empty_desc": "Importe o extrato .ofx do seu banco e as transações aparecem aqui, já categorizadas pelas suas regras."
   },
   "tx_filter": {
-    "all_categories": "Todas as categorias"
+    "all_categories": "Todas as categorias",
+    "clear_all": "Limpar filtros"
   },
   "category_picker": {
     "no_category": "Sem categoria",
     "search_or_create": "Buscar ou criar…",
     "remove_category": "Remover categoria",
     "create_prefix": "Criar",
-    "empty": "Nenhuma categoria."
+    "empty": "Nenhuma categoria"
   },
   "categories": {
     "col_category": "Categoria",
@@ -124,7 +175,7 @@
     "col_transactions": "Transações",
     "edit": "Editar",
     "delete": "Apagar",
-    "empty": "Sem categorias.",
+    "empty": "Nenhuma categoria ainda",
     "form_edit": "Editar categoria",
     "form_new": "Nova categoria",
     "name": "Nome",
@@ -134,22 +185,24 @@
     "name_required": "Nome não pode ser vazio.",
     "saving": "Salvando…",
     "save": "Salvar",
-    "add": "Adicionar"
+    "add": "Adicionar",
+    "empty_desc": "Categorias agrupam seus gastos no dashboard e nos relatórios. Crie a primeira no formulário acima."
   },
   "rules": {
-    "col_pattern": "Pattern",
+    "col_pattern": "Trecho da descrição",
     "col_category": "Categoria",
     "col_due": "Vence",
-    "col_priority": "Prio",
+    "col_priority": "Prioridade",
     "due_day": "dia {day}",
     "edit": "Editar",
     "delete": "Apagar",
-    "empty": "Nenhuma regra ainda. Crie uma acima — ex. pattern \"uber\" → Transporte."
+    "empty": "Uma regra diz \"se a descrição contém X, use a categoria Y\" — e passa a valer sozinha em todo import. Ex.: \"uber\" → Transporte.",
+    "empty_title": "Nenhuma regra ainda"
   },
   "rule_form": {
     "form_edit": "Editar regra",
     "form_new": "Nova regra",
-    "pattern_label": "Pattern (descrição contém)",
+    "pattern_label": "Trecho da descrição",
     "pattern_placeholder": "ex: uber",
     "category": "Categoria",
     "select_placeholder": "— selecione —",
@@ -167,12 +220,12 @@
     "expenses": "Gastos",
     "income": "Renda",
     "no_category": "sem categoria",
-    "no_expenses_period": "Sem gastos no período.",
-    "no_income_period": "Sem entradas no período.",
+    "no_expenses_period": "Sem gastos no período",
+    "no_income_period": "Sem entradas no período",
     "recurring": "recorrente",
     "recurring_title": "Recorrente · {months} meses distintos",
-    "no_data_12m": "Sem dados nos últimos 12 meses.",
-    "empty_tx": "Nenhuma transação ainda.",
+    "no_data_12m": "Sem dados nos últimos 12 meses",
+    "empty_tx": "Nenhuma transação ainda",
     "kpi_income": "Renda",
     "kpi_expenses": "Gastos",
     "kpi_balance": "Saldo do mês",
@@ -274,16 +327,17 @@
     "neutralized_pairs": "Pares neutralizados",
     "neutralized_pairs_title": "Pares estorno/reembolso ↔ transação revertida (desmarcados por padrão)",
     "import_n_one": "Importar {n} transação",
-    "import_n_many": "Importar {n} transações"
+    "import_n_many": "Importar {n} transações",
+    "toggle_all": "Selecionar todas as transações"
   },
   "tx_notes": {
     "detail": "Detalhe",
-    "create_rule_cta": "+ Criar regra desta transação",
+    "create_rule_cta": "Criar regra desta transação",
     "new_rule": "Nova regra",
-    "pattern_title": "LIKE substring que será gravado na regra",
+    "pattern_title": "Trecho que será procurado dentro da descrição de cada transação",
     "creating": "Criando…",
     "create_apply": "Criar e aplicar",
-    "notes": "Notes",
+    "notes": "Anotações",
     "notes_placeholder": "Anotações sobre essa transação…"
   },
   "transactions_page": {
@@ -313,7 +367,8 @@
     "inflows": "Entradas",
     "outflows": "Saídas",
     "loading": "carregando…",
-    "net": "Líquido"
+    "net": "Líquido",
+    "subtitle": "Entradas e saídas reais do mês, dia a dia (transferências e investimentos ficam de fora). Clique num dia pra ver tudo que aconteceu nele."
   },
   "onboarding": {
     "title": "Suas finanças, no seu Mac.",
@@ -328,7 +383,7 @@
     "recurring_no_category": "Recorrências sem categoria",
     "min_occurrences": "mín. ocorrências",
     "empty": "Nada por aqui — todas as contrapartes recorrentes já têm categoria, ou aumente o filtro de ocorrências.",
-    "pattern_label": "Pattern",
+    "pattern_label": "Trecho",
     "create": "Criar",
     "badge_cnpj": "CNPJ",
     "badge_debito": "DÉBITO",
@@ -337,7 +392,9 @@
     "badge_ted_in": "TRANSF. ←",
     "badge_boleto": "BOLETO",
     "badge_system": "SISTEMA",
-    "badge_other": "OUTRO"
+    "badge_other": "OUTRO",
+    "subtitle": "Gastos recorrentes que ainda não têm categoria — débito de cartão, Pix entre pessoas, boletos. CNPJs já são resolvidos na importação; entradas ficam no Dashboard, em Fontes de renda.",
+    "empty_title": "Nada pendente por aqui"
   },
   "settings": {
     "title": "Configurações",
@@ -360,7 +417,8 @@
     "about_line": "finanças pessoais 100% locais no Mac.",
     "shortcuts_label": "Atalhos:",
     "shortcut_search": "Buscar",
-    "shortcut_open_ofx": "Abrir OFX"
+    "shortcut_open_ofx": "Abrir OFX",
+    "restore_ok": "Substituir"
   },
   "watch": {
     "section_title": "Importação automática",
@@ -397,7 +455,7 @@
     "toast_meta_one": "{n} transação · {from} → {to}",
     "toast_meta_many": "{n} transações · {from} → {to}",
     "toast_review": "Revisar",
-    "toast_ignore": "ignorar",
+    "toast_ignore": "Ignorar",
     "toast_collapse": "Encolher",
     "toast_expand": "Ver o extrato encontrado",
     "queue_next": "Próximo extrato ({n} na fila)",

@@ -1,19 +1,30 @@
 <script lang="ts">
   import { locale } from "$lib/i18n/locale.svelte";
-
-  const t = locale.t;
   import { formatMoney } from "$lib/format/money";
+  import EmptyState from "$lib/components/ui/EmptyState.svelte";
   import type { MonthSummary } from "$lib/bindings";
 
-  type Props = {
-    months: MonthSummary[];
-  };
+  const t = locale.t;
 
+  type Props = { months: MonthSummary[] };
   let { months }: Props = $props();
 
+  let hovered = $state<string | null>(null);
+
   function shortLabel(yyyymm: string): string {
-    const [y, mo] = yyyymm.split("-");
-    return `${locale.monthsShort[Number(mo) - 1] ?? mo}/${y}`;
+    const [, mo] = yyyymm.split("-");
+    return locale.monthsShort[Number(mo) - 1] ?? mo;
+  }
+
+  function yearLabel(yyyymm: string): string {
+    return yyyymm.slice(2, 4);
+  }
+
+  /** Marca a virada de ano — sem isso, doze rótulos de mês não dizem quando
+   *  o ano trocou. */
+  function isYearStart(i: number): boolean {
+    if (i === 0) return true;
+    return months[i].month.slice(0, 4) !== months[i - 1].month.slice(0, 4);
   }
 
   let maxValue = $derived(
@@ -32,22 +43,41 @@
   }
 </script>
 
-<div class="grid grid-cols-12 gap-1.5 items-end h-[140px] pt-2">
-  {#each months as m (m.month)}
-    <div class="flex flex-col items-center gap-1.5 h-full">
-      <div
-        class="w-full flex-1 flex flex-col-reverse rounded-t overflow-hidden bg-surface-2"
-        title={`${m.month} · in: ${formatMoney(m.income)} · out: ${formatMoney(m.expense)}`}
-      >
-        <span class="w-full bg-pos" style="height: {pct(m.income)}%"></span>
-        <span class="w-full bg-neg" style="height: {pct(m.expense)}%; opacity: 0.6;"></span>
-      </div>
-      <span class="text-[9.5px] text-fg-faint tabular">{shortLabel(m.month)}</span>
+{#if months.length === 0}
+  <EmptyState icon="trendingUp" title={t("dashboard.no_data_12m")} compact />
+{:else}
+  <div class="flex flex-col gap-2">
+    <div class="grid grid-cols-12 gap-1.5 items-end h-[132px]">
+      {#each months as m, i (m.month)}
+        <!-- Duas barras lado a lado por mês: entradas e saídas comparáveis num
+             relance, em vez de empilhadas (que só mostra o total). -->
+        <div
+          role="presentation"
+          onmouseenter={() => (hovered = m.month)}
+          onmouseleave={() => (hovered = null)}
+          class="flex flex-col items-center gap-1.5 h-full"
+          title={`${m.month} · ${t("dashboard.legend_inflows")}: ${formatMoney(m.income)} · ${t("dashboard.legend_outflows")}: ${formatMoney(m.expense)}`}
+        >
+          <div class="w-full flex-1 flex items-end justify-center gap-[3px]">
+            <span
+              class="flex-1 max-w-[13px] rounded-t-[3px] bg-pos transition-opacity duration-[var(--dur-fast)]"
+              style="height: {pct(m.income)}%; opacity: {hovered && hovered !== m.month ? 0.35 : 0.95}"
+            ></span>
+            <span
+              class="flex-1 max-w-[13px] rounded-t-[3px] bg-neg transition-opacity duration-[var(--dur-fast)]"
+              style="height: {pct(m.expense)}%; opacity: {hovered && hovered !== m.month ? 0.25 : 0.7}"
+            ></span>
+          </div>
+          <span
+            class="text-cap2 tabular transition-colors duration-[var(--dur-fast)]
+                   {hovered === m.month ? 'text-fg' : 'text-fg-subtle'}"
+          >
+            {shortLabel(m.month)}{#if isYearStart(i)}<span class="text-fg-subtle"
+                >’{yearLabel(m.month)}</span
+              >{/if}
+          </span>
+        </div>
+      {/each}
     </div>
-  {/each}
-  {#if months.length === 0}
-    <div class="col-span-12 text-center text-fg-faint italic py-8">
-      {t("dashboard.no_data_12m")}
-    </div>
-  {/if}
-</div>
+  </div>
+{/if}

@@ -3,6 +3,9 @@
 
   const t = locale.t;
   import { onMount } from "svelte";
+  import Page from "$lib/components/ui/Page.svelte";
+  import ErrorNote from "$lib/components/ui/ErrorNote.svelte";
+  import Spinner from "$lib/components/ui/Spinner.svelte";
   import MonthStepper from "$lib/components/shell/MonthStepper.svelte";
   import CalendarGrid, { type DayFlow } from "$lib/components/calendar/CalendarGrid.svelte";
   import DayDetails from "$lib/components/calendar/DayDetails.svelte";
@@ -22,7 +25,12 @@
   /** Dia selecionado (1..31). null = nenhum. */
   let selectedDay = $state<number | null>(null);
 
-  const today = new Date().toISOString().slice(0, 10);
+  /** Hoje no fuso de quem está lendo. `toISOString()` devolve UTC: à noite, a
+   *  oeste de Greenwich, ele já virou o dia — e o calendário destacava amanhã. */
+  const today = (() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  })();
 
   function monthForCalendar(m: string | null): string {
     if (!m) {
@@ -146,42 +154,38 @@
 
 </script>
 
-<section class="p-8 max-w-6xl mx-auto flex flex-col gap-5">
-  <header class="flex items-baseline justify-between gap-4 flex-wrap">
-    <div class="flex flex-col gap-1">
-      <h2 class="text-xl font-semibold tracking-tight" style="font-family: var(--font-display)">
-        {t("nav.calendar")}
-      </h2>
-      <p class="text-xs text-fg-faint max-w-xl">
-        {t("calendar_page.desc_1")} <strong>{t("calendar_page.desc_strong")}</strong> {t("calendar_page.desc_2")}
-      </p>
-    </div>
+<Page
+  title={t("nav.calendar")}
+  subtitle={t("calendar_page.subtitle")}
+  width="wide"
+>
+  {#snippet toolbar()}
     <MonthStepper month={viewMonth} onChange={onMonthChange} />
-  </header>
+  {/snippet}
 
   {#if error}
-    <div class="rounded-lg border border-border bg-surface p-3 text-sm text-neg">{error}</div>
+    <ErrorNote message={error} />
   {/if}
 
   <!-- Resumo do mês compacto (sempre visível, mesmo em mês vazio) -->
-  <div class="rounded-lg border border-border-subtle bg-surface px-4 py-2.5 flex items-center gap-6 text-[12px]">
+  <div class="card px-4 py-2.5 flex items-center gap-7 text-callout">
     <div class="flex items-center gap-2">
-      <span class="text-fg-faint text-[10.5px] uppercase tracking-wider">{t("calendar_page.inflows")}</span>
+      <span class="text-foot text-fg-subtle">{t("calendar_page.inflows")}</span>
       <span class="tabular text-pos font-medium">
         {monthTotals.inflow > 0 ? formatMoney(String(monthTotals.inflow)) : "—"}
       </span>
     </div>
     <div class="flex items-center gap-2">
-      <span class="text-fg-faint text-[10.5px] uppercase tracking-wider">{t("calendar_page.outflows")}</span>
+      <span class="text-foot text-fg-subtle">{t("calendar_page.outflows")}</span>
       <span class="tabular text-neg font-medium">
         {monthTotals.outflow > 0 ? formatMoney(String(monthTotals.outflow)) : "—"}
       </span>
     </div>
     <div class="flex items-center gap-2 ml-auto">
       {#if loading}
-        <span class="text-fg-faint text-[11px]">{t("calendar_page.loading")}</span>
+        <Spinner size={12} class="text-fg-faint" />
       {/if}
-      <span class="text-fg-faint text-[10.5px] uppercase tracking-wider">{t("calendar_page.net")}</span>
+      <span class="text-foot text-fg-subtle">{t("calendar_page.net")}</span>
       <span class="tabular font-semibold {monthTotals.net >= 0 ? 'text-pos' : 'text-neg'}">
         {formatMoney(String(monthTotals.net))}
       </span>
@@ -204,4 +208,4 @@
       <DayDetails {selectedDate} {transactions} {categories} {events} {today} />
     </aside>
   </div>
-</section>
+</Page>

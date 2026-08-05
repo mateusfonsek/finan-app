@@ -1,5 +1,7 @@
 <script lang="ts">
   import { Button } from "$lib/components/ui/button";
+  import Icon from "$lib/components/ui/Icon.svelte";
+  import ErrorNote from "$lib/components/ui/ErrorNote.svelte";
   import { locale } from "$lib/i18n/locale.svelte";
   import type { CategoryWithCount } from "$lib/bindings";
 
@@ -64,27 +66,24 @@
   }
 </script>
 
-<form onsubmit={submit} class="rounded-lg border border-border-subtle bg-surface p-4 flex flex-col gap-3">
-  <div class="text-[10.5px] uppercase tracking-wider font-semibold text-fg-faint">
-    {initial ? t("categories.form_edit") : t("categories.form_new")}
+<form
+  onsubmit={submit}
+  class="card p-4 flex flex-col gap-3.5 {initial ? 'ring-[1.5px] ring-accent ring-inset' : ''}"
+>
+  <div class="flex items-center gap-2">
+    <Icon name={initial ? "pencil" : "plus"} size={13} class="text-fg-subtle" />
+    <span class="section-title">{initial ? t("categories.form_edit") : t("categories.form_new")}</span>
   </div>
 
-  <div class="grid grid-cols-[1fr_140px_auto] gap-2 items-end">
+  <div class="grid grid-cols-[minmax(0,320px)_150px_auto] gap-2.5 items-end justify-start">
     <label class="flex flex-col gap-1">
-      <span class="text-[11px] text-fg-muted">{t("categories.name")}</span>
-      <input
-        bind:value={name}
-        placeholder={t("categories.name_placeholder")}
-        class="rounded-md border border-border bg-surface-2 px-2 py-1 text-[12px] text-fg focus:outline-none focus:border-accent"
-      />
+      <span class="text-foot text-fg-subtle">{t("categories.name")}</span>
+      <input bind:value={name} placeholder={t("categories.name_placeholder")} class="field" />
     </label>
 
     <label class="flex flex-col gap-1">
-      <span class="text-[11px] text-fg-muted">{t("categories.type")}</span>
-      <select
-        bind:value={kind}
-        class="rounded-md border border-border bg-surface-2 px-2 py-1 text-[12px] text-fg"
-      >
+      <span class="text-foot text-fg-subtle">{t("categories.type")}</span>
+      <select bind:value={kind} class="field">
         <option value="expense">{t("kind.expense")}</option>
         <option value="income">{t("kind.income")}</option>
         <option value="transfer">{t("kind.transfer")}</option>
@@ -102,22 +101,33 @@
   </div>
 
   <div class="flex flex-col gap-1.5">
-    <span class="text-[11px] text-fg-muted">{t("categories.color")}</span>
-    <div class="flex gap-1.5 flex-wrap">
+    <span class="text-foot text-fg-subtle">{t("categories.color")}</span>
+    <!-- Poço de cores: o selecionado ganha um anel externo e um visto por
+         dentro — a marca não depende só do contorno pra ser vista. -->
+    <div class="flex gap-2 flex-wrap" role="radiogroup" aria-label={t("categories.color")}>
       {#each COLOR_TOKENS as token}
+        {@const selected = colorToken === token}
         <button
           type="button"
+          role="radio"
+          aria-checked={selected}
           onclick={() => (colorToken = token)}
-          aria-label={token}
-          class="w-6 h-6 rounded-full transition-all
-                 {colorToken === token ? 'ring-2 ring-accent ring-offset-2 ring-offset-surface scale-110' : 'hover:scale-105'}"
+          aria-label={token.replace("--color-cat-", "")}
+          class="w-6 h-6 rounded-full grid place-items-center text-white
+                 transition-transform duration-[var(--dur-fast)] ease-[var(--ease-snap)]
+                 hover:scale-110 active:scale-95
+                 {selected ? 'ring-2 ring-accent ring-offset-2 ring-offset-surface' : ''}"
           style="background: var({token})"
-        ></button>
+        >
+          {#if selected}
+            <Icon name="check" size={12} stroke={3} class="drop-shadow-[0_1px_2px_rgba(0,0,0,.45)]" />
+          {/if}
+        </button>
       {/each}
     </div>
   </div>
 
   {#if error}
-    <div class="text-[11px] text-neg">{error}</div>
+    <ErrorNote message={error} />
   {/if}
 </form>

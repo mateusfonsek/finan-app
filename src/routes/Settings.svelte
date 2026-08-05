@@ -1,7 +1,18 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { Button } from "$lib/components/ui/button";
-  import { open as openDialog, save as saveDialog, message } from "@tauri-apps/plugin-dialog";
+  import Page from "$lib/components/ui/Page.svelte";
+  import Card from "$lib/components/ui/Card.svelte";
+  import Icon from "$lib/components/ui/Icon.svelte";
+  import ErrorNote from "$lib/components/ui/ErrorNote.svelte";
+  import { popover } from "$lib/motion";
+  import { healthCheck } from "$lib/api/health";
+  import {
+    confirm,
+    open as openDialog,
+    save as saveDialog,
+    message,
+  } from "@tauri-apps/plugin-dialog";
   import { revealItemInDir } from "@tauri-apps/plugin-opener";
   import { homeDir, join } from "@tauri-apps/api/path";
   import { dbPath, exportBackup, restoreBackup } from "$lib/api/backup";
@@ -33,6 +44,8 @@
   let menuWrapperEl: HTMLDivElement | undefined = $state();
   let icloudWaiting = $state(0);
   let lastScanAt = $state<string | null>(null);
+  /** A versão vem do binário — literal no template envelhece sem avisar. */
+  let version = $state<string | null>(null);
 
   async function loadFolders() {
     folders = await listWatchedFolders();
@@ -64,6 +77,7 @@
   onMount(async () => {
     try {
       path = await dbPath();
+      void healthCheck().then((h) => (version = h.version)).catch(() => {});
       await watch.loadEnabled();
       if (watch.enabled) await loadFolders();
     } catch (e) {
@@ -136,7 +150,12 @@
     // Criar a pasta é a ÚNICA escrita em disco da feature — por isso pergunta,
     // e só quando ela realmente não existe.
     if (!(await dirExists(target))) {
-      if (!confirm(t("watch.create_icloud_confirm"))) return;
+      const ok = await confirm(t("watch.create_icloud_confirm"), {
+        title: t("watch.preset_icloud"),
+        okLabel: t("common.create"),
+        cancelLabel: t("common.cancel"),
+      });
+      if (!ok) return;
       try {
         await ensureDir(target);
       } catch (e) {
@@ -265,7 +284,14 @@
     });
     if (!picked || Array.isArray(picked)) return;
 
-    const confirmed = confirm(t("settings.restore_confirm"));
+    // Restaurar SUBSTITUI o banco — destrutivo e irreversível, então é um dos
+    // poucos lugares que merece um alerta nativo bloqueando o caminho.
+    const confirmed = await confirm(t("settings.restore_confirm"), {
+      title: t("settings.restore_title"),
+      kind: "warning",
+      okLabel: t("settings.restore_ok"),
+      cancelLabel: t("common.cancel"),
+    });
     if (!confirmed) return;
 
     busy = true;
@@ -283,84 +309,83 @@
   }
 </script>
 
-<section class="p-8 max-w-3xl mx-auto flex flex-col gap-6">
-  <header>
-    <h2 class="text-xl font-semibold tracking-tight" style="font-family: var(--font-display)">
-      {t("settings.title")}
-    </h2>
-  </header>
-
-  <div class="rounded-xl bg-surface border border-border-subtle p-5 flex flex-col gap-3">
-    <div class="text-[10.5px] uppercase tracking-wider font-semibold text-fg-faint">
-      {t("settings.language")}
-    </div>
-    <p class="text-xs text-fg-muted leading-relaxed">
-      {t("settings.language_desc")}
-    </p>
+<Page title={t("settings.title")} width="narrow">
+  <!-- ── Idioma ─────────────────────────────────────────────────────────── -->
+  <Card title={t("settings.language")}>
+    <p class="text-sub text-fg-muted leading-relaxed">{t("settings.language_desc")}</p>
     <div class="flex flex-wrap gap-2">
       {#each locales as l}
+        {@const active = locale.code === l.code}
         <button
           type="button"
           onclick={() => locale.set(l.code)}
-          class="flex items-center gap-2 px-3 py-1.5 rounded-md text-[12.5px] font-medium border transition-colors
-                 {locale.code === l.code
-                   ? 'bg-accent-soft text-fg border-accent'
-                   : 'text-fg-muted border-border hover:bg-hover hover:text-fg'}"
-          aria-pressed={locale.code === l.code}
+          class="press flex items-center gap-2 h-7 px-3 rounded-[var(--radius-md)] text-callout font-medium
+                 border transition-colors duration-[var(--dur-fast)]
+                 {active
+            ? 'bg-accent text-accent-on border-transparent'
+            : 'text-fg-muted border-border bg-surface-2 hover:bg-hover hover:text-fg'}"
+          aria-pressed={active}
         >
           {#if l.flag}<span>{l.flag}</span>{/if}
           <span>{l.name}</span>
+          {#if active}<Icon name="check" size={12} stroke={2.6} />{/if}
         </button>
       {/each}
     </div>
-  </div>
+  </Card>
 
-  <div class="rounded-xl bg-surface border border-border-subtle p-5 flex flex-col gap-3">
-    <div class="flex items-center justify-between">
-      <div class="text-[10.5px] uppercase tracking-wider font-semibold text-fg-faint">
-        {t("watch.section_title")}
-      </div>
+  <!-- ── Importação automática ──────────────────────────────────────────── -->
+  <Card title={t("watch.section_title")}>
+    {#snippet actions()}
       {#if watch.enabled}
         <button
           type="button"
           onclick={disableWatch}
-          class="text-[11px] text-fg-muted hover:text-fg transition-colors"
+          class="text-foot text-fg-subtle hover:text-fg transition-colors duration-[var(--dur-fast)] shrink-0"
         >
           {t("watch.disable")}
         </button>
       {/if}
-    </div>
+    {/snippet}
 
     {#if !watch.enabled}
-      <div class="text-[13px] font-medium text-fg">{t("watch.pitch_title")}</div>
-      <p class="text-xs text-fg-muted leading-relaxed">{t("watch.pitch_body")}</p>
-      <p class="text-[11px] text-fg-faint leading-relaxed">🔒 {t("watch.privacy_note")}</p>
+      <div class="flex flex-col gap-2">
+        <div class="text-title3 font-semibold text-fg">{t("watch.pitch_title")}</div>
+        <p class="text-sub text-fg-muted leading-relaxed">{t("watch.pitch_body")}</p>
+        <p class="text-foot text-fg-subtle leading-relaxed flex items-start gap-1.5 pt-1">
+          <span class="mt-px"><Icon name="lock" size={11.5} /></span>
+          <span>{t("watch.privacy_note")}</span>
+        </p>
+      </div>
       <div>
         <Button onclick={enableWatch}>{t("watch.enable_cta")}</Button>
       </div>
     {:else}
-      <div class="text-[10px] uppercase tracking-wider text-fg-faint">
-        {t("watch.folders_label")}
-      </div>
-      <div class="rounded-lg border border-border-subtle divide-y divide-border-subtle">
+      <div class="text-foot text-fg-subtle">{t("watch.folders_label")}</div>
+      <div class="card-inset divide-y divide-border-subtle overflow-hidden">
         {#each folders as f (f.id)}
-          <div class="p-3 flex items-start gap-3">
-            <span class="text-base leading-none pt-0.5">{f.exists ? "📁" : "⚠️"}</span>
+          <div class="group p-3 flex items-start gap-2.5">
+            <span
+              class="w-6 h-6 shrink-0 grid place-items-center rounded-[var(--radius-sm)] mt-px
+                     {f.exists ? 'bg-surface-2 text-fg-subtle' : 'bg-neg/12 text-neg'}"
+            >
+              <Icon name={f.exists ? "folder" : "triangleAlert"} size={13} />
+            </span>
             <div class="flex-1 min-w-0">
-              <div class="text-[12.5px] font-medium text-fg">{f.label}</div>
-              <div class="text-[10.5px] text-fg-faint truncate">{f.path}</div>
+              <div class="text-callout font-medium text-fg">{f.label}</div>
+              <div class="text-cap text-fg-subtle truncate font-mono" title={f.path}>{f.path}</div>
               {#if !f.exists}
-                <div class="text-[11px] text-neg mt-1">{t("watch.folder_missing")}</div>
+                <div class="text-foot text-neg mt-1">{t("watch.folder_missing")}</div>
                 <div class="flex gap-2 mt-1.5">
-                  <Button variant="outline" onclick={() => relocate(f)}>
+                  <Button variant="outline" size="sm" onclick={() => relocate(f)}>
                     {t("watch.folder_relocate")}
                   </Button>
-                  <Button variant="ghost" onclick={() => dropFolder(f)}>
+                  <Button variant="ghost" size="sm" onclick={() => dropFolder(f)}>
                     {t("watch.folder_remove")}
                   </Button>
                 </div>
               {:else}
-                <div class="text-[10.5px] text-fg-muted mt-0.5">
+                <div class="text-cap text-fg-muted mt-0.5">
                   {#if f.imported_count === 0}
                     {t("watch.imported_none")}
                   {:else}
@@ -375,22 +400,29 @@
               {/if}
             </div>
             {#if f.exists}
-              <div class="flex gap-1 shrink-0">
+              <div
+                class="flex gap-1 shrink-0 opacity-0 group-hover:opacity-100 focus-within:opacity-100
+                       transition-opacity duration-[var(--dur-fast)]"
+              >
                 <button
                   type="button"
                   onclick={() => revealFolder(f)}
                   title={t("watch.folder_menu_reveal")}
-                  class="text-[11px] text-fg-muted hover:text-fg px-1.5 py-0.5 rounded hover:bg-hover"
+                  aria-label={t("watch.folder_menu_reveal")}
+                  class="press w-6 h-6 grid place-items-center rounded-[var(--radius-sm)] text-fg-muted
+                         hover:bg-hover hover:text-fg transition-colors duration-[var(--dur-fast)]"
                 >
-                  ↗
+                  <Icon name="externalLink" size={12} />
                 </button>
                 <button
                   type="button"
                   onclick={() => dropFolder(f)}
                   title={t("watch.folder_menu_remove")}
-                  class="text-[11px] text-fg-muted hover:text-neg px-1.5 py-0.5 rounded hover:bg-hover"
+                  aria-label={t("watch.folder_menu_remove")}
+                  class="press w-6 h-6 grid place-items-center rounded-[var(--radius-sm)] text-fg-muted
+                         hover:bg-neg/12 hover:text-neg transition-colors duration-[var(--dur-fast)]"
                 >
-                  ×
+                  <Icon name="x" size={12} stroke={2.2} />
                 </button>
               </div>
             {/if}
@@ -399,114 +431,130 @@
       </div>
 
       <div class="relative" bind:this={menuWrapperEl}>
-        <Button variant="outline" onclick={() => (menuOpen = !menuOpen)}>
-          + {t("watch.add_folder")} ▾
+        <Button variant="outline" onclick={() => (menuOpen = !menuOpen)} aria-expanded={menuOpen}>
+          <Icon name="plus" size={12} stroke={2.4} />
+          {t("watch.add_folder")}
+          <Icon name="chevronDown" size={11} stroke={2.2} class="opacity-60" />
         </Button>
         {#if menuOpen}
-          <div class="absolute z-10 mt-1 w-64 rounded-lg border border-border bg-surface shadow-lg py-1 text-[12.5px]">
-            <button type="button" onclick={addICloud}
-              class="w-full text-left px-3 py-1.5 hover:bg-hover text-fg">
-              ☁️ {t("watch.preset_icloud")}
-            </button>
-            <button type="button" onclick={addDownloads}
-              class="w-full text-left px-3 py-1.5 hover:bg-hover text-fg flex justify-between">
-              <span>⬇️ {t("watch.preset_downloads")}</span>
-              <span class="text-fg-faint text-[10.5px]">{t("watch.preset_downloads_hint")}</span>
-            </button>
-            <button type="button" onclick={addDesktop}
-              class="w-full text-left px-3 py-1.5 hover:bg-hover text-fg">
-              🖥️ {t("watch.preset_desktop")}
-            </button>
-            <div class="border-t border-border-subtle my-1"></div>
-            <button type="button" onclick={() => addFrom()}
-              class="w-full text-left px-3 py-1.5 hover:bg-hover text-fg">
-              📁 {t("watch.preset_other")}
+          <div
+            transition:popover={{ origin: "top left" }}
+            class="material-pop absolute z-10 mt-1.5 w-72 p-1 text-callout"
+            role="menu"
+          >
+            {#each [{ icon: "cloud" as const, label: t("watch.preset_icloud"), hint: "", fn: addICloud }, { icon: "download" as const, label: t("watch.preset_downloads"), hint: t("watch.preset_downloads_hint"), fn: addDownloads }, { icon: "monitor" as const, label: t("watch.preset_desktop"), hint: "", fn: addDesktop }] as item}
+              <button
+                type="button"
+                role="menuitem"
+                onclick={item.fn}
+                class="w-full text-left px-2 h-7 rounded-[var(--radius-sm)] flex items-center gap-2
+                       text-fg-muted hover:bg-accent hover:text-accent-on
+                       transition-colors duration-[var(--dur-instant)]"
+              >
+                <Icon name={item.icon} size={13} />
+                <span class="flex-1 truncate">{item.label}</span>
+                {#if item.hint}
+                  <span class="text-cap opacity-70">{item.hint}</span>
+                {/if}
+              </button>
+            {/each}
+            <div class="hairline my-1"></div>
+            <button
+              type="button"
+              role="menuitem"
+              onclick={() => addFrom()}
+              class="w-full text-left px-2 h-7 rounded-[var(--radius-sm)] flex items-center gap-2
+                     text-fg-muted hover:bg-accent hover:text-accent-on
+                     transition-colors duration-[var(--dur-instant)]"
+            >
+              <Icon name="folder" size={13} />
+              <span class="flex-1 truncate">{t("watch.preset_other")}</span>
             </button>
           </div>
         {/if}
       </div>
 
       {#if icloudWaiting > 0}
-        <div class="text-[11px] text-fg-faint">
-          ☁️ {icloudWaiting === 1
+        <div class="text-foot text-fg-subtle flex items-center gap-1.5">
+          <Icon name="cloud" size={12} />
+          {icloudWaiting === 1
             ? t("watch.icloud_waiting_one", { n: icloudWaiting })
             : t("watch.icloud_waiting_many", { n: icloudWaiting })}
         </div>
       {/if}
 
-      <div class="flex items-center justify-between pt-1 border-t border-border-subtle">
+      <div class="flex items-center justify-between pt-2.5 border-t border-border-subtle">
         <!-- Evidência, não status genérico (spec §4.2): a hora real da última
              varredura, ou o reconhecimento de que ainda não houve nenhuma. -->
-        <span class="text-[10.5px] text-fg-faint">
+        <span class="text-cap text-fg-subtle tabular">
           {lastScanAt
             ? t("watch.last_scan_at", { time: formatScan(lastScanAt) })
             : t("watch.last_scan_never")}
         </span>
-        <button
-          type="button"
-          onclick={scanNow}
-          class="text-[11px] text-fg-muted hover:text-fg transition-colors"
-        >
+        <Button variant="ghost" size="sm" onclick={scanNow}>
+          <Icon name="rotateCw" size={11.5} />
           {t("watch.folder_menu_scan")}
-        </button>
+        </Button>
       </div>
     {/if}
-  </div>
+  </Card>
 
-  <div class="rounded-xl bg-surface border border-border-subtle p-5 flex flex-col gap-3">
-    <div class="text-[10.5px] uppercase tracking-wider font-semibold text-fg-faint">
-      {t("settings.database")}
-    </div>
-    <p class="text-xs text-fg-muted leading-relaxed">
-      {t("settings.database_desc")}
-    </p>
-    <div class="font-mono text-[11.5px] text-fg break-all bg-surface-2 rounded-md p-2 border border-border-subtle">
+  <!-- ── Banco de dados ─────────────────────────────────────────────────── -->
+  <Card title={t("settings.database")}>
+    <p class="text-sub text-fg-muted leading-relaxed">{t("settings.database_desc")}</p>
+    <div class="card-inset font-mono text-foot text-fg break-all p-2.5 selectable">
       {path ?? t("common.loading")}
     </div>
     <div>
       <Button variant="outline" onclick={reveal} disabled={!path}>
+        <Icon name="externalLink" size={12} />
         {t("settings.open_in_finder")}
       </Button>
     </div>
-  </div>
+  </Card>
 
-  <div class="rounded-xl bg-surface border border-border-subtle p-5 flex flex-col gap-3">
-    <div class="text-[10.5px] uppercase tracking-wider font-semibold text-fg-faint">
-      {t("settings.backup")}
-    </div>
-    <p class="text-xs text-fg-muted leading-relaxed">
-      {t("settings.backup_desc")}
-    </p>
+  <!-- ── Backup ─────────────────────────────────────────────────────────── -->
+  <Card title={t("settings.backup")}>
+    <p class="text-sub text-fg-muted leading-relaxed">{t("settings.backup_desc")}</p>
     <div class="flex gap-2">
-      <Button onclick={doExport} disabled={busy}>{t("settings.export")}</Button>
-      <Button variant="outline" onclick={doRestore} disabled={busy}>{t("settings.restore")}</Button>
+      <Button onclick={doExport} disabled={busy}>
+        <Icon name="upload" size={12} />
+        {t("settings.export")}
+      </Button>
+      <Button variant="outline" onclick={doRestore} disabled={busy}>
+        <Icon name="download" size={12} />
+        {t("settings.restore")}
+      </Button>
     </div>
     {#if info}
-      <div class="text-[11.5px] text-pos">{info}</div>
+      <ErrorNote message={info} tone="success" />
     {/if}
     {#if error}
-      <div class="text-[11.5px] text-neg">{error}</div>
+      <ErrorNote message={error} />
     {/if}
-  </div>
+  </Card>
 
-  <div class="rounded-xl bg-surface border border-border-subtle p-5 flex flex-col gap-2">
-    <div class="text-[10.5px] uppercase tracking-wider font-semibold text-fg-faint">
-      {t("settings.about")}
+  <!-- ── Sobre + atalhos ────────────────────────────────────────────────── -->
+  <Card title={t("settings.about")}>
+    <div class="text-sub text-fg-muted">
+      <strong class="text-fg font-semibold">finan app</strong>
+      <span class="tabular">{version ? `v${version}` : ""}</span>
+      — {t("settings.about_line")}
     </div>
-    <div class="text-[12px] text-fg-muted">
-      <strong class="text-fg">finan app</strong> v0.2.0 — {t("settings.about_line")}
+
+    <!-- Atalhos numa grade: procurar um atalho numa frase corrida é trabalho. -->
+    <div class="grid grid-cols-3 gap-x-5 gap-y-1.5 pt-1">
+      {#each [["⌘1", t("nav.dashboard")], ["⌘2", t("nav.transactions")], ["⌘3", t("nav.calendar")], ["⌘4", t("sidebar.import")], ["⌘5", t("nav.categories")], ["⌘6", t("nav.rules")], ["⌘7", t("nav.suggestions")], ["⌘F", t("settings.shortcut_search")], ["⌘O", t("settings.shortcut_open_ofx")]] as [key, label]}
+        <div class="flex items-center gap-2 min-w-0">
+          <kbd
+            class="shrink-0 min-w-[26px] h-5 px-1.5 grid place-items-center rounded-[5px] border border-border
+                   bg-surface-2 text-cap font-mono text-fg-muted"
+          >
+            {key}
+          </kbd>
+          <span class="text-foot text-fg-subtle truncate">{label}</span>
+        </div>
+      {/each}
     </div>
-    <div class="text-[11px] text-fg-faint">
-      {t("settings.shortcuts_label")}
-      <span class="font-mono">⌘1</span> {t("nav.dashboard")} ·
-      <span class="font-mono">⌘2</span> {t("nav.transactions")} ·
-      <span class="font-mono">⌘3</span> {t("nav.calendar")} ·
-      <span class="font-mono">⌘4</span> {t("sidebar.import")} ·
-      <span class="font-mono">⌘5</span> {t("nav.categories")} ·
-      <span class="font-mono">⌘6</span> {t("nav.rules")} ·
-      <span class="font-mono">⌘7</span> {t("nav.suggestions")} ·
-      <span class="font-mono">⌘F</span> {t("settings.shortcut_search")} ·
-      <span class="font-mono">⌘O</span> {t("settings.shortcut_open_ofx")}
-    </div>
-  </div>
-</section>
+  </Card>
+</Page>

@@ -1,9 +1,10 @@
 <script lang="ts">
   import { locale } from "$lib/i18n/locale.svelte";
+  import { formatMoney } from "$lib/format/money";
+  import EmptyState from "$lib/components/ui/EmptyState.svelte";
+  import type { CategorySpend } from "$lib/bindings";
 
   const t = locale.t;
-  import { formatMoney } from "$lib/format/money";
-  import type { CategorySpend } from "$lib/bindings";
 
   type Props = {
     items: CategorySpend[];
@@ -25,23 +26,30 @@
   }
 </script>
 
-<div class="flex flex-col gap-2.5">
-  {#each shown as it}
-    <div class="grid grid-cols-[16px_1fr_auto] gap-2 items-center">
-      <span
-        class="w-2.5 h-2.5 rounded-sm shrink-0"
-        style="background: {it.color_token ? `var(${it.color_token})` : 'var(--color-cat-outros)'}"
-      ></span>
-      <span class="text-[12px] text-fg font-medium truncate">{it.name}</span>
-      <span class="text-[11.5px] text-fg-muted tabular">{formatMoney(it.total)}</span>
-      <div class="col-start-2 col-span-2 h-1 bg-surface-2 rounded-full overflow-hidden">
-        <span
-          class="block h-full rounded-full"
-          style="width: {widthPct(it.total)}%; background: {it.color_token ? `var(${it.color_token})` : 'var(--color-accent)'}"
-        ></span>
+{#if shown.length === 0}
+  <EmptyState icon="tags" title={t("dashboard.no_expenses_period")} compact />
+{:else}
+  <div class="flex flex-col gap-3">
+    {#each shown as it}
+      <div class="flex flex-col gap-1.5">
+        <div class="flex items-baseline gap-2">
+          <span
+            class="w-2.5 h-2.5 rounded-[3px] shrink-0 translate-y-px"
+            style="background: {it.color_token ? `var(${it.color_token})` : 'var(--color-cat-outros)'}"
+          ></span>
+          <span class="text-callout text-fg font-medium truncate flex-1 min-w-0">{it.name}</span>
+          <span class="text-sub text-fg-muted tabular shrink-0">{formatMoney(it.total)}</span>
+        </div>
+        <!-- A barra é comparativa, não absoluta: a maior categoria define 100%. -->
+        <div class="h-1.5 bg-surface-2 rounded-full overflow-hidden">
+          <span
+            class="block h-full rounded-full transition-[width] duration-[var(--dur-slow)] ease-[var(--ease-snap)]"
+            style="width: {widthPct(it.total)}%; background: {it.color_token
+              ? `var(${it.color_token})`
+              : 'var(--color-accent)'}"
+          ></span>
+        </div>
       </div>
-    </div>
-  {:else}
-    <div class="text-fg-faint italic text-[12px]">{t("dashboard.no_expenses_period")}</div>
-  {/each}
-</div>
+    {/each}
+  </div>
+{/if}

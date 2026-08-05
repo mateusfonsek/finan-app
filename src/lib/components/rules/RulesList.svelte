@@ -1,4 +1,6 @@
 <script lang="ts">
+  import Icon from "$lib/components/ui/Icon.svelte";
+  import EmptyState from "$lib/components/ui/EmptyState.svelte";
   import { locale } from "$lib/i18n/locale.svelte";
   import type { Category, Rule } from "$lib/bindings";
 
@@ -21,62 +23,74 @@
   }
 </script>
 
-<div class="rounded-lg border border-border-subtle bg-surface overflow-hidden">
-  <table class="w-full text-[12px]">
-    <thead class="bg-surface-2">
-      <tr>
-        <th class="text-left px-4 py-2 font-medium text-fg-faint uppercase tracking-wider text-[10.5px]">{t("rules.col_pattern")}</th>
-        <th class="text-left px-4 py-2 font-medium text-fg-faint uppercase tracking-wider text-[10.5px] w-[180px]">{t("rules.col_category")}</th>
-        <th class="text-right px-4 py-2 font-medium text-fg-faint uppercase tracking-wider text-[10.5px] w-[90px]">{t("rules.col_due")}</th>
-        <th class="text-right px-4 py-2 font-medium text-fg-faint uppercase tracking-wider text-[10.5px] w-[90px]">{t("rules.col_priority")}</th>
-        <th class="px-4 py-2 w-[120px]"></th>
-      </tr>
-    </thead>
-    <tbody>
-      {#each rules as r (r.id)}
-        <tr class="border-t border-border-subtle hover:bg-hover">
-          <td class="px-4 py-2.5">
-            {#if r.display_name}
-              <div class="text-[12px] text-fg font-medium">{r.display_name}</div>
-              <div class="text-[10.5px] text-fg-faint font-mono">{r.pattern}</div>
-            {:else}
-              <div class="font-mono text-[11.5px]">{r.pattern}</div>
-            {/if}
-          </td>
-          <td class="px-4 py-2.5">
-            <span class="inline-flex items-center gap-1.5">
-              <span class="w-2 h-2 rounded-full" style="background: var({categoryToken(r.category_id)})"></span>
-              {categoryName(r.category_id)}
-            </span>
-          </td>
-          <td class="px-4 py-2.5 text-right tabular text-fg-muted">
-            {r.due_day ? t("rules.due_day", { day: r.due_day }) : "—"}
-          </td>
-          <td class="px-4 py-2.5 text-right tabular">{r.priority}</td>
-          <td class="px-4 py-2.5 text-right flex gap-2 justify-end">
-            <button
-              type="button"
-              onclick={() => onEdit(r)}
-              class="text-[11px] text-fg-muted hover:text-fg underline-offset-2 hover:underline"
-            >
-              {t("rules.edit")}
-            </button>
-            <button
-              type="button"
-              onclick={() => onDelete(r)}
-              class="text-[11px] text-neg hover:underline underline-offset-2"
-            >
-              {t("rules.delete")}
-            </button>
-          </td>
+<div class="card overflow-hidden">
+  {#if rules.length === 0}
+    <EmptyState icon="wandSparkles" title={t("rules.empty_title")} description={t("rules.empty")} />
+  {:else}
+    <table class="w-full">
+      <thead>
+        <tr class="border-b border-border-subtle">
+          <th class="col-head text-left px-4 py-2">{t("rules.col_pattern")}</th>
+          <th class="col-head text-left px-4 py-2 w-[172px]">{t("rules.col_category")}</th>
+          <th class="col-head text-right px-4 py-2 w-[88px]">{t("rules.col_due")}</th>
+          <th class="col-head text-right px-4 py-2 w-[86px]">{t("rules.col_priority")}</th>
+          <th class="px-4 py-2 w-[92px]"><span class="sr-only">{t("common.actions")}</span></th>
         </tr>
-      {:else}
-        <tr>
-          <td colspan="5" class="px-4 py-10 text-center text-fg-faint">
-            {t("rules.empty")}
-          </td>
-        </tr>
-      {/each}
-    </tbody>
-  </table>
+      </thead>
+      <tbody>
+        {#each rules as r (r.id)}
+          <tr class="row group border-t border-border-subtle first:border-t-0">
+            <td class="px-4 py-2">
+              {#if r.display_name}
+                <div class="text-callout text-fg font-medium">{r.display_name}</div>
+                <div class="text-cap text-fg-subtle font-mono truncate">{r.pattern}</div>
+              {:else}
+                <div class="font-mono text-sub text-fg">{r.pattern}</div>
+              {/if}
+            </td>
+            <td class="px-4 py-2">
+              <span class="inline-flex items-center gap-1.5 text-sub text-fg">
+                <span
+                  class="w-2 h-2 rounded-full shrink-0"
+                  style="background: var({categoryToken(r.category_id)})"
+                ></span>
+                {categoryName(r.category_id)}
+              </span>
+            </td>
+            <td class="px-4 py-2 text-right text-sub tabular text-fg-muted">
+              {r.due_day ? t("rules.due_day", { day: r.due_day }) : "—"}
+            </td>
+            <td class="px-4 py-2 text-right text-sub tabular text-fg-muted">{r.priority}</td>
+            <td class="px-4 py-2">
+              <div
+                class="flex gap-1 justify-end opacity-0 group-hover:opacity-100 focus-within:opacity-100
+                       transition-opacity duration-[var(--dur-fast)]"
+              >
+                <button
+                  type="button"
+                  onclick={() => onEdit(r)}
+                  title={t("rules.edit")}
+                  aria-label={`${t("rules.edit")} ${r.pattern}`}
+                  class="press w-6 h-6 grid place-items-center rounded-[var(--radius-sm)] text-fg-muted
+                         hover:bg-hover hover:text-fg transition-colors duration-[var(--dur-fast)]"
+                >
+                  <Icon name="pencil" size={12.5} />
+                </button>
+                <button
+                  type="button"
+                  onclick={() => onDelete(r)}
+                  title={t("rules.delete")}
+                  aria-label={`${t("rules.delete")} ${r.pattern}`}
+                  class="press w-6 h-6 grid place-items-center rounded-[var(--radius-sm)] text-fg-muted
+                         hover:bg-neg/12 hover:text-neg transition-colors duration-[var(--dur-fast)]"
+                >
+                  <Icon name="trash2" size={12.5} />
+                </button>
+              </div>
+            </td>
+          </tr>
+        {/each}
+      </tbody>
+    </table>
+  {/if}
 </div>

@@ -1,5 +1,7 @@
 <script lang="ts">
   import { Button } from "$lib/components/ui/button";
+  import Icon from "$lib/components/ui/Icon.svelte";
+  import ErrorNote from "$lib/components/ui/ErrorNote.svelte";
   import { locale } from "$lib/i18n/locale.svelte";
   import type { Category, Rule } from "$lib/bindings";
 
@@ -71,30 +73,34 @@
   }
 </script>
 
-<form onsubmit={submit} class="rounded-lg border border-border-subtle bg-surface p-4 flex flex-col gap-3">
-  <div class="text-[10.5px] uppercase tracking-wider font-semibold text-fg-faint">
-    {initial ? t("rule_form.form_edit") : t("rule_form.form_new")}
+<form
+  onsubmit={submit}
+  class="card p-4 flex flex-col gap-3.5 {initial ? 'ring-[1.5px] ring-accent ring-inset' : ''}"
+>
+  <div class="flex items-center gap-2">
+    <Icon name={initial ? "pencil" : "plus"} size={13} class="text-fg-subtle" />
+    <span class="section-title">{initial ? t("rule_form.form_edit") : t("rule_form.form_new")}</span>
   </div>
 
-  <div class="grid grid-cols-[1fr_180px_90px_110px_auto] gap-2 items-end">
-    <label class="flex flex-col gap-1">
-      <span class="text-[11px] text-fg-muted">{t("rule_form.pattern_label")}</span>
+  <div class="grid grid-cols-[1fr_178px_84px_96px_auto] gap-2.5 items-end">
+    <label class="flex flex-col gap-1 min-w-0">
+      <span class="text-foot text-fg-subtle">{t("rule_form.pattern_label")}</span>
       <input
         bind:value={pattern}
         placeholder={t("rule_form.pattern_placeholder")}
-        class="rounded-md border border-border bg-surface-2 px-2 py-1 text-[12px] text-fg focus:outline-none focus:border-accent"
+        class="field font-mono"
       />
     </label>
 
-    <label class="flex flex-col gap-1">
-      <span class="text-[11px] text-fg-muted">{t("rule_form.category")}</span>
+    <label class="flex flex-col gap-1 min-w-0">
+      <span class="text-foot text-fg-subtle">{t("rule_form.category")}</span>
       <select
         value={categoryId === null ? "" : String(categoryId)}
         onchange={(e) => {
           const v = (e.currentTarget as HTMLSelectElement).value;
           categoryId = v === "" ? null : Number(v);
         }}
-        class="rounded-md border border-border bg-surface-2 px-2 py-1 text-[12px] text-fg"
+        class="field"
       >
         <option value="">{t("rule_form.select_placeholder")}</option>
         {#each categories as c}
@@ -104,16 +110,12 @@
     </label>
 
     <label class="flex flex-col gap-1">
-      <span class="text-[11px] text-fg-muted">{t("rule_form.priority")}</span>
-      <input
-        type="number"
-        bind:value={priority}
-        class="rounded-md border border-border bg-surface-2 px-2 py-1 text-[12px] text-fg tabular focus:outline-none focus:border-accent"
-      />
+      <span class="text-foot text-fg-subtle">{t("rule_form.priority")}</span>
+      <input type="number" bind:value={priority} class="field tabular" />
     </label>
 
     <label class="flex flex-col gap-1">
-      <span class="text-[11px] text-fg-muted" title={t("rule_form.due_day_title")}>
+      <span class="text-foot text-fg-subtle" title={t("rule_form.due_day_title")}>
         {t("rule_form.due_day")}
       </span>
       <input
@@ -122,7 +124,7 @@
         max="31"
         placeholder="—"
         bind:value={dueDayValue}
-        class="rounded-md border border-border bg-surface-2 px-2 py-1 text-[12px] text-fg tabular focus:outline-none focus:border-accent"
+        class="field tabular"
       />
     </label>
 
@@ -137,6 +139,6 @@
   </div>
 
   {#if error}
-    <div class="text-[11px] text-neg">{error}</div>
+    <ErrorNote message={error} />
   {/if}
 </form>

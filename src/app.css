@@ -1,13 +1,28 @@
 @import "tailwindcss";
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   finan app — design foundations
+   ---------------------------------------------------------------------------
+   Escrito no espírito das HIG da Apple: escala de tipo com tracking/leading
+   específicos por tamanho, raios concêntricos, materiais translúcidos para a
+   camada flutuante, e movimento que responde ao gesto em vez de encenar.
+   A PALETA é a original do app — nenhum matiz foi trocado.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
 @theme {
-  /* surfaces */
+  /* ── surfaces ───────────────────────────────────────────────────────────
+     Ordem de profundidade: bg (fundo da janela) < surface (cartão) <
+     surface-2 (campo/cabeçalho) < surface-3 (elevado) < hover. */
   --color-bg: oklch(19% 0.005 240);
   --color-bg-translucent: oklch(19% 0.005 240 / 0.72);
   --color-surface: oklch(22% 0.006 240);
   --color-surface-2: oklch(25% 0.006 240);
   --color-surface-3: oklch(28% 0.007 240);
   --color-hover: oklch(30% 0.008 240);
+
+  /* Barra lateral: material estrutural, mais pesado que o conteúdo (HIG:
+     materiais escuros separam regiões, materiais leves destacam controles). */
+  --color-sidebar: oklch(17% 0.005 240);
 
   /* borders */
   --color-border: oklch(32% 0.009 240);
@@ -45,55 +60,120 @@
   --color-pos: oklch(70% 0.13 145);
   --color-neg: oklch(68% 0.13 25);
 
-  /* radii */
-  --radius-sm: 4px;
-  --radius-md: 6px;
-  --radius-lg: 8px;
-  --radius-xl: 12px;
-  --radius-2xl: 16px;
+  /* ── raio ───────────────────────────────────────────────────────────────
+     Concêntrico: um cartão de 12px com 12px de padding pede 6px por dentro.
+     Controles pequenos ficam em 7px, superfícies flutuantes sobem até 18px. */
+  --radius-xs: 4px;
+  --radius-sm: 5px;
+  --radius-md: 7px;
+  --radius-lg: 10px;
+  --radius-xl: 13px;
+  --radius-2xl: 18px;
 
-  /* fonts */
+  /* ── tipografia ─────────────────────────────────────────────────────────
+     Uma escala, com tracking e leading próprios por tamanho. Texto grande
+     pede tracking negativo (as letras "abrem" ao crescer); texto pequeno
+     pede tracking positivo para não empastar. */
   --font-display: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Inter", system-ui, sans-serif;
   --font-body: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", system-ui, sans-serif;
   --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
+
+  --text-display: 28px;
+  --text-display--line-height: 1.12;
+  --text-display--letter-spacing: -0.022em;
+
+  --text-title1: 22px;
+  --text-title1--line-height: 1.18;
+  --text-title1--letter-spacing: -0.019em;
+
+  --text-title2: 17px;
+  --text-title2--line-height: 1.25;
+  --text-title2--letter-spacing: -0.014em;
+
+  --text-title3: 15px;
+  --text-title3--line-height: 1.3;
+  --text-title3--letter-spacing: -0.01em;
+
+  --text-body: 13px;
+  --text-body--line-height: 1.45;
+  --text-body--letter-spacing: -0.005em;
+
+  --text-callout: 12.5px;
+  --text-callout--line-height: 1.4;
+  --text-callout--letter-spacing: -0.003em;
+
+  --text-sub: 11.5px;
+  --text-sub--line-height: 1.38;
+  --text-sub--letter-spacing: 0em;
+
+  --text-foot: 11px;
+  --text-foot--line-height: 1.36;
+  --text-foot--letter-spacing: 0.003em;
+
+  --text-cap: 10.5px;
+  --text-cap--line-height: 1.32;
+  --text-cap--letter-spacing: 0.008em;
+
+  --text-cap2: 9.5px;
+  --text-cap2--line-height: 1.28;
+  --text-cap2--letter-spacing: 0.014em;
+
+  /* ── movimento ──────────────────────────────────────────────────────────
+     Curvas que aproximam molas: `snap` é criticamente amortecida (sem
+     overshoot, o padrão para UI); `spring` tem o leve overshoot que só
+     combina quando o gesto trouxe momento. */
+  --ease-snap: cubic-bezier(0.32, 0.72, 0, 1);
+  --ease-out-soft: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1);
+
+  --animate-pop-in: pop-in 0.26s var(--ease-snap) both;
+  --animate-sheet-in: sheet-in 0.34s var(--ease-snap) both;
+  --animate-scrim-in: scrim-in 0.24s ease-out both;
+  --animate-dialog-in: dialog-in 0.34s var(--ease-snap) both;
+  --animate-toast-in: toast-in 0.4s var(--ease-snap) both;
+  --animate-rise-in: rise-in 0.32s var(--ease-snap) both;
 }
 
-html {
+/* Durações e sombras vivem fora do @theme porque mudam entre claro e escuro
+   (o @theme só semeia :root uma vez). */
+:root {
+  --dur-instant: 90ms;
+  --dur-fast: 140ms;
+  --dur: 220ms;
+  --dur-slow: 340ms;
+
+  /* Altura reservada no topo para os semáforos do macOS (titleBarStyle
+     "Overlay": a janela não tem barra, o conteúdo sobe até o topo). */
+  --titlebar-h: 44px;
+
+  /* Elevação: sombra difusa + anel de 1px. No escuro, sombra pesada; no
+     claro, quase só o anel — sombra forte sobre fundo claro vira sujeira. */
+  --shadow-raised: 0 1px 2px oklch(0% 0 0 / 0.28);
+  --shadow-pop:
+    0 8px 24px -6px oklch(0% 0 0 / 0.5),
+    0 2px 6px -2px oklch(0% 0 0 / 0.3);
+  --shadow-sheet: -16px 0 44px -12px oklch(0% 0 0 / 0.55);
+  --shadow-dialog:
+    0 28px 72px -18px oklch(0% 0 0 / 0.68),
+    0 4px 12px -4px oklch(0% 0 0 / 0.4);
+
+  /* Materiais da camada flutuante. */
+  --material-chrome: oklch(19% 0.005 240 / 0.72);
+  --material-pop: oklch(24% 0.006 240 / 0.82);
+  --material-blur: saturate(180%) blur(24px);
+  /* Aresta clara no topo do material = luz batendo na superfície. */
+  --material-edge: oklch(100% 0 0 / 0.07);
+
+  --focus-ring: 0 0 0 3.5px var(--color-accent-ring);
+
   color-scheme: light dark;
+  accent-color: var(--color-accent);
 }
 
-body {
-  margin: 0;
-  background: var(--color-bg);
-  color: var(--color-fg);
-  font-family: var(--font-body);
-  font-size: 13px;
-  line-height: 1.5;
-  letter-spacing: -0.01em;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  font-feature-settings: "calt", "ss01", "cv11";
-}
-
-::selection {
-  background: var(--color-accent-soft);
-  color: var(--color-fg);
-}
-
-.tabular {
-  font-variant-numeric: tabular-nums;
-}
-
-/* macOS nativo: o cursor não vira mãozinha em links/controles — só a seta.
-   Anchors e <summary> são os que o navegador transforma em pointer por padrão. */
-a[href],
-summary {
-  cursor: default;
-}
-
-/* Light mode: respeita o tema do sistema. Sobrescreve apenas surfaces, bordas e
-   texto; cores categóricas/semânticas (mid-lightness) funcionam nos dois temas.
-   accent escurece um pouco pra manter contraste sobre fundo claro. */
+/* ═══════════════════════════════════════════════════════════════════════════
+   Tema claro — só superfícies, bordas, texto e elevação. As cores
+   categóricas/semânticas são de luminosidade média e funcionam nos dois.
+   ═══════════════════════════════════════════════════════════════════════════ */
 @media (prefers-color-scheme: light) {
   :root {
     --color-bg: oklch(97% 0.003 240);
@@ -102,6 +182,7 @@ summary {
     --color-surface-2: oklch(96.5% 0.004 240);
     --color-surface-3: oklch(93.5% 0.005 240);
     --color-hover: oklch(92% 0.006 240);
+    --color-sidebar: oklch(94.5% 0.004 240);
 
     --color-border: oklch(86% 0.008 240);
     --color-border-subtle: oklch(91% 0.006 240);
@@ -113,12 +194,396 @@ summary {
 
     --color-accent: oklch(54% 0.15 145);
     --color-accent-hi: oklch(47% 0.16 145);
-    /* No light, o botão primário é verde com texto branco (no dark o texto é escuro). */
+    /* No claro o botão primário é verde com texto branco (no escuro, escuro). */
     --color-accent-on: oklch(100% 0 0);
+
+    --shadow-raised: 0 1px 1.5px oklch(0% 0 0 / 0.07);
+    --shadow-pop:
+      0 8px 24px -8px oklch(0% 0 0 / 0.16),
+      0 1px 3px -1px oklch(0% 0 0 / 0.1);
+    --shadow-sheet: -16px 0 44px -16px oklch(0% 0 0 / 0.18);
+    --shadow-dialog:
+      0 28px 72px -22px oklch(0% 0 0 / 0.26),
+      0 3px 10px -4px oklch(0% 0 0 / 0.12);
+
+    --material-chrome: oklch(97% 0.003 240 / 0.75);
+    --material-pop: oklch(100% 0 0 / 0.86);
+    --material-edge: oklch(100% 0 0 / 0.6);
   }
 }
 
-/* Respeita "Reduzir movimento" do sistema. */
+/* ═══════════════════════════════════════════════════════════════════════════
+   Base
+   ═══════════════════════════════════════════════════════════════════════════ */
+html {
+  color-scheme: light dark;
+}
+
+/* A janela em si nunca rola: quem rola é o painel de conteúdo. Sem isso, um
+   popover que escapa da borda cria uma barra de rolagem no documento inteiro. */
+html,
+body {
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  margin: 0;
+  background: var(--color-bg);
+  color: var(--color-fg);
+  font-family: var(--font-body);
+  font-size: var(--text-body);
+  line-height: 1.45;
+  letter-spacing: -0.005em;
+  font-optical-sizing: auto;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: "calt", "ss01", "cv11";
+  /* App de desktop: texto de interface não é selecionável, como no macOS.
+     Campos e conteúdo marcado voltam a ser abaixo. */
+  -webkit-user-select: none;
+  user-select: none;
+  overscroll-behavior: none;
+}
+
+input,
+textarea,
+[contenteditable="true"],
+.selectable {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-display);
+  margin: 0;
+  font-weight: 600;
+}
+
+::selection {
+  background: var(--color-accent-soft);
+  color: var(--color-fg);
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* macOS nativo: o cursor não vira mãozinha em links/controles — só a seta. */
+a[href],
+summary,
+button,
+[role="button"] {
+  cursor: default;
+}
+
+/* Toda a moldura da janela arrasta, menos o que é clicável dentro dela. */
+[data-tauri-drag-region] {
+  cursor: default;
+  app-region: drag;
+  -webkit-app-region: drag;
+}
+[data-tauri-drag-region] :is(button, a, input, select, textarea, [role="button"]) {
+  app-region: no-drag;
+  -webkit-app-region: no-drag;
+}
+
+/* ── Foco ────────────────────────────────────────────────────────────────
+   Um anel só, igual em todo lugar. `:focus-visible` para o anel não aparecer
+   em clique de mouse — como no macOS. */
+:focus {
+  outline: none;
+}
+:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+  border-color: var(--color-accent);
+  z-index: 1;
+  position: relative;
+}
+
+/* ── Barras de rolagem no estilo overlay do macOS ─────────────────────── */
+::-webkit-scrollbar {
+  width: 11px;
+  height: 11px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: color-mix(in oklch, var(--color-fg) 20%, transparent);
+  border-radius: 999px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in oklch, var(--color-fg) 34%, transparent);
+  background-clip: content-box;
+}
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Primitivas — as formas que se repetem em toda a interface.
+   ═══════════════════════════════════════════════════════════════════════════ */
+@layer components {
+  /* ── Cartão ─────────────────────────────────────────────────────────── */
+  .card {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border-subtle);
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-raised);
+  }
+
+  /* Cartão aninhado dentro de outro: raio menor, sem sombra. */
+  .card-inset {
+    background: color-mix(in oklch, var(--color-surface-2) 55%, transparent);
+    border: 1px solid var(--color-border-subtle);
+    border-radius: var(--radius-lg);
+  }
+
+  /* ── Cabeçalho de seção ─────────────────────────────────────────────── */
+  /* Caixa alta em corpo minúsculo é tique de dashboard, não de app do macOS:
+     aqui é frase normal, peso semibold, no tamanho de legenda. */
+  .section-title {
+    font-size: var(--text-sub);
+    line-height: var(--text-sub--line-height);
+    letter-spacing: var(--text-sub--letter-spacing);
+    font-weight: 600;
+    color: var(--color-fg-muted);
+  }
+
+  .section-note {
+    font-size: var(--text-foot);
+    line-height: var(--text-foot--line-height);
+    letter-spacing: var(--text-foot--letter-spacing);
+    color: var(--color-fg-subtle);
+  }
+
+  /* Cabeçalho de coluna de tabela. */
+  .col-head {
+    font-size: var(--text-foot);
+    line-height: var(--text-foot--line-height);
+    letter-spacing: var(--text-foot--letter-spacing);
+    font-weight: 500;
+    color: var(--color-fg-subtle);
+  }
+
+  /* ── Campos ─────────────────────────────────────────────────────────── */
+  .field {
+    background: var(--color-surface-2);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    color: var(--color-fg);
+    font-size: var(--text-callout);
+    line-height: 1.4;
+    letter-spacing: var(--text-callout--letter-spacing);
+    padding: 5px 8px;
+    transition:
+      border-color var(--dur-fast) var(--ease-snap),
+      background-color var(--dur-fast) var(--ease-snap),
+      box-shadow var(--dur-fast) var(--ease-snap);
+  }
+  .field::placeholder {
+    color: var(--color-fg-faint);
+  }
+  .field:hover:not(:disabled):not(:focus) {
+    border-color: color-mix(in oklch, var(--color-border) 65%, var(--color-fg-faint));
+  }
+  .field:focus,
+  .field:focus-visible {
+    background: var(--color-bg);
+    border-color: var(--color-accent);
+    box-shadow: var(--focus-ring);
+  }
+  .field:disabled {
+    opacity: 0.5;
+  }
+
+  /* <select> ganha a seta desenhada por nós, como o pop-up button do macOS. */
+  select.field {
+    appearance: none;
+    padding-right: 24px;
+    background-image: linear-gradient(45deg, transparent 50%, currentColor 50%),
+      linear-gradient(135deg, currentColor 50%, transparent 50%);
+    background-position:
+      calc(100% - 13px) calc(50% + 2px),
+      calc(100% - 9px) calc(50% + 2px);
+    background-size: 4px 4px, 4px 4px;
+    background-repeat: no-repeat;
+    color: var(--color-fg);
+  }
+
+  /* ── Materiais flutuantes ───────────────────────────────────────────── */
+  /* Popovers/menus: vidro sobre o conteúdo, com aresta clara no topo. */
+  .material-pop {
+    background: var(--material-pop);
+    -webkit-backdrop-filter: var(--material-blur);
+    backdrop-filter: var(--material-blur);
+    border: 1px solid var(--color-border);
+    border-top-color: var(--material-edge);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-pop);
+  }
+
+  /* Cromo fixo (cabeçalho de página, rodapé de ação): o conteúdo passa por
+     baixo em vez de ser cortado por uma faixa opaca. */
+  .material-chrome {
+    background: var(--material-chrome);
+    -webkit-backdrop-filter: var(--material-blur);
+    backdrop-filter: var(--material-blur);
+  }
+
+  /* Em vez de uma régua de 1px sob o cabeçalho fixo, uma borda que só
+     aparece quando há conteúdo passando por baixo. */
+  .scroll-edge::after {
+    content: "";
+    position: absolute;
+    inset-inline: 0;
+    bottom: -1px;
+    height: 1px;
+    background: var(--color-border-subtle);
+    opacity: 0;
+    transition: opacity var(--dur) var(--ease-snap);
+  }
+  .scroll-edge[data-scrolled="true"]::after,
+  [data-scrolled="true"] .scroll-edge::after {
+    opacity: 1;
+  }
+
+  /* ── Feedback de toque ──────────────────────────────────────────────── */
+  /* HIG: o realce nasce no pointer-down, não na soltura. */
+  .press {
+    transition: transform var(--dur-instant) var(--ease-snap);
+  }
+  .press:active:not(:disabled) {
+    transform: scale(0.97);
+  }
+  .press-sm:active:not(:disabled) {
+    transform: scale(0.985);
+  }
+
+  /* ── Linha de lista / tabela ────────────────────────────────────────── */
+  .row {
+    transition: background-color var(--dur-fast) var(--ease-snap);
+  }
+  .row:hover {
+    background: var(--color-hover);
+  }
+
+  /* ── Divisor ────────────────────────────────────────────────────────── */
+  .hairline {
+    height: 1px;
+    background: var(--color-border-subtle);
+  }
+
+  /* ── Pastilha ───────────────────────────────────────────────────────── */
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    border-radius: 999px;
+    border: 1px solid var(--color-border);
+    background: var(--color-surface-2);
+    padding: 2px 8px;
+    font-size: var(--text-foot);
+    line-height: 1.4;
+    letter-spacing: var(--text-foot--letter-spacing);
+    font-weight: 500;
+    white-space: nowrap;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Coreografia — entradas e saídas simétricas (HIG: se algo sai por um
+   caminho, volta pelo mesmo).
+   ═══════════════════════════════════════════════════════════════════════════ */
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes dialog-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+@keyframes sheet-in {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: none;
+  }
+}
+
+@keyframes scrim-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Materializar, não só surgir: o desfoque chega junto com a escala. */
+@keyframes material-in {
+  from {
+    opacity: 0;
+    backdrop-filter: saturate(100%) blur(0px);
+    -webkit-backdrop-filter: saturate(100%) blur(0px);
+  }
+  to {
+    opacity: 1;
+    backdrop-filter: var(--material-blur);
+    -webkit-backdrop-filter: var(--material-blur);
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Acessibilidade do sistema
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* "Reduzir movimento": não é ausência de resposta — é resposta sem
+   deslocamento. Fica o esmaecer, some o deslizar e o overshoot. */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -128,9 +593,40 @@ summary {
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+
+  .press:active:not(:disabled),
+  .press-sm:active:not(:disabled) {
+    transform: none;
+  }
 }
 
-/* Respeita "Aumentar contraste" do sistema: bordas e texto mais fortes. */
+/* "Reduzir transparência": o material vira sólido e o desfoque sai. */
+@media (prefers-reduced-transparency: reduce) {
+  :root {
+    --material-chrome: var(--color-bg);
+    --material-pop: var(--color-surface);
+    --material-blur: none;
+  }
+  .material-pop,
+  .material-chrome {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+
+/* "Aumentar contraste": bordas e texto mais fortes, materiais mais opacos. */
+@media (prefers-contrast: more) {
+  :root {
+    --material-chrome: var(--color-bg);
+    --material-pop: var(--color-surface);
+  }
+  .card,
+  .card-inset,
+  .field {
+    border-color: var(--color-border);
+  }
+}
+
 @media (prefers-contrast: more) and (prefers-color-scheme: dark) {
   :root {
     --color-border: oklch(46% 0.01 240);

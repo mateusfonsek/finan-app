@@ -19,6 +19,24 @@
 
   let aboutOpen = $state(false);
 
+  // Estado de rolagem do painel de conteúdo. O cabeçalho de cada tela é
+  // material translúcido fixo no topo; a régua que o separa do conteúdo só
+  // aparece quando existe conteúdo passando por baixo — nunca como uma linha
+  // decorativa permanente.
+  let scroller: HTMLElement | undefined = $state();
+  let scrolled = $state(false);
+
+  function onMainScroll() {
+    const next = (scroller?.scrollTop ?? 0) > 2;
+    if (next !== scrolled) scrolled = next;
+  }
+
+  /** Trocar de tela sempre começa do topo — como um push de navegação. */
+  function resetScroll() {
+    scroller?.scrollTo({ top: 0 });
+    scrolled = false;
+  }
+
   // "Abrir com finan": drena os .ofx abertos via Finder, carrega e entrega pra
   // tela de Importar via o mesmo stash que ela já lê no onMount.
   async function handleOpenedOfx() {
@@ -106,15 +124,20 @@
   });
 </script>
 
-<div class="h-screen grid grid-cols-[232px_1fr]">
+<div class="h-screen grid grid-cols-[236px_1fr] overflow-hidden">
   <Sidebar onAbout={() => (aboutOpen = true)} />
-  <main class="bg-bg overflow-y-auto">
-    <Router {routes} />
+  <!-- `data-scrolled` alimenta o efeito de borda do cabeçalho fixo: a régua de
+       separação só existe quando há conteúdo passando por baixo dele. -->
+  <main
+    bind:this={scroller}
+    onscroll={onMainScroll}
+    data-scrolled={scrolled}
+    class="bg-bg overflow-y-auto"
+  >
+    <Router {routes} onRouteLoaded={resetScroll} />
   </main>
 </div>
 
 <WatchToast />
 
-{#if aboutOpen}
-  <AboutDialog onClose={() => (aboutOpen = false)} />
-{/if}
+<AboutDialog open={aboutOpen} onClose={() => (aboutOpen = false)} />

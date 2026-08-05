@@ -1,120 +1,157 @@
 <script lang="ts">
-  import { onMount } from "svelte";
   import { openUrl } from "@tauri-apps/plugin-opener";
+  import Icon from "$lib/components/ui/Icon.svelte";
   import logoUrl from "$lib/assets/logo.png";
+  import { healthCheck } from "$lib/api/health";
   import { locale } from "$lib/i18n/locale.svelte";
+  import { dialog, scrim } from "$lib/motion";
 
   const t = locale.t;
 
-  type Props = { onClose: () => void };
-  let { onClose }: Props = $props();
+  type Props = { open: boolean; onClose: () => void };
+  let { open, onClose }: Props = $props();
 
   const GITHUB_URL = "https://github.com/MateusFonseK/finan-app";
 
   let closeEl: HTMLButtonElement | undefined = $state();
+  let panelEl: HTMLElement | undefined = $state();
+
+  /** A versão vem do binário, não de um literal no template: era daí que vinha
+   *  o "v0.2.0" desatualizado que a janela mostrava. */
+  let version = $state<string | null>(null);
 
   let specs = $derived(
     locale.raw<Array<{ label: string; value: string }>>("about.specs") ?? [],
   );
 
   function onkeydown(e: KeyboardEvent) {
+    if (!open) return;
     if (e.key === "Escape") {
       e.preventDefault();
       onClose();
+      return;
+    }
+    // Tarefa modal: o foco não escapa da janela enquanto ela está aberta.
+    if (e.key === "Tab" && panelEl) {
+      const focusables = panelEl.querySelectorAll<HTMLElement>(
+        "button, [href], input, select, textarea, [tabindex]:not([tabindex='-1'])",
+      );
+      if (focusables.length === 0) return;
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
     }
   }
 
-  async function openGithub() {
-    await openUrl(GITHUB_URL);
-  }
-
-  onMount(() => {
-    closeEl?.focus();
+  $effect(() => {
+    if (!open) return;
+    void healthCheck()
+      .then((h) => (version = h.version))
+      .catch(() => (version = null));
+    // O foco entra na janela assim que ela materializa.
+    queueMicrotask(() => closeEl?.focus());
   });
 </script>
 
 <svelte:window {onkeydown} />
 
-<!-- backdrop -->
-<button
-  type="button"
-  aria-label={t("common.close")}
-  onclick={onClose}
-  class="fixed inset-0 z-40 bg-black/50"
-  style="backdrop-filter: blur(2px)"
-></button>
-
-<!-- dialog -->
-<div
-  role="dialog"
-  aria-modal="true"
-  aria-label={t("sidebar.about_title")}
-  class="fixed left-1/2 top-1/2 z-50 w-[min(400px,calc(100vw-2rem))] max-h-[calc(100vh-3rem)] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-2xl border border-border bg-surface"
-  style="box-shadow: 0 24px 64px -16px rgba(0,0,0,.65), 0 0 0 1px var(--color-border)"
->
+{#if open}
+  <!-- Tarefa modal: o fundo é escurecido e empurrado pra trás. A janela
+       materializa no centro (escala + opacidade juntas) e desmaterializa pelo
+       mesmo caminho. -->
   <button
-    bind:this={closeEl}
     type="button"
-    onclick={onClose}
     aria-label={t("common.close")}
-    class="absolute right-4 top-4 z-10 text-fg-faint hover:text-fg transition-colors"
-  >
-    ✕
-  </button>
+    onclick={onClose}
+    transition:scrim
+    class="fixed inset-0 z-70 bg-black/45"
+    style="backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px)"
+  ></button>
 
-  <div class="flex flex-col py-10">
-    <!-- hero -->
-    <div class="px-10 flex flex-col items-center text-center gap-4 pb-9">
-      <img
-        src={logoUrl}
-        alt=""
-        draggable="false"
-        class="w-14 h-14 rounded-2xl"
-        style="box-shadow: 0 4px 16px -6px rgba(0,0,0,.45)"
-      />
-      <div class="flex flex-col items-center gap-1.5">
-        <h2 class="text-[22px] font-semibold tracking-tight leading-none" style="font-family: var(--font-display)">
-          finan app
-        </h2>
-        <p class="text-[12.5px] text-fg-muted">{t("about.tagline")}</p>
-      </div>
-    </div>
-
-    <div class="h-px bg-border-subtle"></div>
-
-    <!-- promise -->
-    <p class="px-10 py-7 text-center text-[12.5px] text-fg-muted leading-relaxed">
-      {t("about.promise")}
-    </p>
-
-    <div class="h-px bg-border-subtle"></div>
-
-    <!-- spec sheet -->
-    <dl class="px-10 py-7 grid grid-cols-[auto_1fr] gap-x-7 gap-y-3.5 items-baseline">
-      {#each specs as s}
-        <dt class="text-[12.5px] font-semibold text-accent whitespace-nowrap">{s.label}</dt>
-        <dd class="text-[12px] text-fg-muted">{s.value}</dd>
-      {/each}
-    </dl>
-
-    <div class="h-px bg-border-subtle"></div>
-
-    <!-- colophon -->
-    <div class="px-10 pt-8 flex flex-col gap-4">
-      <div class="flex items-baseline justify-between gap-3">
-        <span class="text-[13px] font-medium text-fg">Mateus Fonseca</span>
-        <span class="font-mono text-[11px] text-fg-faint tabular">v0.2.0</span>
-      </div>
+  <div class="fixed inset-0 z-80 grid place-items-center p-6 pointer-events-none">
+    <div
+      bind:this={panelEl}
+      role="dialog"
+      aria-modal="true"
+      aria-label={t("sidebar.about_title")}
+      transition:dialog
+      class="card pointer-events-auto relative w-[min(400px,100%)] max-h-full overflow-y-auto
+             rounded-[var(--radius-2xl)] shadow-[var(--shadow-dialog)]"
+    >
       <button
+        bind:this={closeEl}
         type="button"
-        onclick={openGithub}
-        class="self-start text-[12px] text-accent hover:text-accent-hi underline-offset-4 hover:underline transition-colors"
+        onclick={onClose}
+        aria-label={t("common.close")}
+        class="press absolute right-3.5 top-3.5 z-10 w-6 h-6 grid place-items-center rounded-full
+               text-fg-subtle hover:text-fg hover:bg-hover transition-colors duration-[var(--dur-fast)]"
       >
-        github.com/MateusFonseK ↗
+        <Icon name="x" size={13} stroke={2} />
       </button>
-      <p class="text-[10.5px] text-fg-faint leading-relaxed pt-2">
-        {t("about.disclaimer")}
-      </p>
+
+      <div class="flex flex-col py-9">
+        <!-- hero -->
+        <div class="px-10 flex flex-col items-center text-center gap-4 pb-8">
+          <img
+            src={logoUrl}
+            alt=""
+            draggable="false"
+            class="w-14 h-14 rounded-[13px]"
+            style="box-shadow: 0 6px 18px -8px oklch(0% 0 0 / 0.5)"
+          />
+          <div class="flex flex-col items-center gap-1.5">
+            <h2 class="text-title1 font-semibold text-fg">finan app</h2>
+            <p class="text-callout text-fg-muted">{t("about.tagline")}</p>
+          </div>
+        </div>
+
+        <div class="hairline"></div>
+
+        <!-- promessa -->
+        <p class="px-10 py-6 text-center text-callout text-fg-muted leading-relaxed">
+          {t("about.promise")}
+        </p>
+
+        <div class="hairline"></div>
+
+        <!-- ficha técnica -->
+        <dl class="px-10 py-6 grid grid-cols-[auto_1fr] gap-x-6 gap-y-3 items-baseline">
+          {#each specs as s}
+            <dt class="text-callout font-semibold text-accent whitespace-nowrap">{s.label}</dt>
+            <dd class="text-sub text-fg-muted">{s.value}</dd>
+          {/each}
+        </dl>
+
+        <div class="hairline"></div>
+
+        <!-- colofão -->
+        <div class="px-10 pt-6 flex flex-col gap-3.5">
+          <div class="flex items-baseline justify-between gap-3">
+            <span class="text-body font-medium text-fg">Mateus Fonseca</span>
+            <span class="font-mono text-foot text-fg-subtle tabular">
+              {version ? `v${version}` : "—"}
+            </span>
+          </div>
+          <button
+            type="button"
+            onclick={() => void openUrl(GITHUB_URL)}
+            class="self-start inline-flex items-center gap-1 text-sub text-accent hover:text-accent-hi
+                   underline-offset-4 hover:underline transition-colors duration-[var(--dur-fast)]"
+          >
+            github.com/MateusFonseK
+            <Icon name="arrowUpRight" size={11} stroke={2} />
+          </button>
+          <p class="text-cap text-fg-subtle leading-relaxed pt-1">
+            {t("about.disclaimer")}
+          </p>
+        </div>
+      </div>
     </div>
   </div>
-</div>
+{/if}
