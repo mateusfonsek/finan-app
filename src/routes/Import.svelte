@@ -20,6 +20,7 @@
   import { listCategories } from "$lib/api/categories";
   import { createRule, deleteRuleWithCleanup, updateRule } from "$lib/api/rules";
   import { autoClassifyWithCnpj } from "$lib/api/suggestions";
+  import { enrichmentStatus } from "$lib/api/enrichment";
   import type { ParsedOfx } from "$lib/ofx/types";
   import { takeStashed } from "$lib/ofx/open";
   import { watch, type Discovery } from "$lib/stores/watch.svelte";
@@ -153,8 +154,13 @@
         }));
       busyMsg = t("import.importing");
       importResult = await insertTransactions(account.id, toInsert);
-      busyMsg = t("import.resolving_cnpj");
-      autoReport = await autoClassifyWithCnpj(account.id);
+      // The real gate is in the backend; this only avoids announcing a step
+      // that will not happen.
+      const enrich = await enrichmentStatus().catch(() => null);
+      if (enrich?.available && enrich.enabled) {
+        busyMsg = t("import.resolving_cnpj", { taxId: enrich.tax_id_name });
+        autoReport = await autoClassifyWithCnpj(account.id);
+      }
       if (watchHash) await watch.resolve(watchHash, "imported");
     } catch (e) {
       error = e instanceof Error ? e.message : String(e);

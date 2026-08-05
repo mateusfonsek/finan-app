@@ -306,7 +306,7 @@
     "reversal_legend_many": "{n} pares estorno/reembolso ↔ original detectados — desmarcados por padrão porque a soma é zero (não é gasto nem renda real). Marque manualmente se quiser importar mesmo assim.",
     "preparing": "Preparando…",
     "importing": "Importando…",
-    "resolving_cnpj": "Resolvendo CNPJs novos…",
+    "resolving_cnpj": "Buscando empresas por {taxId}…",
     "result_title": "Resultado do import",
     "imported_one": "transação importada",
     "imported_many": "transações importadas",
@@ -495,7 +495,12 @@
     "shortcuts_label": "Atalhos:",
     "shortcut_search": "Buscar",
     "shortcut_open_ofx": "Abrir OFX",
-    "restore_ok": "Substituir"
+    "restore_ok": "Substituir",
+    "enrich_title": "Buscar empresa por {taxId}",
+    "enrich_desc": "Durante o import, consulta um serviço externo pra descobrir a empresa por trás de cada {taxId} na descrição e sugerir categoria. Requer internet.",
+    "enrich_provider": "Consulta: {provider}",
+    "enrich_on": "Ativado",
+    "enrich_off": "Desativado"
   },
   "watch": {
     "section_title": "Importação automática",

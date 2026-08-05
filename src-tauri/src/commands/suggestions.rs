@@ -217,6 +217,20 @@ pub fn auto_classify_with_cnpj(
     account_id: Option<i64>,
 ) -> AppResult<AutoClassifyReport> {
     let pack = locale.pack.lock().expect("locale mutex poisoned");
+
+    // Gate lives here, not in callers: any future caller inherits it. Off (or
+    // a locale without a provider) returns an empty report and touches no network.
+    {
+        let conn = db.conn.lock().expect("db mutex poisoned");
+        if !crate::enrich::is_active(&conn, &pack) {
+            return Ok(AutoClassifyReport {
+                created_rules: Vec::new(),
+                txs_classified: 0,
+                unresolved: Vec::new(),
+            });
+        }
+    }
+
     let unique_cnpjs: Vec<String> = {
         let conn = db.conn.lock().expect("db mutex poisoned");
         let (sql, has_account) = match account_id {
@@ -269,9 +283,9 @@ pub fn auto_classify_with_cnpj(
             continue;
         }
 
-        // Be polite to BrasilAPI: ~250ms between calls.
+        // Delay comes from the provider, not from this file.
         if idx > 0 {
-            thread::sleep(Duration::from_millis(250));
+            thread::sleep(Duration::from_millis(crate::enrich::courtesy_delay_ms(&pack)));
         }
 
         let resolution = {

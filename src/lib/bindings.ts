@@ -324,6 +324,22 @@ async suggestRules(minCount: number) : Promise<Result<RuleSuggestion[], string>>
 async suggestPatternFor(description: string) : Promise<string> {
     return await TAURI_INVOKE("suggest_pattern_for", { description });
 },
+async enrichmentStatus() : Promise<Result<EnrichmentStatus, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("enrichment_status") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async setEnrichmentEnabled(enabled: boolean) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("set_enrichment_enabled", { enabled }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 /**
  * For every uncategorized OUTFLOW transaction with a CNPJ in its description:
  * 1. Skip if a rule already exists with that CNPJ as pattern.
@@ -591,8 +607,26 @@ pattern: string; category_name: string; category_color_token: string | null; due
 export type Category = { id: number; name: string; color_token: string | null; kind: string; is_investment: boolean; created_at: string }
 export type CategorySpend = { category_id: number | null; name: string; color_token: string | null; total: string; percent: number }
 export type CategoryWithCount = { id: number; name: string; color_token: string | null; kind: string; created_at: string; transaction_count: number }
+/**
+ * Brazilian field names on purpose: this is the UI contract, not the core.
+ */
 export type CnpjResolution = { cnpj: string; razao_social: string | null; nome_fantasia: string | null; cnae_fiscal: string | null; cnae_fiscal_descricao: string | null; suggested_category_id: number | null }
 export type DiscoveredFile = { id: number; content_hash: string; path: string; file_name: string; size: number; status: string; seen_at: string }
+export type EnrichmentStatus = { 
+/**
+ * Active locale has a tax-id format and a known provider. When `false`
+ * the UI hides the setting instead of showing an inert switch.
+ */
+available: boolean; enabled: boolean; 
+/**
+ * e.g. "CNPJ" — so the screen names the id the way the user knows it.
+ */
+tax_id_name: string; 
+/**
+ * e.g. "brasilapi" — shown before opting in, so the user knows who is
+ * being called.
+ */
+provider: string }
 /**
  * Linha do widget "Maiores gastos do mês" — transação com categoria
  * resolvida inline (nome + token de cor) pra evitar segundo round-trip.

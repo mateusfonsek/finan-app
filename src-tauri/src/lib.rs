@@ -1,6 +1,7 @@
 mod commands;
 mod db;
 mod domain;
+mod enrich;
 mod error;
 mod locale;
 
@@ -39,6 +40,8 @@ pub fn run() {
         commands::cnpj::resolve_cnpj,
         commands::suggestions::suggest_rules,
         commands::suggestions::suggest_pattern_for,
+        commands::enrichment::enrichment_status,
+        commands::enrichment::set_enrichment_enabled,
         commands::suggestions::auto_classify_with_cnpj,
         commands::summary::summary_kpis,
         commands::summary::summary_by_category,

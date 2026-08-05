@@ -4,6 +4,7 @@
   import Page from "$lib/components/ui/Page.svelte";
   import Card from "$lib/components/ui/Card.svelte";
   import Icon from "$lib/components/ui/Icon.svelte";
+  import Switch from "$lib/components/ui/Switch.svelte";
   import ErrorNote from "$lib/components/ui/ErrorNote.svelte";
   import { popover } from "$lib/motion";
   import { healthCheck } from "$lib/api/health";
@@ -29,7 +30,8 @@
     removeWatchedFolder,
     updateWatchedFolderPath,
   } from "$lib/api/watch";
-  import type { WatchedFolder } from "$lib/bindings";
+  import { enrichmentStatus, setEnrichmentEnabled } from "$lib/api/enrichment";
+  import type { EnrichmentStatus, WatchedFolder } from "$lib/bindings";
 
   const t = locale.t;
   const locales = locale.list();
@@ -39,6 +41,15 @@
   let info = $state<string | null>(null);
   let error = $state<string | null>(null);
 
+  /** `null` while loading. Availability comes from the backend, never from a
+   *  language comparison here. */
+  let enrich = $state<EnrichmentStatus | null>(null);
+
+  async function toggleEnrich(value: boolean) {
+    await setEnrichmentEnabled(value);
+    enrich = await enrichmentStatus();
+  }
+
   let folders = $state<WatchedFolder[]>([]);
   let menuOpen = $state(false);
   let menuWrapperEl: HTMLDivElement | undefined = $state();
@@ -46,6 +57,16 @@
   let lastScanAt = $state<string | null>(null);
   /** A versão vem do binário — literal no template envelhece sem avisar. */
   let version = $state<string | null>(null);
+
+  async function loadEnrich() {
+    try {
+      enrich = await enrichmentStatus();
+    } catch {
+      // No status, no setting — better hidden than showing a switch that does
+      // not know its own state.
+      enrich = null;
+    }
+  }
 
   async function loadFolders() {
     folders = await listWatchedFolders();
@@ -78,6 +99,7 @@
     try {
       path = await dbPath();
       void healthCheck().then((h) => (version = h.version)).catch(() => {});
+      await loadEnrich();
       await watch.loadEnabled();
       if (watch.enabled) await loadFolders();
     } catch (e) {
@@ -333,6 +355,35 @@
       {/each}
     </div>
   </Card>
+
+  <!-- ── Tax-id company lookup ──────────────────────────────────────────── -->
+  <!-- Only exists when the locale pack declares both a format and a provider. -->
+  {#if enrich?.available}
+    <Card title={t("settings.enrich_title", { taxId: enrich.tax_id_name })}>
+      <div class="flex items-start justify-between gap-4">
+        <div class="flex flex-col gap-1.5 min-w-0">
+          <p class="text-sub text-fg-muted leading-relaxed">
+            {t("settings.enrich_desc", { taxId: enrich.tax_id_name })}
+          </p>
+          <!-- Who answers the lookup is visible before opting in. -->
+          <p class="text-foot text-fg-subtle flex items-start gap-1.5">
+            <span class="mt-px"><Icon name="cloud" size={11.5} /></span>
+            <span>{t("settings.enrich_provider", { provider: enrich.provider })}</span>
+          </p>
+        </div>
+        <div class="flex items-center gap-2.5 shrink-0">
+          <span class="text-foot text-fg-subtle">
+            {enrich.enabled ? t("settings.enrich_on") : t("settings.enrich_off")}
+          </span>
+          <Switch
+            checked={enrich.enabled}
+            onChange={toggleEnrich}
+            label={t("settings.enrich_title", { taxId: enrich.tax_id_name })}
+          />
+        </div>
+      </div>
+    </Card>
+  {/if}
 
   <!-- ── Importação automática ──────────────────────────────────────────── -->
   <Card title={t("watch.section_title")}>
