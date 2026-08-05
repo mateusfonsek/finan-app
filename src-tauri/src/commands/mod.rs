@@ -3,6 +3,7 @@ pub mod app_settings;
 pub mod backup;
 pub mod categories;
 pub mod cnpj;
+pub mod enrich_job;
 pub mod enrichment;
 pub mod health;
 pub mod openfile;

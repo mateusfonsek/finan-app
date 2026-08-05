@@ -42,7 +42,8 @@ pub fn run() {
         commands::suggestions::suggest_pattern_for,
         commands::enrichment::enrichment_status,
         commands::enrichment::set_enrichment_enabled,
-        commands::suggestions::auto_classify_with_cnpj,
+        commands::enrich_job::start_cnpj_enrichment,
+        commands::enrich_job::cancel_cnpj_enrichment,
         commands::summary::summary_kpis,
         commands::summary::summary_by_category,
         commands::summary::summary_by_month,
@@ -170,6 +171,7 @@ pub fn run() {
             app.manage(database);
             app.manage(locale_state);
             app.manage(commands::openfile::PendingOpen::default());
+            app.manage(commands::enrich_job::EnrichJob::default());
             Ok(())
         })
         .build(tauri::generate_context!())

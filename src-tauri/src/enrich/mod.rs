@@ -123,13 +123,6 @@ pub fn lookup_with(
     })
 }
 
-/// Delay between calls to the active locale's provider.
-pub fn courtesy_delay_ms(pack: &LocalePack) -> u64 {
-    provider::for_name(&pack.manifest.tax_id.provider)
-        .map(|p| p.courtesy_delay_ms())
-        .unwrap_or(0)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
