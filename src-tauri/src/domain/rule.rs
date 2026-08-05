@@ -18,6 +18,24 @@ pub struct Rule {
     pub created_at: String,
 }
 
+/// Uma regra + quantas transações ela alcança. Serve à tela de Regras, onde a
+/// pergunta é "essa regra está pegando alguma coisa?".
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+pub struct RuleWithCount {
+    pub id: i64,
+    pub patterns: Vec<String>,
+    pub category_id: i64,
+    pub priority: i32,
+    pub due_day: Option<i32>,
+    pub display_name: Option<String>,
+    pub created_at: String,
+    /// Transações cuja descrição casa QUALQUER trecho da regra, independente
+    /// da categoria em que estão hoje. É alcance, não autoria: uma transação
+    /// que você categorizou na mão continua contando, e uma que outra regra de
+    /// prioridade maior levou também.
+    pub transaction_count: u32,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 pub struct NewRule {
     pub patterns: Vec<String>,

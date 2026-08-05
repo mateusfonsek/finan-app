@@ -153,6 +153,19 @@ async listRules() : Promise<Result<Rule[], string>> {
     else return { status: "error", error: e  as any };
 }
 },
+/**
+ * Como `list_rules`, mas com o alcance de cada regra. Comando separado porque
+ * a contagem varre as transações — quem só precisa das regras (import,
+ * sugestões, calendário) não deve pagar por ela.
+ */
+async listRulesWithCount() : Promise<Result<RuleWithCount[], string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("list_rules_with_count") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async createRule(input: NewRule) : Promise<Result<Rule, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("create_rule", { input }) };
@@ -609,6 +622,18 @@ due_day: number | null;
  */
 display_name: string | null; created_at: string }
 export type RuleSuggestion = { key: string; label: string; suggested_pattern: string; count: number; total: string; sample_description: string; transaction_ids: number[] }
+/**
+ * Uma regra + quantas transações ela alcança. Serve à tela de Regras, onde a
+ * pergunta é "essa regra está pegando alguma coisa?".
+ */
+export type RuleWithCount = { id: number; patterns: string[]; category_id: number; priority: number; due_day: number | null; display_name: string | null; created_at: string; 
+/**
+ * Transações cuja descrição casa QUALQUER trecho da regra, independente
+ * da categoria em que estão hoje. É alcance, não autoria: uma transação
+ * que você categorizou na mão continua contando, e uma que outra regra de
+ * prioridade maior levou também.
+ */
+transaction_count: number }
 export type Transaction = { id: number; account_id: number; date: string; 
 /**
  * Decimal serialized as string (e.g. "-123.45"). Never f64.

@@ -2,7 +2,7 @@ use rusqlite::params;
 use tauri::State;
 
 use crate::db::Db;
-use crate::domain::rule::{CalendarEvent, NewRule, Rule, UpdateRule};
+use crate::domain::rule::{CalendarEvent, NewRule, Rule, RuleWithCount, UpdateRule};
 use crate::error::{AppError, AppResult};
 
 fn validate_due_day(d: Option<i32>) -> AppResult<()> {
@@ -75,6 +75,41 @@ pub fn list_rules(db: State<'_, Db>) -> AppResult<Vec<Rule>> {
             due_day: row.get(3)?,
             display_name: row.get(4)?,
             created_at: row.get(5)?,
+        })
+    })?;
+    rows.collect::<rusqlite::Result<Vec<_>>>()
+        .map_err(AppError::from)
+}
+
+/// Como `list_rules`, mas com o alcance de cada regra. Comando separado porque
+/// a contagem varre as transações — quem só precisa das regras (import,
+/// sugestões, calendário) não deve pagar por ela.
+#[tauri::command]
+#[specta::specta]
+pub fn list_rules_with_count(db: State<'_, Db>) -> AppResult<Vec<RuleWithCount>> {
+    let conn = db.conn.lock().expect("db mutex poisoned");
+    let mut stmt = conn.prepare(
+        "SELECT r.id, r.category_id, r.priority, r.due_day, r.display_name, r.created_at,
+                (SELECT COUNT(*) FROM transactions t
+                  WHERE EXISTS (
+                      SELECT 1 FROM rule_patterns p
+                       WHERE p.rule_id = r.id
+                         AND LOWER(t.description) LIKE '%' || LOWER(p.pattern) || '%'
+                  )) AS tx_count
+         FROM rules r
+         ORDER BY r.priority DESC, r.created_at DESC",
+    )?;
+    let rows = stmt.query_map([], |row| {
+        let id: i64 = row.get(0)?;
+        Ok(RuleWithCount {
+            id,
+            patterns: patterns_of(&conn, id)?,
+            category_id: row.get(1)?,
+            priority: row.get(2)?,
+            due_day: row.get(3)?,
+            display_name: row.get(4)?,
+            created_at: row.get(5)?,
+            transaction_count: row.get::<_, i64>(6)? as u32,
         })
     })?;
     rows.collect::<rusqlite::Result<Vec<_>>>()
@@ -739,6 +774,36 @@ mod tests {
                 .unwrap();
             assert_eq!(cat, None);
         }
+    }
+
+    /// A contagem é ALCANCE: conta o que a regra casa, mesmo que a transação
+    /// esteja hoje noutra categoria (manual ou por regra de prioridade maior).
+    #[test]
+    fn rule_reach_counts_matches_regardless_of_current_category() {
+        let mut conn = fresh_conn();
+        let acc = insert_account(&conn);
+        let transporte = category_id(&conn, "Transporte");
+        let mercado = category_id(&conn, "Mercado");
+        let rule = insert_rule_multi(&conn, &["alpha", "beta"], transporte, 0);
+
+        insert_tx(&conn, acc, "compra ALPHA 1", None);
+        insert_tx(&conn, acc, "compra BETA 2", None);
+        // Categorizada na mão noutra categoria — continua sendo alcance da regra.
+        insert_tx(&conn, acc, "compra alpha 3", Some(mercado));
+        insert_tx(&conn, acc, "padaria", None);
+        apply_rules_internal(&mut conn, None).unwrap();
+
+        let reach: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM transactions t
+                  WHERE EXISTS (SELECT 1 FROM rule_patterns p
+                                 WHERE p.rule_id = ?1
+                                   AND LOWER(t.description) LIKE '%' || LOWER(p.pattern) || '%')",
+                params![rule],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(reach, 3);
     }
 
     #[test]

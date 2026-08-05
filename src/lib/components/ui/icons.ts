@@ -2,7 +2,7 @@
  * Conjunto de símbolos da interface.
  *
  * Desenhos da Lucide (ISC), embutidos como dados em vez de importados do
- * pacote: o app se orgulha de ser leve, e aqui entram só os 51 símbolos que a
+ * pacote: o app se orgulha de ser leve, e aqui entram só os símbolos que a
  * interface realmente usa — sem árvore de 1.500 componentes atrás.
  *
  * Grid de 24, traço variável: peso fino para símbolos decorativos, mais firme
@@ -73,6 +73,16 @@ export const ICONS = {
   "chevronsUpDown": [
     ["path", {"d":"m7 15 5 5 5-5"}],
     ["path", {"d":"m7 9 5-5 5 5"}],
+  ],
+  // Ranking: a seta sobe e as barras crescem. Escolhido em vez de um duplo
+  // chevron porque este último já é o indicador de ordenação — dois glifos
+  // parecidos lado a lado no mesmo cabeçalho não diriam coisas diferentes.
+  "arrowUpNarrowWide": [
+    ["path", {"d":"m3 8 4-4 4 4"}],
+    ["path", {"d":"M7 4v16"}],
+    ["path", {"d":"M11 12h4"}],
+    ["path", {"d":"M11 16h7"}],
+    ["path", {"d":"M11 20h10"}],
   ],
   "x": [
     ["path", {"d":"M18 6 6 18"}],

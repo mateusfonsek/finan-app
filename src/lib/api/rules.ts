@@ -1,5 +1,5 @@
 import { commands } from "../bindings";
-import type { CalendarEvent, NewRule, Rule, UpdateRule } from "../bindings";
+import type { CalendarEvent, NewRule, Rule, RuleWithCount, UpdateRule } from "../bindings";
 
 function unwrap<T>(result: { status: "ok"; data: T } | { status: "error"; error: string }): T {
   if (result.status === "error") throw new Error(result.error);
@@ -8,6 +8,12 @@ function unwrap<T>(result: { status: "ok"; data: T } | { status: "error"; error:
 
 export async function listRules(): Promise<Rule[]> {
   return unwrap(await commands.listRules());
+}
+
+/** Regras + quantas transações cada uma alcança. Só a tela de Regras precisa
+ *  da contagem, que varre as transações. */
+export async function listRulesWithCount(): Promise<RuleWithCount[]> {
+  return unwrap(await commands.listRulesWithCount());
 }
 
 export async function createRule(input: NewRule): Promise<Rule> {

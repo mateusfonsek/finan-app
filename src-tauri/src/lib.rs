@@ -26,6 +26,7 @@ pub fn run() {
         commands::transactions::update_transaction_category,
         commands::transactions::update_transaction_notes,
         commands::rules::list_rules,
+        commands::rules::list_rules_with_count,
         commands::rules::create_rule,
         commands::rules::update_rule,
         commands::rules::delete_rule,

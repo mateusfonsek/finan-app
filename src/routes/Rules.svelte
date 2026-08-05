@@ -14,29 +14,29 @@
   import RulesList from "$lib/components/rules/RulesList.svelte";
   import { listCategories } from "$lib/api/categories";
   import {
-    listRules,
+    listRulesWithCount,
     createRule,
     updateRule,
     deleteRule,
     applyRulesToUncategorized,
   } from "$lib/api/rules";
-  import type { Category, Rule } from "$lib/bindings";
+  import type { Category, RuleWithCount } from "$lib/bindings";
 
-  let rules = $state<Rule[]>([]);
+  let rules = $state<RuleWithCount[]>([]);
   let categories = $state<Category[]>([]);
-  let editing = $state<Rule | null>(null);
+  let editing = $state<RuleWithCount | null>(null);
   let loading = $state(true);
   let error = $state<string | null>(null);
   let applyMsg = $state<string | null>(null);
   let applying = $state(false);
 
   async function refresh() {
-    rules = await listRules();
+    rules = await listRulesWithCount();
   }
 
   onMount(async () => {
     try {
-      [categories, rules] = await Promise.all([listCategories(), listRules()]);
+      [categories, rules] = await Promise.all([listCategories(), listRulesWithCount()]);
     } catch (e) {
       error = e instanceof Error ? e.message : String(e);
     } finally {
@@ -82,7 +82,7 @@
   }
 
   /** Alerta NATIVO do macOS — apagar uma regra descategoriza transações. */
-  async function onDelete(rule: Rule) {
+  async function onDelete(rule: RuleWithCount) {
     const label = rule.display_name ?? rule.patterns[0] ?? "";
     const ok = await confirm(t("rules_page.delete_confirm", { pattern: label }), {
       title: t("rules.delete"),
@@ -113,7 +113,9 @@
   }
 </script>
 
-<Page title={t("nav.rules")} subtitle={t("rules_page.desc")}>
+<!-- `wide`: seis colunas não cabem na coluna padrão sem espremer o trecho da
+     descrição, que é a informação principal da tela. -->
+<Page title={t("nav.rules")} subtitle={t("rules_page.desc")} width="wide">
   {#snippet toolbar()}
     <Button variant="outline" onclick={onApply} disabled={applying || rules.length === 0}>
       <Icon name="rotateCw" size={12.5} class={applying ? "animate-spin" : ""} />
