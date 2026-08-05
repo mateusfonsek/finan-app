@@ -2,7 +2,9 @@ use rusqlite::params;
 use tauri::State;
 
 use crate::db::Db;
-use crate::domain::rule::{CalendarEvent, NewRule, Rule, RuleWithCount, UpdateRule};
+use crate::domain::rule::{
+    CalendarEvent, NewRule, Rule, RuleChoice, RulePreviewRow, RuleWithCount, UpdateRule,
+};
 use crate::error::{AppError, AppResult};
 
 fn validate_due_day(d: Option<i32>) -> AppResult<()> {
@@ -227,6 +229,136 @@ pub fn delete_rule_with_cleanup(db: State<'_, Db>, rule_id: i64) -> AppResult<u3
     // Re-apply remaining rules — a previously-shadowed rule may now match.
     apply_rules_internal(&mut conn, None)?;
     Ok(cleared as u32)
+}
+
+/// Tudo que aplicar as regras MUDARIA, sem gravar nada.
+///
+/// Diferente de `apply_rules_to_uncategorized`, que só toca no que está sem
+/// categoria, aqui entram também as transações que já têm categoria e cuja
+/// regra vencedora aponta pra outra — são elas que a tela de revisão precisa
+/// mostrar antes de sobrescrever qualquer coisa.
+///
+/// Transações onde a regra vencedora já concorda com a categoria atual ficam
+/// de fora: não são mudança nenhuma, e listá-las só faria a revisão parecer
+/// maior do que é.
+#[tauri::command]
+#[specta::specta]
+pub fn preview_rule_application(
+    db: State<'_, Db>,
+    account_id: Option<i64>,
+) -> AppResult<Vec<RulePreviewRow>> {
+    let conn = db.conn.lock().expect("db mutex poisoned");
+    let scope_filter = match account_id {
+        Some(_) => "AND t.account_id = ?1",
+        None => "",
+    };
+    // A subconsulta correlacionada escolhe a MESMA regra vencedora que
+    // `apply_rules_internal` usaria — prioridade desc, empate pelo mais novo.
+    // Se as duas divergissem, a revisão mentiria sobre o resultado.
+    let sql = format!(
+        "SELECT t.id, t.date, t.amount, t.description, t.category_id,
+                r.id, r.category_id, r.display_name
+           FROM transactions t
+           JOIN rules r ON r.id = (
+                SELECT r2.id FROM rules r2
+                 WHERE EXISTS (
+                       SELECT 1 FROM rule_patterns p
+                        WHERE p.rule_id = r2.id
+                          AND LOWER(t.description) LIKE '%' || LOWER(p.pattern) || '%'
+                 )
+                 ORDER BY r2.priority DESC, r2.created_at DESC
+                 LIMIT 1
+           )
+          WHERE (t.category_id IS NULL OR t.category_id <> r.category_id)
+                {scope_filter}
+          ORDER BY t.date DESC, t.id DESC",
+    );
+
+    let mut stmt = conn.prepare(&sql)?;
+    type Row = (i64, String, String, String, Option<i64>, i64, i64, Option<String>);
+    let map = |row: &rusqlite::Row<'_>| -> rusqlite::Result<Row> {
+        Ok((
+            row.get(0)?,
+            row.get(1)?,
+            row.get(2)?,
+            row.get(3)?,
+            row.get(4)?,
+            row.get(5)?,
+            row.get(6)?,
+            row.get(7)?,
+        ))
+    };
+    let raw: Vec<Row> = match account_id {
+        Some(id) => stmt.query_map(params![id], map)?.collect::<rusqlite::Result<_>>()?,
+        None => stmt.query_map([], map)?.collect::<rusqlite::Result<_>>()?,
+    };
+
+    let mut out = Vec::with_capacity(raw.len());
+    for (tx_id, date, amount, description, current, rule_id, new_cat, display_name) in raw {
+        // Sem `display_name`, o rótulo é o trecho que casou ESTA descrição — e
+        // não o primeiro da regra, que pode não ter nada a ver com esta linha.
+        let rule_label = match display_name {
+            Some(name) => name,
+            None => {
+                let desc_lc = description.to_lowercase();
+                patterns_of(&conn, rule_id)?
+                    .into_iter()
+                    .find(|p| desc_lc.contains(&p.to_lowercase()))
+                    .unwrap_or_default()
+            }
+        };
+        out.push(RulePreviewRow {
+            transaction_id: tx_id,
+            date,
+            amount,
+            description,
+            current_category_id: current,
+            new_category_id: new_cat,
+            rule_id,
+            rule_label,
+        });
+    }
+    Ok(out)
+}
+
+/// Grava só as mudanças que o usuário marcou na revisão.
+///
+/// Recebe a categoria de destino junto, em vez de reconsultar as regras: o que
+/// é gravado é exatamente o que foi mostrado na tela, mesmo que uma regra tenha
+/// mudado nesse meio-tempo.
+#[tauri::command]
+#[specta::specta]
+pub fn apply_rule_choices(db: State<'_, Db>, choices: Vec<RuleChoice>) -> AppResult<u32> {
+    if choices.is_empty() {
+        return Ok(0);
+    }
+    let mut conn = db.conn.lock().expect("db mutex poisoned");
+    let tx = conn.transaction()?;
+    let mut applied = 0u32;
+    {
+        let mut stmt =
+            tx.prepare("UPDATE transactions SET category_id = ?1 WHERE id = ?2")?;
+        for c in &choices {
+            // Categoria inexistente viraria FK órfã: falha alto em vez de
+            // gravar lixo silenciosamente.
+            let exists: bool = tx
+                .query_row(
+                    "SELECT 1 FROM categories WHERE id = ?1",
+                    params![c.category_id],
+                    |_| Ok(true),
+                )
+                .unwrap_or(false);
+            if !exists {
+                return Err(AppError::Invalid(format!(
+                    "category {} not found",
+                    c.category_id
+                )));
+            }
+            applied += stmt.execute(params![c.category_id, c.transaction_id])? as u32;
+        }
+    }
+    tx.commit()?;
+    Ok(applied)
 }
 
 /// Run all rules on transactions with `category_id IS NULL` (manual categorization
@@ -804,6 +936,117 @@ mod tests {
             )
             .unwrap();
         assert_eq!(reach, 3);
+    }
+
+    /// Réplica do SQL de `preview_rule_application` (o comando precisa de State,
+    /// que não existe fora do Tauri). Se este SQL divergir do de lá, os testes
+    /// abaixo param de significar alguma coisa.
+    fn preview(conn: &Connection) -> Vec<(i64, Option<i64>, i64)> {
+        let mut stmt = conn
+            .prepare(
+                "SELECT t.id, t.category_id, r.category_id
+                   FROM transactions t
+                   JOIN rules r ON r.id = (
+                        SELECT r2.id FROM rules r2
+                         WHERE EXISTS (
+                               SELECT 1 FROM rule_patterns p
+                                WHERE p.rule_id = r2.id
+                                  AND LOWER(t.description) LIKE '%' || LOWER(p.pattern) || '%'
+                         )
+                         ORDER BY r2.priority DESC, r2.created_at DESC
+                         LIMIT 1
+                   )
+                  WHERE (t.category_id IS NULL OR t.category_id <> r.category_id)
+                  ORDER BY t.date DESC, t.id DESC",
+            )
+            .unwrap();
+        stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))
+            .unwrap()
+            .collect::<rusqlite::Result<_>>()
+            .unwrap()
+    }
+
+    /// O preview mostra as duas classes: sem categoria E já categorizada que
+    /// mudaria. A segunda é justamente a que `apply_rules_internal` ignora.
+    #[test]
+    fn preview_lists_both_uncategorized_and_overrides() {
+        let conn = fresh_conn();
+        let acc = insert_account(&conn);
+        let transporte = category_id(&conn, "Transporte");
+        let outros = category_id(&conn, "Outros");
+        insert_rule(&conn, "testmerchant", transporte, 0);
+
+        let sem_cat = insert_tx(&conn, acc, "TESTMERCHANT trip 1", None);
+        let com_outra = insert_tx(&conn, acc, "TESTMERCHANT trip 2", Some(outros));
+        // Já está na categoria que a regra quer: não é mudança, não entra.
+        insert_tx(&conn, acc, "TESTMERCHANT trip 3", Some(transporte));
+        // Não casa regra nenhuma.
+        insert_tx(&conn, acc, "padaria do bairro", None);
+
+        let rows = preview(&conn);
+        let ids: Vec<i64> = rows.iter().map(|(id, _, _)| *id).collect();
+        assert_eq!(ids.len(), 2, "só as duas que mudariam");
+        assert!(ids.contains(&sem_cat));
+        assert!(ids.contains(&com_outra));
+
+        let overrides: Vec<_> = rows.iter().filter(|(_, cur, _)| cur.is_some()).collect();
+        assert_eq!(overrides.len(), 1);
+        assert_eq!(overrides[0].2, transporte, "destino é a categoria da regra");
+    }
+
+    /// O preview tem que eleger a MESMA regra que aplicar elegeria — senão a
+    /// tela de revisão promete uma coisa e o banco grava outra.
+    #[test]
+    fn preview_agrees_with_apply_on_uncategorized() {
+        let mut conn = fresh_conn();
+        let acc = insert_account(&conn);
+        let transporte = category_id(&conn, "Transporte");
+        let outros = category_id(&conn, "Outros");
+
+        insert_rule(&conn, "testmerchant", outros, 0);
+        insert_rule(&conn, "testmerchant trip", transporte, 10);
+        let tx_id = insert_tx(&conn, acc, "TESTMERCHANT TRIP 9", None);
+
+        let promised = preview(&conn)
+            .into_iter()
+            .find(|(id, _, _)| *id == tx_id)
+            .expect("preview deve listar a transação sem categoria")
+            .2;
+
+        apply_rules_internal(&mut conn, None).unwrap();
+        let actual: Option<i64> = conn
+            .query_row(
+                "SELECT category_id FROM transactions WHERE id = ?1",
+                params![tx_id],
+                |r| r.get(0),
+            )
+            .unwrap();
+
+        assert_eq!(Some(promised), actual);
+        assert_eq!(actual, Some(transporte));
+    }
+
+    /// Depois de aplicar, o que estava sem categoria some do preview — só
+    /// sobra o que exige decisão humana.
+    #[test]
+    fn preview_shrinks_to_overrides_after_apply() {
+        let mut conn = fresh_conn();
+        let acc = insert_account(&conn);
+        let transporte = category_id(&conn, "Transporte");
+        let mercado = category_id(&conn, "Mercado");
+        insert_rule(&conn, "testmerchant", transporte, 0);
+
+        insert_tx(&conn, acc, "TESTMERCHANT a", None);
+        let manual = insert_tx(&conn, acc, "TESTMERCHANT b", Some(mercado));
+
+        assert_eq!(preview(&conn).len(), 2);
+        apply_rules_internal(&mut conn, None).unwrap();
+
+        let rows = preview(&conn);
+        assert_eq!(rows.len(), 1, "a sem-categoria foi resolvida");
+        assert_eq!(rows[0].0, manual);
+        assert_eq!(rows[0].1, Some(mercado));
+        assert_eq!(rows[0].2, transporte);
     }
 
     #[test]

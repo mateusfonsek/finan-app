@@ -222,6 +222,41 @@ async applyRulesToUncategorized(accountId: number | null) : Promise<Result<numbe
 }
 },
 /**
+ * Tudo que aplicar as regras MUDARIA, sem gravar nada.
+ * 
+ * Diferente de `apply_rules_to_uncategorized`, que só toca no que está sem
+ * categoria, aqui entram também as transações que já têm categoria e cuja
+ * regra vencedora aponta pra outra — são elas que a tela de revisão precisa
+ * mostrar antes de sobrescrever qualquer coisa.
+ * 
+ * Transações onde a regra vencedora já concorda com a categoria atual ficam
+ * de fora: não são mudança nenhuma, e listá-las só faria a revisão parecer
+ * maior do que é.
+ */
+async previewRuleApplication(accountId: number | null) : Promise<Result<RulePreviewRow[], string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("preview_rule_application", { accountId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Grava só as mudanças que o usuário marcou na revisão.
+ * 
+ * Recebe a categoria de destino junto, em vez de reconsultar as regras: o que
+ * é gravado é exatamente o que foi mostrado na tela, mesmo que uma regra tenha
+ * mudado nesse meio-tempo.
+ */
+async applyRuleChoices(choices: RuleChoice[]) : Promise<Result<number, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("apply_rule_choices", { choices }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
  * Cruza regras × transações do mês pra montar eventos do calendário.
  * 
  * Para cada regra:
@@ -621,6 +656,37 @@ due_day: number | null;
  * = nenhum rótulo definido; a UI cai pro primeiro pattern.
  */
 display_name: string | null; created_at: string }
+/**
+ * Escolha do usuário na tela de revisão: esta transação vai pra esta categoria.
+ * 
+ * A categoria vem explícita em vez de recalculada no momento de aplicar — se
+ * as regras mudarem entre a revisão e o clique, grava-se o que foi revisado, e
+ * não uma surpresa.
+ */
+export type RuleChoice = { transaction_id: number; category_id: number }
+/**
+ * Uma mudança que aplicar as regras causaria numa transação. É o material da
+ * tela de revisão: nada é gravado até o usuário escolher.
+ */
+export type RulePreviewRow = { transaction_id: number; date: string; 
+/**
+ * Decimal como string, igual ao resto do app. Nunca f64.
+ */
+amount: string; description: string; 
+/**
+ * `None` = a transação está sem categoria. Qualquer outra coisa significa
+ * que aplicar a regra SUBSTITUI a categoria atual.
+ * 
+ * Atenção: o banco não registra quem definiu a categoria, então isto não
+ * distingue "você escolheu na mão" de "uma regra anterior definiu". A UI
+ * não pode afirmar autoria — só que existe categoria e ela mudaria.
+ */
+current_category_id: number | null; new_category_id: number; rule_id: number; 
+/**
+ * Rótulo da regra que venceu: `display_name` quando existe, senão o trecho
+ * que de fato casou esta descrição.
+ */
+rule_label: string }
 export type RuleSuggestion = { key: string; label: string; suggested_pattern: string; count: number; total: string; sample_description: string; transaction_ids: number[] }
 /**
  * Uma regra + quantas transações ela alcança. Serve à tela de Regras, onde a

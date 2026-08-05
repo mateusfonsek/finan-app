@@ -9,6 +9,7 @@
   import Loading from "$lib/components/ui/Loading.svelte";
   import ErrorNote from "$lib/components/ui/ErrorNote.svelte";
   import Icon from "$lib/components/ui/Icon.svelte";
+  import RuleApplyDialog from "$lib/components/rules/RuleApplyDialog.svelte";
   import RuleForm from "$lib/components/rules/RuleForm.svelte";
   import RulePanel from "$lib/components/rules/RulePanel.svelte";
   import RulesList from "$lib/components/rules/RulesList.svelte";
@@ -18,9 +19,10 @@
     createRule,
     updateRule,
     deleteRule,
-    applyRulesToUncategorized,
+    previewRuleApplication,
+    applyRuleChoices,
   } from "$lib/api/rules";
-  import type { Category, RuleWithCount } from "$lib/bindings";
+  import type { Category, RuleChoice, RulePreviewRow, RuleWithCount } from "$lib/bindings";
 
   let rules = $state<RuleWithCount[]>([]);
   let categories = $state<Category[]>([]);
@@ -29,6 +31,8 @@
   let error = $state<string | null>(null);
   let applyMsg = $state<string | null>(null);
   let applying = $state(false);
+  let previewRows = $state<RulePreviewRow[]>([]);
+  let previewOpen = $state(false);
 
   async function refresh() {
     rules = await listRulesWithCount();
@@ -95,21 +99,42 @@
     await refresh();
   }
 
+  /**
+   * "Revisar e aplicar" não grava nada: ele consulta o que MUDARIA e abre a
+   * revisão. Quem grava é a escolha do usuário lá dentro.
+   *
+   * Quando não há nada a mudar, não abre janela nenhuma — um modal só pra dizer
+   * "nada a fazer" é uma cerimônia que cobra um clique de volta sem entregar
+   * nada. A resposta vai na mesma faixa de sempre, junto do botão que a causou.
+   */
   async function onApply() {
     applying = true;
     applyMsg = null;
+    error = null;
     try {
-      const n = await applyRulesToUncategorized(null);
-      applyMsg = n === 0
-        ? t("rules_page.applied_none")
-        : (n === 1
-            ? t("rules_page.applied_one", { n })
-            : t("rules_page.applied_many", { n }));
+      const rows = await previewRuleApplication(null);
+      if (rows.length === 0) {
+        applyMsg = t("rule_apply.nothing_to_do");
+        return;
+      }
+      previewRows = rows;
+      previewOpen = true;
     } catch (e) {
       error = e instanceof Error ? e.message : String(e);
     } finally {
       applying = false;
     }
+  }
+
+  async function onConfirmApply(choices: RuleChoice[]) {
+    const n = await applyRuleChoices(choices);
+    previewOpen = false;
+    previewRows = [];
+    applyMsg =
+      n === 1 ? t("rule_apply.applied_one") : t("rule_apply.applied_many", { n });
+    // As contagens de alcance da tabela não mudam com isso (alcance independe
+    // de categoria), mas a lista é barata e assim nada fica velho na tela.
+    await refresh();
   }
 </script>
 
@@ -149,6 +174,15 @@
     />
   {/if}
 </Page>
+
+{#if previewOpen}
+  <RuleApplyDialog
+    rows={previewRows}
+    {categories}
+    onClose={() => (previewOpen = false)}
+    onApply={onConfirmApply}
+  />
+{/if}
 
 {#if editing}
   <RulePanel

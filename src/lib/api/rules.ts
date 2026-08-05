@@ -1,5 +1,13 @@
 import { commands } from "../bindings";
-import type { CalendarEvent, NewRule, Rule, RuleWithCount, UpdateRule } from "../bindings";
+import type {
+  CalendarEvent,
+  NewRule,
+  Rule,
+  RuleChoice,
+  RulePreviewRow,
+  RuleWithCount,
+  UpdateRule,
+} from "../bindings";
 
 function unwrap<T>(result: { status: "ok"; data: T } | { status: "error"; error: string }): T {
   if (result.status === "error") throw new Error(result.error);
@@ -37,6 +45,18 @@ export async function applyRulesToUncategorized(
   accountId: number | null = null,
 ): Promise<number> {
   return unwrap(await commands.applyRulesToUncategorized(accountId));
+}
+
+/** Tudo que aplicar as regras mudaria — sem gravar nada. Alimenta a revisão. */
+export async function previewRuleApplication(
+  accountId: number | null = null,
+): Promise<RulePreviewRow[]> {
+  return unwrap(await commands.previewRuleApplication(accountId));
+}
+
+/** Grava só o que o usuário marcou na revisão. */
+export async function applyRuleChoices(choices: RuleChoice[]): Promise<number> {
+  return unwrap(await commands.applyRuleChoices(choices));
 }
 
 export async function calendarEvents(month: string): Promise<CalendarEvent[]> {

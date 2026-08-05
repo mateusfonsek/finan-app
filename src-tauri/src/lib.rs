@@ -32,6 +32,8 @@ pub fn run() {
         commands::rules::delete_rule,
         commands::rules::delete_rule_with_cleanup,
         commands::rules::apply_rules_to_uncategorized,
+        commands::rules::preview_rule_application,
+        commands::rules::apply_rule_choices,
         commands::rules::calendar_events,
         commands::cnpj::resolve_cnpj,
         commands::suggestions::suggest_rules,
