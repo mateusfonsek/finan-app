@@ -6,6 +6,7 @@
 //! (`rules.cnae_map`). A pack without a provider makes this whole module a
 //! no-op, with no country check anywhere.
 
+pub mod job;
 pub mod provider;
 pub mod providers;
 
