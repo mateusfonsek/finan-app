@@ -2,9 +2,14 @@ use rusqlite::params;
 use tauri::State;
 
 use crate::db::Db;
+use rust_decimal::Decimal;
+use std::str::FromStr;
+
 use crate::domain::rule::{
-    CalendarEvent, NewRule, Rule, RuleChoice, RulePreviewRow, RuleWithCount, UpdateRule,
+    CalendarEvent, NewRule, Rule, RuleChoice, RuleMatches, RulePreviewRow, RuleWithCount,
+    UpdateRule,
 };
+use crate::domain::transaction::Transaction;
 use crate::error::{AppError, AppResult};
 
 fn validate_due_day(d: Option<i32>) -> AppResult<()> {
@@ -229,6 +234,53 @@ pub fn delete_rule_with_cleanup(db: State<'_, Db>, rule_id: i64) -> AppResult<u3
     // Re-apply remaining rules — a previously-shadowed rule may now match.
     apply_rules_internal(&mut conn, None)?;
     Ok(cleared as u32)
+}
+
+/// As transações que uma regra alcança, mais recentes primeiro.
+///
+/// Usa o MESMO `EXISTS` sobre `rule_patterns` da contagem em
+/// `list_rules_with_count`: o número que a tabela mostra é a promessa do que
+/// esta lista contém, e as duas divergindo seria uma mentira silenciosa.
+#[tauri::command]
+#[specta::specta]
+pub fn transactions_matching_rule(db: State<'_, Db>, rule_id: i64) -> AppResult<RuleMatches> {
+    let conn = db.conn.lock().expect("db mutex poisoned");
+    let mut stmt = conn.prepare(
+        "SELECT id, account_id, date, amount, description, category_id, notes, ofx_fitid, imported_at
+           FROM transactions t
+          WHERE EXISTS (
+                SELECT 1 FROM rule_patterns p
+                 WHERE p.rule_id = ?1
+                   AND LOWER(t.description) LIKE '%' || LOWER(p.pattern) || '%'
+          )
+          ORDER BY t.date DESC, t.id DESC",
+    )?;
+    let transactions: Vec<Transaction> = stmt
+        .query_map(params![rule_id], |row| {
+            Ok(Transaction {
+                id: row.get(0)?,
+                account_id: row.get(1)?,
+                date: row.get(2)?,
+                amount: row.get(3)?,
+                description: row.get(4)?,
+                category_id: row.get(5)?,
+                notes: row.get(6)?,
+                ofx_fitid: row.get(7)?,
+                imported_at: row.get(8)?,
+            })
+        })?
+        .collect::<rusqlite::Result<_>>()?;
+
+    let mut total = Decimal::ZERO;
+    for t in &transactions {
+        total += Decimal::from_str(&t.amount)
+            .map_err(|e| AppError::Invalid(format!("bad amount: {e}")))?;
+    }
+
+    Ok(RuleMatches {
+        transactions,
+        total: total.to_string(),
+    })
 }
 
 /// Tudo que aplicar as regras MUDARIA, sem gravar nada.
@@ -1047,6 +1099,51 @@ mod tests {
         assert_eq!(rows[0].0, manual);
         assert_eq!(rows[0].1, Some(mercado));
         assert_eq!(rows[0].2, transporte);
+    }
+
+    /// A lista do modal e a contagem da tabela vêm do mesmo critério. Se
+    /// divergirem, o número vira uma promessa que a lista não cumpre.
+    #[test]
+    fn matching_list_agrees_with_reach_count() {
+        let conn = fresh_conn();
+        let acc = insert_account(&conn);
+        let casa = category_id(&conn, "Casa");
+        let mercado = category_id(&conn, "Mercado");
+        let rule = insert_rule_multi(&conn, &["alpha", "beta"], casa, 0);
+
+        insert_tx(&conn, acc, "cobranca ALPHA 1", None);
+        insert_tx(&conn, acc, "cobranca BETA 2", Some(mercado));
+        insert_tx(&conn, acc, "cobranca alpha 3", Some(casa));
+        insert_tx(&conn, acc, "padaria", None);
+
+        let reach: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM transactions t
+                  WHERE EXISTS (SELECT 1 FROM rule_patterns p
+                                 WHERE p.rule_id = ?1
+                                   AND LOWER(t.description) LIKE '%' || LOWER(p.pattern) || '%')",
+                params![rule],
+                |r| r.get(0),
+            )
+            .unwrap();
+
+        let listed: Vec<String> = conn
+            .prepare(
+                "SELECT description FROM transactions t
+                  WHERE EXISTS (SELECT 1 FROM rule_patterns p
+                                 WHERE p.rule_id = ?1
+                                   AND LOWER(t.description) LIKE '%' || LOWER(p.pattern) || '%')
+                  ORDER BY t.date DESC, t.id DESC",
+            )
+            .unwrap()
+            .query_map(params![rule], |r| r.get(0))
+            .unwrap()
+            .collect::<rusqlite::Result<_>>()
+            .unwrap();
+
+        assert_eq!(reach, 3);
+        assert_eq!(listed.len() as i64, reach, "lista e contagem têm que bater");
+        assert!(!listed.iter().any(|d| d.contains("padaria")));
     }
 
     #[test]

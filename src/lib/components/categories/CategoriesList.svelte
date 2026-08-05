@@ -10,9 +10,10 @@
     categories: CategoryWithCount[];
     onEdit: (c: CategoryWithCount) => void;
     onDelete: (c: CategoryWithCount) => Promise<void>;
+    selectedId?: number | null;
   };
 
-  let { categories, onEdit, onDelete }: Props = $props();
+  let { categories, onEdit, onDelete, selectedId = null }: Props = $props();
 
   function kindLabel(k: string): string {
     return t("kind." + k);
@@ -29,15 +30,21 @@
           <th class="col-head text-left px-4 py-2">{t("categories.col_category")}</th>
           <th class="col-head text-left px-4 py-2 w-[140px]">{t("categories.col_type")}</th>
           <th class="col-head text-right px-4 py-2 w-[120px]">{t("categories.col_transactions")}</th>
-          <th class="px-4 py-2 w-[92px]"><span class="sr-only">{t("common.actions")}</span></th>
+          <th class="px-4 py-2 w-[60px]"><span class="sr-only">{t("common.actions")}</span></th>
         </tr>
       </thead>
       <tbody>
         {#each categories as c (c.id)}
-          <!-- As ações só aparecem na linha sob o cursor: a tabela fica limpa,
-               e o que se pode fazer com a linha aparece quando ela é o assunto. -->
-          <tr class="row group border-t border-border-subtle first:border-t-0">
-            <td class="px-4 py-2">
+          {@const selected = selectedId === c.id}
+          <!-- A linha inteira abre o painel de edição — mesmo gesto das tabelas
+               de regras e de transações. Só a coluna de ações escapa do clique,
+               e nela sobra o que a linha não faz: apagar. -->
+          <tr
+            class="row group border-t border-border-subtle first:border-t-0 cursor-default
+                   {selected ? 'bg-accent-soft hover:bg-accent-soft' : ''}"
+            aria-selected={selected}
+          >
+            <td class="px-4 py-2" onclick={() => onEdit(c)}>
               <span class="inline-flex items-center gap-2 text-callout">
                 <span
                   class="w-2.5 h-2.5 rounded-[3px] shrink-0"
@@ -46,8 +53,13 @@
                 <span class="font-medium text-fg">{c.name}</span>
               </span>
             </td>
-            <td class="px-4 py-2 text-sub text-fg-muted">{kindLabel(c.kind)}</td>
-            <td class="px-4 py-2 text-right text-sub tabular text-fg-muted">
+            <td class="px-4 py-2 text-sub text-fg-muted" onclick={() => onEdit(c)}>
+              {kindLabel(c.kind)}
+            </td>
+            <td
+              class="px-4 py-2 text-right text-sub tabular text-fg-muted"
+              onclick={() => onEdit(c)}
+            >
               {c.transaction_count}
             </td>
             <td class="px-4 py-2">
@@ -55,16 +67,6 @@
                 class="flex gap-1 justify-end opacity-0 group-hover:opacity-100 focus-within:opacity-100
                        transition-opacity duration-[var(--dur-fast)]"
               >
-                <button
-                  type="button"
-                  onclick={() => onEdit(c)}
-                  title={t("categories.edit")}
-                  aria-label={`${t("categories.edit")} ${c.name}`}
-                  class="press w-6 h-6 grid place-items-center rounded-[var(--radius-sm)] text-fg-muted
-                         hover:bg-hover hover:text-fg transition-colors duration-[var(--dur-fast)]"
-                >
-                  <Icon name="pencil" size={12.5} />
-                </button>
                 <button
                   type="button"
                   onclick={() => onDelete(c)}

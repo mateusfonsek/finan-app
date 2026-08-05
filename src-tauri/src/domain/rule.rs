@@ -59,6 +59,20 @@ pub struct RulePreviewRow {
     pub rule_label: String,
 }
 
+/// As transações que uma regra alcança, com o total somado.
+///
+/// "Alcança" é o mesmo critério da contagem em [`RuleWithCount`]: casa qualquer
+/// trecho da regra, independente da categoria em que a transação está hoje. Os
+/// dois PRECISAM concordar — o número da tabela é o que promete o conteúdo
+/// desta lista.
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+pub struct RuleMatches {
+    pub transactions: Vec<crate::domain::transaction::Transaction>,
+    /// Soma dos valores. Decimal como string, somado com `rust_decimal` — nunca
+    /// em f64, que acumularia erro numa lista longa.
+    pub total: String,
+}
+
 /// Escolha do usuário na tela de revisão: esta transação vai pra esta categoria.
 ///
 /// A categoria vem explícita em vez de recalculada no momento de aplicar — se

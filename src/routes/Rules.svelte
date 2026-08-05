@@ -10,6 +10,7 @@
   import ErrorNote from "$lib/components/ui/ErrorNote.svelte";
   import Icon from "$lib/components/ui/Icon.svelte";
   import RuleApplyDialog from "$lib/components/rules/RuleApplyDialog.svelte";
+  import RuleMatchesDialog from "$lib/components/rules/RuleMatchesDialog.svelte";
   import RuleForm from "$lib/components/rules/RuleForm.svelte";
   import RulePanel from "$lib/components/rules/RulePanel.svelte";
   import RulesList from "$lib/components/rules/RulesList.svelte";
@@ -33,6 +34,9 @@
   let applying = $state(false);
   let previewRows = $state<RulePreviewRow[]>([]);
   let previewOpen = $state(false);
+  /** Regra cuja lista de transações está aberta. O painel de edição continua
+   *  montado atrás — fechar aqui devolve você pra regra que estava editando. */
+  let matchesFor = $state<RuleWithCount | null>(null);
 
   async function refresh() {
     rules = await listRulesWithCount();
@@ -190,5 +194,15 @@
     {categories}
     onClose={() => (editing = null)}
     onSave={onUpdate}
+    onViewMatches={() => (matchesFor = editing)}
+    blocked={matchesFor !== null}
+  />
+{/if}
+
+{#if matchesFor}
+  <RuleMatchesDialog
+    rule={matchesFor}
+    {categories}
+    onClose={() => (matchesFor = null)}
   />
 {/if}

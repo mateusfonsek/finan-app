@@ -9,14 +9,23 @@
     valuesOf,
     type PatternRow,
   } from "./PatternListEditor.svelte";
-  import type { Category, Rule } from "$lib/bindings";
+  import type { Category, RuleWithCount } from "$lib/bindings";
 
   const t = locale.t;
 
   type Props = {
-    rule: Rule;
+    /** `RuleWithCount` e não `Rule`: o painel mostra o alcance da regra no
+     *  botão que abre a lista, e esse número já vem carregado com a tabela. */
+    rule: RuleWithCount;
     categories: Category[];
     onClose: () => void;
+    /** Abre a lista das transações que esta regra alcança. Quem monta o modal
+     *  é a página — o painel só diz que o usuário pediu. */
+    onViewMatches: () => void;
+    /** `true` quando um modal está aberto POR CIMA deste painel. Sem isso, o
+     *  `Esc` que fecha o modal fecharia o painel junto — os dois escutam a
+     *  janela, e a tecla chegaria nos dois no mesmo evento. */
+    blocked?: boolean;
     onSave: (
       ruleId: number,
       data: {
@@ -29,7 +38,14 @@
     ) => Promise<void>;
   };
 
-  let { rule, categories, onClose, onSave }: Props = $props();
+  let {
+    rule,
+    categories,
+    onClose,
+    onSave,
+    onViewMatches,
+    blocked = false,
+  }: Props = $props();
 
   let rows = $state<PatternRow[]>([]);
   let categoryId = $state<number | null>(null);
@@ -89,6 +105,8 @@
   }
 
   function onkeydown(e: KeyboardEvent) {
+    // Enquanto há algo por cima, o teclado é de quem está na frente.
+    if (blocked) return;
     if (e.key === "Escape") {
       e.preventDefault();
       onClose();
@@ -238,6 +256,23 @@
     <p class="px-4 py-3 text-cap text-fg-faint leading-snug">
       {t("rule_panel.scope_note")}
     </p>
+
+    <!-- Ação de inspeção, no fim e com peso de link — mesmo tratamento do
+         "adicionar outra descrição" logo acima. Um botão desenhado aqui
+         competiria com Salvar, que é a ação principal do painel; isto não
+         altera nada, só mostra. -->
+    <div class="px-4 pb-4">
+      <button
+        type="button"
+        onclick={onViewMatches}
+        class="press-sm flex items-center gap-1.5 text-foot text-fg-muted
+               hover:text-accent transition-colors duration-[var(--dur-fast)]"
+      >
+        <Icon name="arrowLeftRight" size={12} stroke={2} />
+        {t("rule_matches.cta")}
+        <span class="tabular text-fg-faint">{rule.transaction_count}</span>
+      </button>
+    </div>
   </div>
 
   <footer class="px-4 py-3 border-t border-border-subtle flex justify-end gap-2">

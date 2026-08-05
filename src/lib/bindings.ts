@@ -222,6 +222,21 @@ async applyRulesToUncategorized(accountId: number | null) : Promise<Result<numbe
 }
 },
 /**
+ * As transações que uma regra alcança, mais recentes primeiro.
+ * 
+ * Usa o MESMO `EXISTS` sobre `rule_patterns` da contagem em
+ * `list_rules_with_count`: o número que a tabela mostra é a promessa do que
+ * esta lista contém, e as duas divergindo seria uma mentira silenciosa.
+ */
+async transactionsMatchingRule(ruleId: number) : Promise<Result<RuleMatches, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("transactions_matching_rule", { ruleId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
  * Tudo que aplicar as regras MUDARIA, sem gravar nada.
  * 
  * Diferente de `apply_rules_to_uncategorized`, que só toca no que está sem
@@ -664,6 +679,20 @@ display_name: string | null; created_at: string }
  * não uma surpresa.
  */
 export type RuleChoice = { transaction_id: number; category_id: number }
+/**
+ * As transações que uma regra alcança, com o total somado.
+ * 
+ * "Alcança" é o mesmo critério da contagem em [`RuleWithCount`]: casa qualquer
+ * trecho da regra, independente da categoria em que a transação está hoje. Os
+ * dois PRECISAM concordar — o número da tabela é o que promete o conteúdo
+ * desta lista.
+ */
+export type RuleMatches = { transactions: Transaction[]; 
+/**
+ * Soma dos valores. Decimal como string, somado com `rust_decimal` — nunca
+ * em f64, que acumularia erro numa lista longa.
+ */
+total: string }
 /**
  * Uma mudança que aplicar as regras causaria numa transação. É o material da
  * tela de revisão: nada é gravado até o usuário escolher.

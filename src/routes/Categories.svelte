@@ -8,6 +8,8 @@
   import Loading from "$lib/components/ui/Loading.svelte";
   import ErrorNote from "$lib/components/ui/ErrorNote.svelte";
   import CategoryForm from "$lib/components/categories/CategoryForm.svelte";
+  import CategoryPanel from "$lib/components/categories/CategoryPanel.svelte";
+  import KindGuide from "$lib/components/categories/KindGuide.svelte";
   import CategoriesList from "$lib/components/categories/CategoriesList.svelte";
   import {
     listCategoriesWithCount,
@@ -41,14 +43,15 @@
     await refresh();
   }
 
-  async function onUpdate(data: { name: string; colorToken: string; kind: string }) {
-    if (!editing) return;
-    await updateCategory(editing.id, {
+  async function onUpdate(
+    categoryId: number,
+    data: { name: string; colorToken: string; kind: string },
+  ) {
+    await updateCategory(categoryId, {
       name: data.name,
       color_token: data.colorToken,
       kind: data.kind,
     });
-    editing = null;
     await refresh();
   }
 
@@ -84,20 +87,27 @@
       <ErrorNote message={error} />
     {/if}
 
-    {#if editing}
-      <CategoryForm
-        initial={editing}
-        onSave={onUpdate}
-        onCancel={() => (editing = null)}
-      />
-    {:else}
-      <CategoryForm onSave={onCreate} />
-    {/if}
+    <!-- Acima do formulário porque a dúvida nasce ao preencher o campo "Tipo",
+         e a resposta tem que estar antes da pergunta. -->
+    <KindGuide />
+
+    <!-- O formulário da página cria; editar acontece no painel lateral. Assim o
+         "novo" nunca muda de identidade no meio do caminho. -->
+    <CategoryForm onSave={onCreate} />
 
     <CategoriesList
       {categories}
       onEdit={(c) => (editing = c)}
       {onDelete}
+      selectedId={editing?.id ?? null}
     />
   {/if}
 </Page>
+
+{#if editing}
+  <CategoryPanel
+    category={editing}
+    onClose={() => (editing = null)}
+    onSave={onUpdate}
+  />
+{/if}

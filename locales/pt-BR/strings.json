@@ -360,6 +360,21 @@
     "count_one": "{n} transação",
     "count_many": "{n} transações"
   },
+  "kind_guide": {
+    "title": "O que significa cada tipo?",
+    "expense": "O que você gasta.",
+    "income": "O que você recebe.",
+    "transfer": "Dinheiro mudando de lugar: fatura do cartão, entre suas contas, investimento. Fica fora da renda, dos gastos e do saldo."
+  },
+  "category_panel": {
+    "title": "Editar categoria",
+    "tx_none": "Nenhuma transação nesta categoria",
+    "tx_one": "1 transação nesta categoria",
+    "tx_many": "{n} transações nesta categoria",
+    "kind_hint": "Só “Transferência” muda os cálculos: fica fora da renda, dos gastos e do saldo.",
+    "color_hint": "A cor identifica a categoria no dashboard e nos gráficos.",
+    "scope_note": "Renomear ou trocar a cor vale na hora em todas as transações desta categoria."
+  },
   "categories_page": {
     "desc": "Crie, edite ou apague qualquer categoria. As 9 categorias iniciais vêm pré-criadas mas podem ser modificadas ou removidas livremente — apagar deixa as transações vinculadas sem categoria.",
     "delete_confirm": "Apagar \"{name}\"?",
@@ -378,6 +393,18 @@
     "due_day_hint": "Dia do mês em que a conta vence — é o que coloca a regra no calendário. Vazio = sem prazo fixo.",
     "priority_hint": "Quando duas regras batem na mesma transação, vale a de maior prioridade.",
     "scope_note": "Alterar a regra não mexe no que já foi categorizado. Use “Aplicar a existentes” pra reprocessar as transações sem categoria."
+  },
+  "rule_matches": {
+    "cta": "Ver transações desta regra",
+    "title": "Transações da regra",
+    "count_one": "1 transação",
+    "count_many": "{n} transações",
+    "total": "{value} no total",
+    "loading": "Carregando…",
+    "empty_title": "Nenhuma transação casa esta regra",
+    "empty_desc": "Nenhuma descrição do seu extrato contém os trechos desta regra. Confira se estão escritos como o banco escreve.",
+    "no_category": "Sem categoria",
+    "note": "Casa qualquer trecho da regra, independente da categoria em que a transação está hoje."
   },
   "rule_apply": {
     "title": "Revisar alterações",

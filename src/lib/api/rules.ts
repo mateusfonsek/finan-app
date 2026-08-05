@@ -4,6 +4,7 @@ import type {
   NewRule,
   Rule,
   RuleChoice,
+  RuleMatches,
   RulePreviewRow,
   RuleWithCount,
   UpdateRule,
@@ -45,6 +46,12 @@ export async function applyRulesToUncategorized(
   accountId: number | null = null,
 ): Promise<number> {
   return unwrap(await commands.applyRulesToUncategorized(accountId));
+}
+
+/** As transações que a regra alcança, com o total. Mesmo critério da contagem
+ *  mostrada na tabela de regras. */
+export async function transactionsMatchingRule(ruleId: number): Promise<RuleMatches> {
+  return unwrap(await commands.transactionsMatchingRule(ruleId));
 }
 
 /** Tudo que aplicar as regras mudaria — sem gravar nada. Alimenta a revisão. */
