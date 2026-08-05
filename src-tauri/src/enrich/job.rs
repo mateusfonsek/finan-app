@@ -435,6 +435,98 @@ mod tests {
     }
 
     #[test]
+    fn a_failed_lookup_is_counted_and_the_loop_carries_on() {
+        let conn = fresh_conn();
+        let acc = seed_account(&conn);
+        seed_tx(&conn, acc, "Pix - ENERGISA - 09.095.183/0001-40 - ITAU");
+        seed_tx(&conn, acc, "Pix - DEMERGE - 33.967.103/0001-84 - BB");
+        // Só o segundo tem resposta; o primeiro (ordem alfabética) falha.
+        let fake = FakeProvider::new(&[("33967103000184", "5611201")]);
+
+        let (events, _db) = collect_events(conn, &fake, Some(acc), &AtomicBool::new(false));
+
+        assert_eq!(
+            kinds(&events),
+            vec!["started", "failed", "resolved", "finished"],
+            "a falha não interrompe o que vem depois"
+        );
+        match &events[1] {
+            EnrichEvent::Failed { done, tax_id } => {
+                assert_eq!(*done, 1);
+                assert_eq!(tax_id, "09.095.183/0001-40");
+            }
+            other => panic!("esperava Failed, veio {other:?}"),
+        }
+    }
+
+    #[test]
+    fn cancelling_stops_early_and_creates_nothing() {
+        let conn = fresh_conn();
+        let acc = seed_account(&conn);
+        seed_tx(&conn, acc, "Pix - ENERGISA - 09.095.183/0001-40 - ITAU");
+        seed_tx(&conn, acc, "Pix - DEMERGE - 33.967.103/0001-84 - BB");
+        let fake = FakeProvider::new(&[
+            ("09095183000140", "4711301"),
+            ("33967103000184", "5611201"),
+        ]);
+        // Já cancelado antes da primeira volta: nenhuma consulta deve sair.
+        let cancel = AtomicBool::new(true);
+
+        let (events, db) = collect_events(conn, &fake, Some(acc), &cancel);
+
+        assert_eq!(kinds(&events), vec!["started", "cancelled"]);
+        assert_eq!(fake.call_count(), 0, "cancelado antes de consultar");
+        assert_eq!(rules_for(&db, "09.095.183/0001-40"), 0);
+        assert_eq!(rules_for(&db, "33.967.103/0001-84"), 0);
+    }
+
+    #[test]
+    fn cancelled_report_carries_the_partial_result() {
+        let conn = fresh_conn();
+        let acc = seed_account(&conn);
+        seed_tx(&conn, acc, "Pix - ENERGISA - 09.095.183/0001-40 - ITAU");
+        seed_tx(&conn, acc, "Pix - DEMERGE - 33.967.103/0001-84 - BB");
+        let fake = FakeProvider::new(&[
+            ("09095183000140", "4711301"),
+            ("33967103000184", "5611201"),
+        ]);
+        let cancel = AtomicBool::new(false);
+
+        // Cancela assim que o primeiro resolver: a segunda volta não acontece.
+        let guarded = Mutex::new(conn);
+        let mut events = Vec::new();
+        run_enrichment(&guarded, &pack(), &fake, Some(acc), &cancel, &mut |e| {
+            if matches!(e, EnrichEvent::Resolved { .. }) {
+                cancel.store(true, Ordering::Relaxed);
+            }
+            events.push(e);
+        })
+        .unwrap();
+
+        assert_eq!(kinds(&events), vec!["started", "resolved", "cancelled"]);
+        match events.last().unwrap() {
+            EnrichEvent::Cancelled { report } => {
+                assert_eq!(
+                    report.created_rules.len(),
+                    1,
+                    "a regra criada antes da parada permanece no relatório"
+                );
+            }
+            other => panic!("esperava Cancelled, veio {other:?}"),
+        }
+        assert_eq!(
+            rules_for(&guarded, "09.095.183/0001-40"),
+            1,
+            "a regra continua no banco depois do cancelamento"
+        );
+        assert_eq!(
+            rules_for(&guarded, "33.967.103/0001-84"),
+            0,
+            "a que nunca foi consultada não existe"
+        );
+    }
+
+    #[test]
     fn collects_unique_tax_ids_sorted_and_deduped() {
         let conn = fresh_conn();
         let acc = seed_account(&conn);
