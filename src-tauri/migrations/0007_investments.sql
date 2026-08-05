@@ -1,14 +1,14 @@
--- Flag pra distinguir categorias de investimento das outras transferências.
--- kind='transfer' + is_investment=1 → Investimentos (visualizadas em seção própria)
--- kind='transfer' + is_investment=0 → Transferências internas (pagamento de fatura etc)
--- Ambas saem dos KPIs de Renda/Gastos, mas só Investimentos têm acompanhamento dedicado.
+-- Flag separating investment categories from other transfers.
+-- kind='transfer' + is_investment=1 -> Investments (own dashboard section)
+-- kind='transfer' + is_investment=0 -> internal transfers (card bill, etc)
+-- Both leave the income/spending KPIs; only investments get dedicated tracking.
 ALTER TABLE categories ADD COLUMN is_investment INTEGER NOT NULL DEFAULT 0;
 
--- Categoria Investimentos (cor indigo distinta).
+-- Investments category (distinct indigo colour).
 INSERT OR IGNORE INTO categories (name, color_token, kind, is_investment)
 VALUES ('Investimentos', '--color-cat-indigo', 'transfer', 1);
 
--- Reaponta as regras seed do RDB (criadas em 0006) pra Investimentos.
+-- Repoints the RDB seed rules from 0006 to Investments.
 UPDATE rules
 SET category_id = (SELECT id FROM categories WHERE name = 'Investimentos'),
     display_name = CASE pattern
@@ -19,7 +19,7 @@ SET category_id = (SELECT id FROM categories WHERE name = 'Investimentos'),
 WHERE pattern IN ('Aplicação RDB', 'Resgate RDB')
   AND EXISTS (SELECT 1 FROM categories WHERE name = 'Investimentos');
 
--- Reclassifica tx existentes que estavam em Transferências por causa do RDB.
+-- Reclassifies existing tx that landed in Transfers because of RDB.
 UPDATE transactions
 SET category_id = (SELECT id FROM categories WHERE name = 'Investimentos')
 WHERE id IN (

@@ -1,6 +1,9 @@
 <script lang="ts">
   import { push, router } from "svelte-spa-router";
+  import Icon from "$lib/components/ui/Icon.svelte";
+  import { Button } from "$lib/components/ui/button";
   import { locale } from "$lib/i18n/locale.svelte";
+  import { toast as toastMotion } from "$lib/motion";
   import { watch } from "$lib/stores/watch.svelte";
   import {
     autoCollapse,
@@ -14,21 +17,22 @@
 
   const t = locale.t;
 
-  /** Tempo até encolher sozinha. Ela NÃO some depois disso — vira pastilha. */
+  /** Time until it collapses on its own. It does NOT disappear — it becomes a
+   *  pill. */
   const AUTO_COLLAPSE_MS = 6000;
 
-  // Não chamar de `state`: `$state` seria lido como auto-subscribe da store
-  // `state` (a sintaxe `$` do Svelte), e o compilador reclama de uso antes
-  // da declaração.
+  // Not named `state`: `$state` would read as an auto-subscription to a store
+  // called `state` (Svelte's `$` syntax), and the compiler complains about use
+  // before declaration.
   let toast = $state(initialToastState);
   let hovering = $state(false);
   let timer: ReturnType<typeof setTimeout> | undefined;
 
   let current = $derived(watch.discoveries[0] ?? null);
 
-  // Alinhar com a descoberta em foco é efeito, não derivação: `syncHash`
-  // preserva o estado quando o hash não mudou, então isto é no-op na maioria
-  // dos renders e só reseta quando chega outro arquivo.
+  // Aligning with the focused discovery is an effect, not a derivation:
+  // `syncHash` preserves state when the hash is unchanged, so this is a no-op
+  // on most renders and only resets when another file arrives.
   $effect(() => {
     toast = syncHash(toast, current?.hash ?? null);
   });
@@ -46,14 +50,14 @@
 
   function review() {
     if (!current) return;
-    // Quem carrega o arquivo é a tela de Importar, via sinal na store: daqui
-    // não dá pra navegar pra `/import` estando já em `/import` (o `push` não
-    // dispara `hashchange`, o Import não remonta, e o clique viraria nada).
+    // The Import screen loads the file, via a signal in the store: navigating
+    // to `/import` from `/import` does nothing (`push` fires no `hashchange`,
+    // Import never remounts, and the click would be swallowed).
     watch.requestOpen(current);
     if (router.location !== IMPORT_ROUTE) void push(IMPORT_ROUTE);
-    // Sem esconder nada aqui: resolver a descoberta é o que a tira da store, e
-    // é a store que decide o que esta notificação mostra. Se a abertura falhar
-    // lá no Import, ela continua pendente — que é o correto.
+    // Nothing is hidden here: resolving the discovery is what removes it from
+    // the store, and the store decides what this notification shows. If opening
+    // fails in Import, it stays pending — which is correct.
   }
 
   async function ignore() {
@@ -63,8 +67,10 @@
 </script>
 
 {#if current && phase !== "hidden"}
+  <!-- A parallel notification, not modal: no scrim, because it interrupts
+       nothing — the user can carry on with what they were doing. -->
   <div
-    class="fixed bottom-5 right-5 z-50"
+    class="fixed bottom-5 right-5 z-40 grid"
     onmouseenter={() => (hovering = true)}
     onmouseleave={() => (hovering = false)}
     role="presentation"
@@ -76,50 +82,47 @@
         to: current.latest ?? "?",
       }}
       <div
-        class="w-[320px] rounded-xl border border-border bg-surface shadow-xl p-4 flex flex-col gap-2"
+        transition:toastMotion
+        class="material-pop col-start-1 row-start-1 justify-self-end self-end
+               w-[326px] p-3.5 flex flex-col gap-2 rounded-[var(--radius-xl)]"
         role="status"
       >
-        <div class="flex items-start gap-2">
-          <span class="text-[12.5px] font-semibold text-fg flex items-center gap-2 flex-1">
-            <span>📄</span>
-            <span>
+        <div class="flex items-start gap-2.5">
+          <span
+            class="w-7 h-7 shrink-0 grid place-items-center rounded-[var(--radius-md)] bg-accent-soft text-accent"
+          >
+            <Icon name="fileText" size={14} stroke={1.8} />
+          </span>
+          <span class="flex-1 min-w-0 flex flex-col gap-0.5 pt-px">
+            <span class="text-callout font-semibold text-fg">
               {watch.pendingCount > 1
                 ? t("watch.toast_title_many", { n: watch.pendingCount })
                 : t("watch.toast_title")}
             </span>
+            <span class="text-sub text-fg-muted truncate" title={current.fileName}>
+              {current.fileName}
+            </span>
           </span>
-          <!-- Encolher na hora, sem esperar o timer. -->
+          <!-- Collapse now, without waiting for the timer. -->
           <button
             type="button"
             onclick={() => (toast = collapse(toast))}
             title={t("watch.toast_collapse")}
             aria-label={t("watch.toast_collapse")}
-            class="text-fg-faint hover:text-fg transition-colors leading-none px-1 -mt-0.5 text-[15px]"
+            class="press w-5 h-5 grid place-items-center rounded-full text-fg-faint
+                   hover:text-fg hover:bg-hover transition-colors duration-[var(--dur-fast)]"
           >
-            −
+            <Icon name="minus" size={11} stroke={2.4} />
           </button>
         </div>
-        <div class="text-[12px] text-fg truncate" title={current.fileName}>{current.fileName}</div>
-        <div class="text-[11px] text-fg-faint tabular">
+        <div class="text-foot text-fg-subtle tabular pl-9.5">
           {current.txCount === 1
             ? t("watch.toast_meta_one", meta)
             : t("watch.toast_meta_many", meta)}
         </div>
-        <div class="flex items-center justify-end gap-3 pt-1">
-          <button
-            type="button"
-            onclick={ignore}
-            class="text-[11.5px] text-fg-muted hover:text-fg transition-colors"
-          >
-            {t("watch.toast_ignore")}
-          </button>
-          <button
-            type="button"
-            onclick={review}
-            class="text-[12px] font-medium px-3 py-1.5 rounded-md bg-accent-soft text-fg border border-accent/30 hover:bg-hover transition-colors"
-          >
-            {t("watch.toast_review")}
-          </button>
+        <div class="flex items-center justify-end gap-2 pt-1">
+          <Button variant="ghost" size="sm" onclick={ignore}>{t("watch.toast_ignore")}</Button>
+          <Button size="sm" onclick={review}>{t("watch.toast_review")}</Button>
         </div>
       </div>
     {:else}
@@ -129,13 +132,16 @@
           : t("watch.badge_pending_many", { n: watch.pendingCount })}
       <button
         type="button"
+        transition:toastMotion
         onclick={() => (toast = expand(toast))}
         title={t("watch.toast_expand")}
-        class="flex items-center gap-2 rounded-full border border-border bg-surface shadow-lg
-               pl-3 pr-3.5 py-2 text-[11.5px] text-fg-muted hover:text-fg hover:bg-hover
-               transition-colors"
+        class="press material-pop col-start-1 row-start-1 justify-self-end self-end
+               flex items-center gap-2 rounded-full pl-2 pr-3.5 h-8
+               text-sub text-fg-muted hover:text-fg transition-colors duration-[var(--dur-fast)]"
       >
-        <span>📄</span>
+        <span class="w-5 h-5 grid place-items-center rounded-full bg-accent-soft text-accent">
+          <Icon name="fileText" size={11} stroke={2} />
+        </span>
         <span class="tabular">{pending}</span>
       </button>
     {/if}

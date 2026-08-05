@@ -4,7 +4,14 @@
   const t = locale.t;
   import { onMount } from "svelte";
   import { push } from "svelte-spa-router";
+  import { confirm } from "@tauri-apps/plugin-dialog";
   import { Button } from "$lib/components/ui/button";
+  import Page from "$lib/components/ui/Page.svelte";
+  import Card from "$lib/components/ui/Card.svelte";
+  import Icon from "$lib/components/ui/Icon.svelte";
+  import ErrorNote from "$lib/components/ui/ErrorNote.svelte";
+  import Spinner from "$lib/components/ui/Spinner.svelte";
+  import { rise } from "$lib/motion";
   import DropZone from "$lib/components/import/DropZone.svelte";
   import ImportPreview from "$lib/components/import/ImportPreview.svelte";
   import { formatMoney } from "$lib/format/money";
@@ -13,6 +20,7 @@
   import { listCategories } from "$lib/api/categories";
   import { createRule, deleteRuleWithCleanup, updateRule } from "$lib/api/rules";
   import { autoClassifyWithCnpj } from "$lib/api/suggestions";
+  import { enrichmentStatus } from "$lib/api/enrichment";
   import type { ParsedOfx } from "$lib/ofx/types";
   import { takeStashed } from "$lib/ofx/open";
   import { watch, type Discovery } from "$lib/stores/watch.svelte";
@@ -31,7 +39,7 @@
 
   let pending = $state<PendingImport | null>(null);
   let account = $state<Account | null>(null);
-  /** Set de chaves compostas `fitid|date|amount` — não confundir com FITID puro. */
+  /** Set of composite `fitid|date|amount` keys — not bare FITIDs. */
   let duplicateKeys = $state<Set<string>>(new Set());
   let selected = $state<Set<string>>(new Set());
   let reversalMap = $state<Map<string, ReversalInfo>>(new Map());
@@ -46,11 +54,11 @@
   /** category chosen per unresolved CNPJ (keyed by cnpj) */
   let chosen = $state<Record<string, number | null>>({});
   let busyKey = $state<string | null>(null);
-  /** Hash do arquivo na pasta observada, quando o import veio de lá — marca o
-   *  arquivo como importado ao final, pra sumir do badge e nunca mais avisar. */
+  /** Content hash when the import came from a watched folder — used to mark the
+   *  file imported at the end so it leaves the badge for good. */
   let watchHash = $state<string | undefined>(undefined);
 
-  // O toast nunca interrompe quem já está revisando um extrato.
+  // The toast never interrupts someone already reviewing a statement.
   $effect(() => {
     watch.suppressToast = pending !== null;
     return () => (watch.suppressToast = false);
@@ -66,10 +74,10 @@
     }
   });
 
-  // "Revisar" no toast só pede pra abrir; quem abre é esta tela. Isso vale pra
-  // quando ela acabou de montar (veio de outra rota) e pra quando o usuário já
-  // estava aqui — nesse segundo caso `push("/import")` não remontaria nada, e
-  // o `onMount` acima nunca rodaria de novo.
+  // "Review" in the toast only asks; this screen opens. That covers both a
+  // fresh mount (arriving from another route) and already being here — in the
+  // second case `push("/import")` would remount nothing and `onMount` above
+  // would never run again.
   $effect(() => {
     if (!watch.openRequest) return;
     const req = watch.takeOpenRequest();
@@ -91,8 +99,8 @@
         .map((t) => ({ ofx_fitid: t.fitid, date: t.date, amount: t.amount }));
       duplicateKeys = await checkExistingTxKeys(account.id, candidates);
       reversalMap = detectReversalPairs(parsed.transactions);
-      // Default: importar tudo MENOS duplicadas e MENOS estornos+revertidos.
-      // Duplicata é por tripla composta (fitid, date, amount); reversal é por fitid.
+      // Default: import everything EXCEPT duplicates and reversal pairs.
+      // Duplicates key on the (fitid, date, amount) triple; reversals on fitid.
       selected = new Set(
         parsed.transactions
           .filter((t) => {
@@ -146,8 +154,13 @@
         }));
       busyMsg = t("import.importing");
       importResult = await insertTransactions(account.id, toInsert);
-      busyMsg = t("import.resolving_cnpj");
-      autoReport = await autoClassifyWithCnpj(account.id);
+      // The real gate is in the backend; this only avoids announcing a step
+      // that will not happen.
+      const enrich = await enrichmentStatus().catch(() => null);
+      if (enrich?.available && enrich.enabled) {
+        busyMsg = t("import.resolving_cnpj", { taxId: enrich.tax_id_name });
+        autoReport = await autoClassifyWithCnpj(account.id);
+      }
       if (watchHash) await watch.resolve(watchHash, "imported");
     } catch (e) {
       error = e instanceof Error ? e.message : String(e);
@@ -172,7 +185,7 @@
     busyKey = `rule:${rule.id}`;
     try {
       const updated = await updateRule(rule.id, {
-        pattern: rule.pattern,
+        patterns: rule.patterns,
         category_id: newCategoryId,
         priority: rule.priority,
         due_day: rule.due_day,
@@ -193,7 +206,7 @@
     busyKey = `rule:${rule.id}`;
     try {
       const updated = await updateRule(rule.id, {
-        pattern: rule.pattern,
+        patterns: rule.patterns,
         category_id: rule.category_id,
         priority: rule.priority,
         due_day: rule.due_day,
@@ -209,7 +222,13 @@
 
   async function onDeleteRule(rule: Rule) {
     if (!autoReport) return;
-    const ok = confirm(t("import.delete_rule_confirm", { pattern: rule.pattern }));
+    const label = rule.display_name ?? rule.patterns[0] ?? "";
+    const ok = await confirm(t("import.delete_rule_confirm", { pattern: label }), {
+      title: t("import.delete"),
+      kind: "warning",
+      okLabel: t("common.delete"),
+      cancelLabel: t("common.cancel"),
+    });
     if (!ok) return;
     busyKey = `rule:${rule.id}`;
     try {
@@ -225,6 +244,13 @@
     }
   }
 
+  /** A rule created during import starts with one snippet (the tax id), but may
+   *  have gained others since — the counter avoids showing half the truth. */
+  function patternsLabel(r: Rule): string {
+    const first = r.patterns[0] ?? "";
+    return r.patterns.length > 1 ? `${first}  +${r.patterns.length - 1}` : first;
+  }
+
   async function onCreateRuleForCnpj(cnpj: string) {
     if (!autoReport) return;
     const categoryId = chosen[cnpj];
@@ -237,7 +263,7 @@
     error = null;
     try {
       const rule = await createRule({
-        pattern: cnpj,
+        patterns: [cnpj],
         category_id: categoryId,
         priority: 10,
         due_day: null,
@@ -270,25 +296,25 @@
     watchHash = undefined;
   }
 
-  /** Carrega o próximo extrato descoberto direto no preview, reaproveitando a
-   *  tela em que já estamos. */
+  /** Loads the next discovered statement straight into the preview, reusing the
+   *  screen we are already on. */
   async function openNextFromQueue() {
     const next = watch.discoveries[0];
     if (next) await openDiscovery(next);
   }
 
-  /** Carrega uma descoberta específica no preview, sem sair da tela. */
+  /** Loads a specific discovery into the preview without leaving the screen. */
   async function openDiscovery(next: Discovery) {
     error = null;
     busy = true;
     try {
-      // Só tocamos em `pending`/no resto do estado do import depois que o
-      // arquivo novo já foi lido e parseado com sucesso — igual a `onparsed`.
-      // Zerar `pending` antes (como fazia o `reset()` aqui) deixava a tela sem
-      // extrato nenhum durante toda a leitura, e se o load falhasse (arquivo
-      // movido, apagado, ou placeholder do iCloud evictado depois do scan) o
-      // erro caía com `pending` já nulo — a tela voltava pra dropzone vazia,
-      // sem explicação nenhuma.
+      // `pending` and the rest of the import state are only touched after the
+      // new file has been read and parsed successfully, same as `onparsed`.
+      // Clearing `pending` first (as `reset()` used to do here) left the screen
+      // with no statement during the whole read, and if the load failed (file
+      // moved, deleted, or an iCloud placeholder evicted after the scan) the
+      // error landed with `pending` already null — the screen fell back to an
+      // empty dropzone with no explanation.
       const loaded = await loadOfxFromPath(next.path);
       reset();
       pending = { file: loaded.file, parsed: loaded.parsed };
@@ -296,12 +322,12 @@
       await prepareImport(loaded.parsed);
     } catch (e) {
       error = e instanceof Error ? e.message : String(e);
-      // Tira o arquivo da fila pra que ele não trave `discoveries[0]` — sem
-      // isso, todo clique em "Próximo extrato" bateria de novo nele e os
-      // extratos atrás nunca sairiam. *Como* ele sai depende da falha: só
-      // conteúdo que não é OFX vira `invalid` (permanente); não conseguir ler
-      // agora é transitório e apenas some desta rodada, voltando na próxima
-      // varredura (spec §5.4).
+      // Takes the file out of the queue so it cannot block `discoveries[0]`;
+      // otherwise every "next statement" click would hit it again and the ones
+      // behind would never surface. *How* it leaves depends on the failure:
+      // only non-OFX content becomes `invalid` (permanent); failing to read now
+      // is transient and merely drops out of this round, returning on the next
+      // scan.
       await watch.noteLoadFailure(next.hash, e);
     } finally {
       busy = false;
@@ -309,68 +335,86 @@
   }
 </script>
 
-<section class="p-8 max-w-5xl mx-auto flex flex-col gap-5">
-  <header class="flex items-baseline justify-between">
-    <h2 class="text-xl font-semibold tracking-tight" style="font-family: var(--font-display)">
-      {t("nav.import")}
-    </h2>
+<Page title={t("nav.import")}>
+  {#snippet toolbar()}
     {#if pending}
-      <span class="text-xs text-fg-faint tabular">{pending.file.name}</span>
+      <span class="chip text-fg-muted max-w-[280px]">
+        <Icon name="fileText" size={12} />
+        <span class="truncate">{pending.file.name}</span>
+      </span>
     {/if}
-  </header>
+  {/snippet}
 
   {#if !pending}
-    {#if error}
-      <div class="rounded-lg border border-border bg-surface p-3 text-sm text-neg">{error}</div>
-    {/if}
-    <DropZone {onparsed} {onerror} />
+    <!-- A target has the size of a target: stretched across the full page it
+         stops looking like an object and becomes an empty band. -->
+    <div class="w-full max-w-xl mx-auto flex flex-col gap-4 pt-4">
+      {#if error}
+        <ErrorNote message={error} />
+      {/if}
+      <DropZone {onparsed} {onerror} />
+    </div>
   {:else if importResult && autoReport}
-    <!-- ============ Post-import view ============ -->
-    <div class="rounded-lg border border-border-subtle bg-surface p-4 flex flex-col gap-1.5">
-      <div class="text-[10.5px] uppercase tracking-wider font-semibold text-fg-faint">
-        {t("import.result_title")}
-      </div>
-      <div class="text-[13px] text-fg">
-        <span class="font-medium">{importResult.inserted}</span>
-        {importResult.inserted === 1 ? t("import.imported_one") : t("import.imported_many")}
-        {#if importResult.skipped_duplicates > 0}
-          · <span class="text-fg-faint">{t("import.skipped_dups", { n: importResult.skipped_duplicates })}</span>
-        {/if}
-      </div>
-      <div class="text-[12px] text-fg-muted">
-        <span class="text-fg font-medium">{autoReport.txs_classified}</span>
-        {autoReport.txs_classified === 1 ? t("import.classified_one") : t("import.classified_many")}
+    <!-- ============ After the import ============ -->
+    <!-- Explicit conclusion: what went in, what was skipped, what the app
+         categorized on its own. Confirming the result is part of the job. -->
+    <div
+      class="card p-4 flex items-start gap-3"
+      style="border-color: color-mix(in oklch, var(--color-pos) 30%, var(--color-border-subtle))"
+      in:rise
+    >
+      <span
+        class="w-8 h-8 shrink-0 grid place-items-center rounded-full"
+        style="color: var(--color-pos); background: color-mix(in oklch, var(--color-pos) 15%, transparent);"
+      >
+        <Icon name="check" size={16} stroke={2.6} />
+      </span>
+      <div class="flex flex-col gap-1 min-w-0">
+        <div class="text-title3 font-semibold text-fg">
+          {importResult.inserted}
+          {importResult.inserted === 1 ? t("import.imported_one") : t("import.imported_many")}
+        </div>
+        <div class="text-sub text-fg-muted">
+          <span class="text-fg font-medium">{autoReport.txs_classified}</span>
+          {autoReport.txs_classified === 1 ? t("import.classified_one") : t("import.classified_many")}
+          {#if importResult.skipped_duplicates > 0}
+            <span class="text-fg-subtle">
+              · {t("import.skipped_dups", { n: importResult.skipped_duplicates })}
+            </span>
+          {/if}
+        </div>
       </div>
     </div>
 
     {#if autoReport.created_rules.length > 0}
-      <div class="rounded-xl bg-surface border border-border-subtle p-4 flex flex-col gap-3">
-        <div class="flex items-baseline justify-between">
-          <div class="text-[10.5px] uppercase tracking-wider font-semibold text-fg-faint">
-            {t("import.rules_created_title", { n: autoReport.created_rules.length })}
-          </div>
-          <div class="text-[10.5px] text-fg-faint">
-            {t("import.rules_created_hint")}
-          </div>
-        </div>
-        <div class="flex flex-col gap-2">
+      <Card
+        title={t("import.rules_created_title", { n: autoReport.created_rules.length })}
+        note={t("import.rules_created_hint")}
+      >
+        <div class="flex flex-col">
           {#each autoReport.created_rules as r (r.id)}
-            <div class="grid grid-cols-[1fr_180px_auto] gap-2 items-center border-b border-border-subtle pb-2 last:border-b-0 last:pb-0">
+            <div
+              class="grid grid-cols-[1fr_178px_auto] gap-2.5 items-center py-2
+                     border-b border-border-subtle last:border-b-0"
+            >
               <div class="flex flex-col gap-0.5 min-w-0">
+                <!-- A field that only looks like one when touched: the list
+                      stays calm, but everything remains editable in place. -->
                 <input
                   type="text"
                   value={r.display_name ?? ""}
-                  placeholder={r.pattern}
+                  placeholder={r.patterns[0] ?? ""}
                   onblur={(e) => {
                     void onChangeRuleName(r, (e.currentTarget as HTMLInputElement).value);
                   }}
                   onkeydown={(e) => {
                     if (e.key === "Enter") (e.currentTarget as HTMLInputElement).blur();
                   }}
-                  class="rounded-md border border-transparent hover:border-border focus:border-accent bg-transparent focus:bg-surface-2 px-2 py-1 text-[12.5px] text-fg font-medium focus:outline-none w-full"
+                  class="field !bg-transparent !border-transparent hover:!border-border
+                         focus:!bg-surface-2 focus:!border-accent font-medium w-full"
                   title={t("import.rule_name_title")}
                 />
-                <div class="text-[10.5px] text-fg-faint tabular px-2">{r.pattern}</div>
+                <div class="text-cap text-fg-subtle font-mono px-2 truncate">{patternsLabel(r)}</div>
               </div>
               <select
                 value={String(r.category_id)}
@@ -379,7 +423,7 @@
                   void onChangeRuleCategory(r, v);
                 }}
                 disabled={busyKey === `rule:${r.id}`}
-                class="rounded-md border border-border bg-surface-2 px-2 py-1 text-[12px] text-fg"
+                class="field"
                 title={t("import.rule_category_title")}
               >
                 {#each categories as c}
@@ -388,33 +432,41 @@
               </select>
               <Button
                 variant="ghost"
+                size="icon"
                 onclick={() => onDeleteRule(r)}
                 disabled={busyKey === `rule:${r.id}`}
+                title={t("import.delete")}
+                aria-label={`${t("import.delete")} ${r.display_name ?? r.patterns[0] ?? ""}`}
+                class="hover:text-neg"
               >
-                {busyKey === `rule:${r.id}` ? "…" : t("import.delete")}
+                {#if busyKey === `rule:${r.id}`}
+                  <Spinner size={12} />
+                {:else}
+                  <Icon name="trash2" size={13} />
+                {/if}
               </Button>
             </div>
           {/each}
         </div>
-      </div>
+      </Card>
     {/if}
 
     {#if autoReport.unresolved.length > 0}
-      <div class="rounded-xl bg-surface border border-border-subtle p-4 flex flex-col gap-3">
-        <div class="text-[10.5px] uppercase tracking-wider font-semibold text-fg-faint">
-          {t("import.unresolved_title", { n: autoReport.unresolved.length })}
-        </div>
-        <div class="text-[10.5px] text-fg-faint">
-          {t("import.unresolved_hint")}
-        </div>
-        <div class="flex flex-col gap-2">
+      <Card
+        title={t("import.unresolved_title", { n: autoReport.unresolved.length })}
+        note={t("import.unresolved_hint")}
+      >
+        <div class="flex flex-col">
           {#each autoReport.unresolved as u}
-            <div class="grid grid-cols-[1fr_180px_auto] gap-2 items-center border-b border-border-subtle pb-2 last:border-b-0 last:pb-0">
-              <div class="flex flex-col">
-                <div class="text-[12.5px] text-fg font-medium">
+            <div
+              class="grid grid-cols-[1fr_178px_auto] gap-2.5 items-center py-2
+                     border-b border-border-subtle last:border-b-0"
+            >
+              <div class="flex flex-col min-w-0">
+                <div class="text-callout text-fg font-medium truncate">
                   {u.razao_social ?? u.nome_fantasia ?? u.cnpj}
                 </div>
-                <div class="text-[10.5px] text-fg-faint tabular">
+                <div class="text-cap text-fg-subtle tabular truncate">
                   {u.cnpj}
                   {#if u.cnae_fiscal_descricao}
                     {t("import.cnae_label", { code: u.cnae_fiscal ?? "—", desc: u.cnae_fiscal_descricao })}
@@ -427,7 +479,8 @@
                   const v = (e.currentTarget as HTMLSelectElement).value;
                   chosen[u.cnpj] = v === "" ? null : Number(v);
                 }}
-                class="rounded-md border border-border bg-surface-2 px-2 py-1 text-[12px] text-fg"
+                aria-label={t("import.category_placeholder")}
+                class="field"
               >
                 <option value="">{t("import.category_placeholder")}</option>
                 {#each categories as c}
@@ -443,14 +496,18 @@
             </div>
           {/each}
         </div>
-      </div>
+      </Card>
     {/if}
 
     {#if error}
-      <div class="rounded-lg border border-border bg-surface p-3 text-sm text-neg">{error}</div>
+      <ErrorNote message={error} />
     {/if}
 
-    <div class="flex justify-end gap-2 sticky bottom-0 bg-bg pt-3 border-t border-border-subtle">
+    <!-- Fixed action bar: translucent material, content passes underneath. -->
+    <div
+      class="material-chrome sticky bottom-0 -mx-8 px-8 py-3 mt-1 flex justify-end gap-2
+             border-t border-border-subtle"
+    >
       <Button variant="ghost" onclick={reset}>{t("import.import_another")}</Button>
       {#if watch.pendingCount > 0}
         <Button variant="outline" onclick={openNextFromQueue} disabled={busy}>
@@ -460,29 +517,35 @@
       <Button onclick={() => push("/transactions")}>{t("import.view_transactions")}</Button>
     </div>
   {:else}
-    <!-- ============ Preview view ============ -->
+    <!-- ============ Review before importing ============ -->
     {@const p = pending.parsed}
     <div class="grid grid-cols-[1fr_280px] gap-4 items-start">
       <div class="flex flex-col gap-3">
-        <div class="rounded-lg border border-border-subtle bg-surface p-4 flex items-center gap-3">
-          <div class="text-[10.5px] uppercase tracking-wider font-semibold text-accent-hi bg-accent-soft border border-accent/30 rounded-full px-2 py-0.5">
-            {p.account.bank === "unknown" ? t("import.bank_unknown") : p.account.bank}
-          </div>
-          <div
-            class="text-[10.5px] uppercase tracking-wider font-semibold rounded-full px-2 py-0.5 border"
-            style={p.account.type === "credit_card"
-              ? "color: var(--color-cat-amarelo); border-color: var(--color-cat-amarelo); background: color-mix(in oklch, var(--color-cat-amarelo) 14%, transparent);"
-              : "color: var(--color-fg-muted); border-color: var(--color-border); background: var(--color-surface-2);"}
-            title={p.account.type === "credit_card"
-              ? t("import.credit_card_title")
-              : t("import.checking_title")}
+        <div class="card p-3.5 flex items-center gap-2.5 flex-wrap">
+          <span
+            class="w-8 h-8 shrink-0 grid place-items-center rounded-[var(--radius-md)] bg-accent-soft text-accent"
           >
-            {p.account.type === "credit_card" ? t("import.credit_card") : t("import.checking")}
+            <Icon name={p.account.type === "credit_card" ? "creditCard" : "landmark"} size={15} />
+          </span>
+          <div class="flex flex-col min-w-0">
+            <span class="text-callout font-medium text-fg truncate">{p.account.displayName}</span>
+            <span class="text-cap text-fg-subtle truncate">
+              {p.account.bank === "unknown" ? t("import.bank_unknown") : p.account.bank}
+              ·
+              <span
+                title={p.account.type === "credit_card"
+                  ? t("import.credit_card_title")
+                  : t("import.checking_title")}
+              >
+                {p.account.type === "credit_card" ? t("import.credit_card") : t("import.checking")}
+              </span>
+            </span>
           </div>
-          <div class="text-sm font-medium">{p.account.displayName}</div>
-          <div class="ml-auto text-xs text-fg-faint tabular">
-            {t("import.tx_count", { n: p.transactions.length })} ·
-            {p.summary.earliest ?? "?"} → {p.summary.latest ?? "?"}
+          <div class="ml-auto text-sub text-fg-subtle tabular text-right">
+            {t("import.tx_count", { n: p.transactions.length })}
+            <div class="text-cap text-fg-subtle">
+              {p.summary.earliest ?? "?"} → {p.summary.latest ?? "?"}
+            </div>
           </div>
         </div>
 
@@ -496,31 +559,56 @@
         />
       </div>
 
-      <aside class="rounded-lg border border-border-subtle bg-surface p-4 flex flex-col gap-2 text-[12px]">
-        <div class="text-[10.5px] uppercase tracking-wider font-semibold text-fg-faint mb-1">{t("import.summary")}</div>
-        <div class="flex justify-between"><span class="text-fg-muted">{t("import.sum_inflows")}</span><span class="tabular text-pos">{formatMoney(p.summary.totalIn)}</span></div>
-        <div class="flex justify-between"><span class="text-fg-muted">{t("import.sum_outflows")}</span><span class="tabular">{formatMoney(p.summary.totalOut)}</span></div>
-        <div class="flex justify-between border-t border-border-subtle pt-2 mt-1"><span class="text-fg-muted">{t("import.sum_net")}</span><span class="tabular font-semibold">{formatMoney(p.summary.net)}</span></div>
-        <div class="flex justify-between mt-2"><span class="text-fg-muted">{t("import.sum_selected")}</span><span class="tabular">{selected.size}</span></div>
-        <div class="flex justify-between"><span class="text-fg-muted">{t("import.sum_duplicates")}</span><span class="tabular text-fg-faint">{duplicateKeys.size}</span></div>
+      <aside class="card p-4 flex flex-col gap-2 text-sub sticky top-[calc(var(--titlebar-h)+64px)]">
+        <div class="section-title mb-1">{t("import.summary")}</div>
+        <div class="flex justify-between">
+          <span class="text-fg-muted">{t("import.sum_inflows")}</span>
+          <span class="tabular text-pos">{formatMoney(p.summary.totalIn)}</span>
+        </div>
+        <div class="flex justify-between">
+          <span class="text-fg-muted">{t("import.sum_outflows")}</span>
+          <span class="tabular text-fg">{formatMoney(p.summary.totalOut)}</span>
+        </div>
+        <div class="flex justify-between border-t border-border-subtle pt-2 mt-1">
+          <span class="text-fg-muted">{t("import.sum_net")}</span>
+          <span class="tabular font-semibold text-fg">{formatMoney(p.summary.net)}</span>
+        </div>
+        <div class="flex justify-between mt-2">
+          <span class="text-fg-muted">{t("import.sum_selected")}</span>
+          <span class="tabular font-medium text-accent">{selected.size}</span>
+        </div>
+        <div class="flex justify-between">
+          <span class="text-fg-muted">{t("import.sum_duplicates")}</span>
+          <span class="tabular text-fg-subtle">{duplicateKeys.size}</span>
+        </div>
         {#if reversalMap.size > 0}
           <div class="flex justify-between" title={t("import.neutralized_pairs_title")}>
             <span class="text-fg-muted">{t("import.neutralized_pairs")}</span>
-            <span class="tabular text-fg-faint">{reversalMap.size / 2}</span>
+            <span class="tabular text-fg-subtle">{reversalMap.size / 2}</span>
           </div>
         {/if}
       </aside>
     </div>
 
     {#if error}
-      <div class="rounded-lg border border-border bg-surface p-3 text-sm text-neg">{error}</div>
+      <ErrorNote message={error} />
     {/if}
 
-    <div class="flex justify-end gap-2 sticky bottom-0 bg-bg pt-3 border-t border-border-subtle">
+    <div
+      class="material-chrome sticky bottom-0 -mx-8 px-8 py-3 mt-1 flex justify-end gap-2
+             border-t border-border-subtle"
+    >
       <Button variant="ghost" onclick={reset}>{t("common.cancel")}</Button>
       <Button onclick={confirmImport} disabled={busy || selected.size === 0}>
-        {busy ? (busyMsg || t("import.importing")) : (selected.size === 1 ? t("import.import_n_one", { n: selected.size }) : t("import.import_n_many", { n: selected.size }))}
+        {#if busy}
+          <Spinner size={12} />
+          {busyMsg || t("import.importing")}
+        {:else}
+          {selected.size === 1
+            ? t("import.import_n_one", { n: selected.size })
+            : t("import.import_n_many", { n: selected.size })}
+        {/if}
       </Button>
     </div>
   {/if}
-</section>
+</Page>

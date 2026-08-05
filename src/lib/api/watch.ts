@@ -11,10 +11,10 @@ export type FileStatus = "pending" | "imported" | "ignored" | "invalid";
 export const WATCH_ENABLED_KEY = "watch_enabled";
 export const WATCH_HINT_DISMISSED_KEY = "watch_hint_dismissed";
 export const ICLOUD_PENDING_KEY = "watch_icloud_pending";
-/** Quando a última varredura terminou (UTC, `datetime('now')` do SQLite). */
+/** When the last scan finished (UTC, SQLite `datetime('now')`). */
 export const LAST_SCAN_KEY = "watch_last_scan_at";
 
-/** Cria a pasta do preset do iCloud. Única escrita em disco da feature. */
+/** Creates the iCloud preset folder. The feature's only disk write. */
 export async function ensureDir(path: string): Promise<void> {
   unwrap(await commands.ensureDir(path));
 }

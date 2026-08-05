@@ -1,5 +1,5 @@
--- Investimento é semanticamente "verde" (crescimento patrimonial), não índigo.
--- Aplica o token novo `--color-cat-investimento` (emerald distinto do mercado/renda).
+-- Investment reads as green (growth), not indigo. Applies the new
+-- `--color-cat-investimento` token, an emerald distinct from market/income.
 UPDATE categories
 SET color_token = '--color-cat-investimento'
 WHERE name = 'Investimentos';

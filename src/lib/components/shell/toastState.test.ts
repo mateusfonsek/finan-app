@@ -9,7 +9,7 @@ import {
   syncHash,
 } from "./toastState";
 
-/** Estado já sincronizado com uma descoberta, que é o ponto de partida real. */
+/** State already synced to a discovery — the real starting point. */
 function withDiscovery(hash = "h1") {
   return syncHash(initialToastState, hash);
 }
@@ -41,8 +41,8 @@ describe("phaseOf", () => {
   });
 
   it("nunca fica escondida por conta própria: sem import, sempre é expanded ou collapsed", () => {
-    // É a regressão que originou este bug — a notificação sumia e a descoberta
-    // ficava inalcançável até reabrir o app.
+    // The regression that caused this bug — the notification vanished and the
+    // discovery stayed unreachable until the app was reopened.
     const estados = [
       withDiscovery(),
       autoCollapse(withDiscovery()),
@@ -63,7 +63,7 @@ describe("syncHash", () => {
   });
 
   it("re-sincronizar a MESMA descoberta preserva o estado", () => {
-    // Sem isso, qualquer re-render reabriria a pastilha que o usuário fechou.
+    // Without this, any re-render would reopen the pill the user closed.
     const s = collapse(withDiscovery("h1"));
     expect(phaseOf(syncHash(s, "h1"), false)).toBe("collapsed");
   });

@@ -7,8 +7,8 @@ pub struct Account {
     pub name: String,
     pub bank: Option<String>,
     pub ofx_acctid: Option<String>,
-    /// `"checking"` (conta corrente) ou `"credit_card"` (cartão de crédito).
-    /// Distingue como o app exibe e categoriza tx originárias dessa conta.
+    /// `"checking"` or `"credit_card"`. Drives how the app displays and
+    /// categorizes transactions from this account.
     pub kind: String,
     pub created_at: String,
 }
@@ -18,7 +18,7 @@ pub struct NewAccount {
     pub name: String,
     pub bank: Option<String>,
     pub ofx_acctid: Option<String>,
-    /// Default `"checking"` quando o frontend não enviar (compat retroativa).
+    /// Defaults to `"checking"` when the frontend omits it (back-compat).
     #[serde(default = "default_kind")]
     pub kind: String,
 }

@@ -9,7 +9,7 @@ import {
 import { OfxReadError } from "$lib/ofx/errors";
 import { loadOfxFromPath } from "$lib/ofx/load";
 
-/** Uma descoberta já validada: só chega aqui o que parseou como OFX. */
+/** A validated discovery: only what parsed as OFX gets here. */
 export type Discovery = {
   hash: string;
   path: string;
@@ -19,35 +19,32 @@ export type Discovery = {
   latest: string | null;
 };
 
-/** Varredura no foco da janela não pode virar rajada de I/O quando o usuário
- *  alterna entre apps. */
+/** Scanning on window focus must not become an I/O burst when the user is
+ *  switching between apps. */
 const THROTTLE_MS = 10_000;
 
 export function createWatchStore() {
   let enabled = $state(false);
   let discoveries = $state<Discovery[]>([]);
-  /** O toast não interrompe quem já está no meio de um import. */
+  /** The toast never interrupts an import already in progress. */
   let suppressToast = $state(false);
   let lastScan = 0;
   let scanning = false;
-  /** Ninguém é obrigado a chamar `loadEnabled()` antes do primeiro `refresh()`
-   *  (isso é responsabilidade de quem monta a tela). Carregamos sob demanda
-   *  aqui pra que o gate do `enabled` nunca rode contra um valor que simplesmente
-   *  nunca foi lido — a alternativa (assumir habilitado até a leitura chegar)
-   *  arriscaria varrer o disco antes de sabermos se o usuário quer isso.
+  /** Callers are not required to call `loadEnabled()` before the first
+   *  `refresh()`. Loading on demand here keeps the `enabled` gate from running
+   *  against a value that was never read — assuming enabled until the read
+   *  lands would risk scanning disk before knowing the user wants it.
    */
   let settingsLoaded = false;
-  /** Promise em voo da leitura da flag. App.svelte (boot) e o listener de foco
-   *  agora podem chamar `refresh()` quase ao mesmo tempo; sem isso, os dois
-   *  disparariam sua própria leitura de `getAppSetting` antes que a primeira
-   *  resolvesse. Não corrompe nada (leitura é idempotente), mas é I/O em
-   *  dobro de graça — compartilhar a promise em voo resolve isso.
+  /** In-flight promise for the flag read. Boot and the focus listener can call
+   *  `refresh()` almost simultaneously; without sharing, each would fire its own
+   *  `getAppSetting`. Harmless (the read is idempotent) but double the I/O for
+   *  nothing.
    */
   let loadingSettings: Promise<void> | null = null;
-  /** Hashes resolvidos (toast/import) enquanto uma varredura está em voo. O
-   *  scan trabalha com um snapshot tirado no início; sem isso, seu resultado
-   *  no final (`discoveries = next`) reviveria uma descoberta que o usuário
-   *  já resolveu enquanto o scan rodava. */
+  /** Hashes resolved (toast/import) while a scan is in flight. The scan works
+   *  from a snapshot taken at the start; without this, its final assignment
+   *  would revive a discovery the user resolved mid-scan. */
   const resolvedDuringScan = new Set<string>();
 
   async function refresh(opts: { force?: boolean } = {}) {
@@ -78,7 +75,7 @@ export function createWatchStore() {
           await noteLoadFailure(f.content_hash, e);
         }
       }
-      // Descarta do snapshot qualquer hash que o toast/import já resolveu
+      // Drop from the snapshot any hash the toast/import already resolved
       // enquanto o scan estava em voo — ver `resolvedDuringScan` acima.
       discoveries = next.filter((d) => !resolvedDuringScan.has(d.hash));
     } finally {
@@ -110,44 +107,44 @@ export function createWatchStore() {
   async function resolve(hash: string, status: FileStatus) {
     await markFile(hash, status);
     discoveries = discoveries.filter((d) => d.hash !== hash);
-    // Se um scan estiver em voo, seu snapshot ainda não sabe dessa resolução —
-    // avisamos aqui pra ele não reviver o item ao terminar.
+    // A scan in flight has a snapshot that predates this resolution — record it
+    // so the scan does not revive the item when it finishes.
     if (scanning) resolvedDuringScan.add(hash);
   }
 
-  /** Tira a descoberta da lista **sem** tocar no banco: o arquivo continua
-   *  `pending` e a próxima varredura tenta de novo. É o oposto de `resolve`,
-   *  que é definitivo. */
+  /** Removes the discovery from the list **without** touching the DB: the file
+   *  stays `pending` and the next scan retries. The opposite of `resolve`,
+   *  which is permanent. */
   function skip(hash: string) {
     discoveries = discoveries.filter((d) => d.hash !== hash);
     if (scanning) resolvedDuringScan.add(hash);
   }
 
-  /** Política única pra "não consegui abrir esta descoberta" (spec §5.4).
+  /** Single policy for "could not open this discovery".
    *
-   *  Ler falhou → transitório (stub do iCloud evictado depois da varredura,
-   *  arquivo movido, permissão): fica `pending` e volta no próximo scan.
-   *  Parse falhou → o conteúdo não é OFX e não vai virar: `invalid`, que é
-   *  permanente, e o usuário nunca vê um erro que é nosso. */
+   *  Read failed → transient (iCloud stub evicted after the scan, file moved,
+   *  permissions): stays `pending` and returns on the next scan.
+   *  Parse failed → the content is not OFX and never will be: `invalid`, which
+   *  is permanent, and the user never sees an error that is ours. */
   async function noteLoadFailure(hash: string, e: unknown) {
     if (e instanceof OfxReadError) skip(hash);
     else await resolve(hash, "invalid");
   }
 
-  /** Pedido de "abrir esta descoberta no Import", vindo do toast.
+  /** Request to open this discovery in Import, coming from the toast.
    *
-   *  Sinal em vez de navegação direta porque `push("/import")` estando já em
-   *  `/import` não dispara `hashchange` — o Import não remonta e o `onMount`
-   *  não roda de novo. A tela de Import observa este sinal e carrega no lugar,
-   *  funcione ela recém-montada ou já na tela. */
+   *  A signal rather than direct navigation because `push("/import")` while
+   *  already on `/import` fires no `hashchange` — Import never remounts and
+   *  `onMount` never reruns. The Import screen watches this signal instead, so
+   *  it works whether freshly mounted or already on screen. */
   let openRequest = $state<Discovery | null>(null);
 
   function requestOpen(discovery: Discovery) {
     openRequest = discovery;
   }
 
-  /** Consome o pedido (só pode ser atendido uma vez — sem isso, um pedido
-   *  antigo reabriria um extrato ao voltar pra tela depois). */
+  /** Consumes the request; it can only be served once, otherwise a stale
+   *  request would reopen a statement on the next visit. */
   function takeOpenRequest(): Discovery | null {
     const req = openRequest;
     openRequest = null;

@@ -1,11 +1,11 @@
--- Categoria 'Transferências' (kind=transfer) — usada pra rotular movimentações
--- internas (pagamento de fatura, aplicação/resgate em poupança) que NÃO são
--- gasto nem renda real. KPIs e summaries excluem categorias desse kind.
+-- 'Transferências' category (kind=transfer): labels internal moves (card bill
+-- payments, savings deposits/withdrawals) that are neither real spending nor
+-- real income. KPIs and summaries exclude categories of this kind.
 INSERT OR IGNORE INTO categories (name, color_token, kind)
 VALUES ('Transferências', '--color-cat-outros', 'transfer');
 
--- Seed de regras determinísticas. NOT EXISTS evita conflito com regras manuais
--- que o usuário possa ter criado pros mesmos patterns.
+-- Deterministic seed rules. NOT EXISTS avoids clashing with manual rules the
+-- user may already have for the same patterns.
 INSERT INTO rules (pattern, category_id, priority, due_day, display_name)
 SELECT 'Pagamento de fatura', c.id, 15, NULL, 'Pagamento de fatura do cartão'
 FROM categories c

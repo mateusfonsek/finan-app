@@ -15,8 +15,8 @@ pub fn db_path(db: State<'_, Db>) -> AppResult<String> {
     Ok(db.path.display().to_string())
 }
 
-/// Lê os bytes crus de um arquivo do disco. Usado pelo drag-and-drop de OFX:
-/// o evento de drop do Tauri entrega só o caminho, não o conteúdo do arquivo.
+/// Reads a file's raw bytes. Used by OFX drag-and-drop: Tauri's drop event
+/// delivers only the path, not the contents.
 #[tauri::command]
 #[specta::specta]
 pub fn read_file_bytes(path: String) -> AppResult<Vec<u8>> {

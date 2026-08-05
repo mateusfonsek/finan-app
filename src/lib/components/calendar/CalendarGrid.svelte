@@ -5,19 +5,19 @@
 
   const t = locale.t;
 
-  /** Totais por dia, calculados em Calendar.svelte a partir das transações do mês. */
+  /** Per-day totals, computed in Calendar.svelte from the month's transactions. */
   export type DayFlow = { inflow: number; outflow: number };
 
   type Props = {
-    /** "YYYY-MM" do mês exibido */
+    /** "YYYY-MM" of the displayed month */
     month: string;
-    /** Hoje, no formato "YYYY-MM-DD" */
+    /** Today, as "YYYY-MM-DD" */
     today: string;
-    /** Totais por dia (chave = dia do mês, 1..31). */
+    /** Per-day totals (key = day of month, 1..31). */
     dayFlows?: Map<number, DayFlow>;
     maxOut?: number;
     maxIn?: number;
-    /** Eventos de regras com due_day ou paid_day. Usados pra renderizar contas a pagar/pagas. */
+    /** Rule events with a due_day or paid_day, used to render bills. */
     events?: CalendarEvent[];
     selectedDay?: number | null;
     onSelectDay?: (day: number | null) => void;
@@ -62,7 +62,7 @@
     const todayPrefix = todayStr.slice(0, 7);
     const todayDay = todayPrefix === monthStr ? Number(todayStr.slice(8, 10)) : -1;
 
-    // Bucket de eventos por due_day (ancora dia 31 no último dia do mês).
+    // Buckets events by due_day (anchors day 31 to the month's last day).
     const dueByDay = new Map<number, CalendarEvent[]>();
     for (const e of evs) {
       if (e.due_day == null) continue;
@@ -83,6 +83,11 @@
         due: dueByDay.get(d) ?? [],
       });
     }
+    // Fills the last week: a grid ending mid-row leaves an unbordered step in
+    // the card's corner.
+    while (out.length % 7 !== 0) {
+      out.push({ day: null, isToday: false, due: [] });
+    }
     return out;
   }
 
@@ -98,23 +103,19 @@
   function billStyle(state: BillState): string {
     switch (state) {
       case "paid":
-        return "background: color-mix(in oklch, var(--color-pos) 18%, transparent); border-color: color-mix(in oklch, var(--color-pos) 50%, transparent); color: var(--color-pos);";
+        return "background: color-mix(in oklch, var(--color-pos) 16%, transparent); color: var(--color-pos);";
       case "overdue":
-        return "background: color-mix(in oklch, var(--color-neg) 14%, transparent); border-color: var(--color-neg); color: var(--color-neg);";
+        return "background: color-mix(in oklch, var(--color-neg) 16%, transparent); color: var(--color-neg);";
       case "pending":
-        return "background: transparent; border-color: var(--color-cat-amarelo); color: var(--color-cat-amarelo);";
+        return "background: color-mix(in oklch, var(--color-cat-amarelo) 15%, transparent); color: var(--color-cat-amarelo);";
     }
   }
 
   function billIcon(state: BillState): string {
-    return state === "paid" ? "✓" : state === "overdue" ? "!" : "○";
+    return state === "paid" ? "✓" : state === "overdue" ? "!" : "•";
   }
 
-  function billLabel(e: CalendarEvent): string {
-    return e.pattern;
-  }
-
-  /** Mapeia intensidade [0,1] em opacidade visível [20%, 100%]. */
+  /** Maps intensity [0,1] to visible opacity [20%, 100%]. */
   function intensityPct(value: number, max: number): number {
     if (max <= 0 || value <= 0) return 0;
     const ratio = Math.min(1, value / max);
@@ -131,10 +132,10 @@
   }
 </script>
 
-<div class="rounded-lg border border-border-subtle bg-surface overflow-hidden">
-  <div class="grid grid-cols-7 bg-surface-2 border-b border-border-subtle">
+<div class="card overflow-hidden">
+  <div class="grid grid-cols-7 border-b border-border-subtle">
     {#each locale.weekdaysShort as wd}
-      <div class="px-2 py-1.5 text-[10px] uppercase tracking-wider font-semibold text-fg-faint text-center">
+      <div class="px-2 py-2 text-cap font-medium text-fg-subtle text-center">
         {wd}
       </div>
     {/each}
@@ -150,12 +151,12 @@
         type="button"
         disabled={cell.day === null}
         onclick={() => cell.day !== null && handleClick(cell.day)}
-        class="text-left min-h-[88px] border-r border-b border-border-subtle p-1.5 flex flex-col gap-1 relative
-               transition-colors
-               {cell.day === null ? 'bg-bg/40' : 'hover:bg-hover'}
-               {cell.isToday && !isSelected ? 'bg-accent-soft/30' : ''}
-               {isSelected ? 'ring-2 ring-accent ring-inset z-10' : ''}
+        class="text-left min-h-[86px] border-r border-b border-border-subtle p-1.5 flex flex-col gap-1 relative
+               transition-colors duration-[var(--dur-fast)] ease-[var(--ease-snap)]
+               {cell.day === null ? 'bg-surface-2/35' : 'hover:bg-hover'}
+               {isSelected ? 'bg-accent-soft hover:bg-accent-soft ring-[1.5px] ring-accent ring-inset z-10' : ''}
                {i % 7 === 6 ? 'border-r-0' : ''}"
+        aria-pressed={isSelected}
         aria-label={cell.day === null
           ? undefined
           : flow
@@ -164,7 +165,13 @@
       >
         {#if cell.day !== null}
           <div class="flex items-center justify-between gap-1 w-full">
-            <span class="text-[12px] tabular {cell.isToday ? 'text-accent font-semibold' : 'text-fg'}">
+            <!-- Today gets the accent disc, as in the macOS Calendar. -->
+            <span
+              class="grid place-items-center min-w-[19px] h-[19px] px-1 rounded-full text-foot tabular
+                     {cell.isToday
+                ? 'bg-accent text-accent-on font-semibold'
+                : 'text-fg font-medium'}"
+            >
               {cell.day}
             </span>
             <div class="flex items-center gap-1">
@@ -185,11 +192,11 @@
             </div>
           </div>
 
-          <!-- Contas vencendo neste dia (até 2 visíveis, "+N" se passar). -->
+          <!-- Bills due this day (up to 2 visible, "+N" beyond). -->
           {#each cell.due.slice(0, 2) as e (e.rule_id)}
             {@const state = billState(e, todayDayInMonth)}
             <div
-              class="text-[9.5px] rounded px-1 py-0.5 truncate flex items-center gap-1 border"
+              class="text-cap2 rounded-[4px] px-1 py-0.5 truncate flex items-center gap-1 font-medium w-full"
               style={billStyle(state)}
               title={`${e.pattern}${
                 state === "paid"
@@ -202,11 +209,13 @@
               }`}
             >
               <span class="shrink-0 font-bold">{billIcon(state)}</span>
-              <span class="truncate">{billLabel(e)}</span>
+              <span class="truncate">{e.pattern}</span>
             </div>
           {/each}
           {#if cell.due.length > 2}
-            <div class="text-[9px] text-fg-faint px-1">{t("calendar.more", { n: cell.due.length - 2 })}</div>
+            <div class="text-cap2 text-fg-subtle px-1">
+              {t("calendar.more", { n: cell.due.length - 2 })}
+            </div>
           {/if}
         {/if}
       </button>
@@ -214,7 +223,9 @@
   </div>
 
   {#if maxOut > 0 || maxIn > 0 || events.some((e) => e.due_day != null)}
-    <div class="border-t border-border-subtle bg-surface-2 px-3 py-1.5 flex items-center gap-4 text-[10.5px] text-fg-muted flex-wrap">
+    <div
+      class="border-t border-border-subtle px-3 py-2 flex items-center gap-4 text-cap text-fg-subtle flex-wrap"
+    >
       {#if maxOut > 0}
         <div class="flex items-center gap-1.5">
           <span>{t("calendar.outflow")}</span>
@@ -236,19 +247,18 @@
         </div>
       {/if}
       {#if events.some((e) => e.due_day != null)}
-        <div class="flex items-center gap-2">
-          <span class="inline-flex items-center gap-1">
-            <span class="inline-block w-2 h-2 rounded border" style="border-color: var(--color-cat-amarelo);"></span>
-            <span style="color: var(--color-cat-amarelo);">{t("calendar.legend_pending")}</span>
-          </span>
-          <span class="inline-flex items-center gap-1">
-            <span class="inline-block w-2 h-2 rounded border" style="border-color: var(--color-neg);"></span>
-            <span style="color: var(--color-neg);">{t("calendar.legend_overdue")}</span>
-          </span>
-          <span class="inline-flex items-center gap-1">
-            <span class="inline-block w-2 h-2 rounded" style="background: color-mix(in oklch, var(--color-pos) 30%, transparent);"></span>
-            <span style="color: var(--color-pos);">{t("calendar.legend_paid")}</span>
-          </span>
+        <div class="flex items-center gap-2 ml-auto">
+          {#each [["pending", "--color-cat-amarelo", "calendar.legend_pending"], ["overdue", "--color-neg", "calendar.legend_overdue"], ["paid", "--color-pos", "calendar.legend_paid"]] as [key, token, label]}
+            <span
+              class="inline-flex items-center gap-1 rounded-full px-1.5 py-px font-medium"
+              style="color: var({token}); background: color-mix(in oklch, var({token}) 14%, transparent);"
+            >
+              <span class="font-bold">
+                {key === "paid" ? "✓" : key === "overdue" ? "!" : "•"}
+              </span>
+              {t(label)}
+            </span>
+          {/each}
         </div>
       {/if}
     </div>

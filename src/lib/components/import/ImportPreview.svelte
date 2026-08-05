@@ -2,6 +2,7 @@
   import { formatMoney } from "$lib/format/money";
   import { txKeyString } from "$lib/api/transactions";
   import { locale } from "$lib/i18n/locale.svelte";
+  import Icon from "$lib/components/ui/Icon.svelte";
   import type { ParsedTransaction } from "$lib/ofx/types";
   import type { ReversalInfo, ReversalRole } from "$lib/ofx/reversals";
 
@@ -9,7 +10,7 @@
 
   type Props = {
     transactions: ParsedTransaction[];
-    /** Chaves compostas `fitid|date|amount` que já existem na DB. */
+    /** Composite `fitid|date|amount` keys already present in the DB. */
     duplicateKeys: Set<string>;
     reversalMap?: Map<string, ReversalInfo>;
     selected: Set<string>;
@@ -37,22 +38,29 @@
   function reversalTooltip(role: ReversalRole): string {
     return tr("import.reversal_" + role);
   }
+
+  function fmtDate(iso: string): string {
+    const mo = Number(iso.slice(5, 7)) - 1;
+    return `${iso.slice(8, 10)} ${(locale.monthsShort[mo] ?? "").toLowerCase()}`;
+  }
 </script>
 
-<div class="rounded-lg border border-border-subtle bg-surface overflow-hidden">
-  <table class="w-full text-[12px]">
-    <thead class="bg-surface-2">
-      <tr>
-        <th class="text-left px-3 py-2 w-8">
+<div class="card overflow-hidden">
+  <table class="w-full">
+    <thead>
+      <tr class="border-b border-border-subtle">
+        <th class="text-left pl-4 pr-2 py-2 w-9">
           <input
             type="checkbox"
             checked={allChecked}
             onchange={(e) => ontoggleAll((e.currentTarget as HTMLInputElement).checked)}
+            aria-label={tr("import.toggle_all")}
+            class="accent-[var(--color-accent)]"
           />
         </th>
-        <th class="text-left px-3 py-2 font-medium text-fg-faint uppercase tracking-wider text-[10.5px]">{tr("tx_table.date")}</th>
-        <th class="text-left px-3 py-2 font-medium text-fg-faint uppercase tracking-wider text-[10.5px]">{tr("tx_table.description")}</th>
-        <th class="text-right px-3 py-2 font-medium text-fg-faint uppercase tracking-wider text-[10.5px]">{tr("tx_table.amount")}</th>
+        <th class="col-head text-left px-3 py-2 w-[76px]">{tr("tx_table.date")}</th>
+        <th class="col-head text-left px-3 py-2">{tr("tx_table.description")}</th>
+        <th class="col-head text-right px-4 py-2 w-[124px]">{tr("tx_table.amount")}</th>
       </tr>
     </thead>
     <tbody>
@@ -60,35 +68,50 @@
         {@const isDup = !!(t.fitid && duplicateKeys.has(txKeyString({ ofx_fitid: t.fitid, date: t.date, amount: t.amount })))}
         {@const isSel = !!(t.fitid && selected.has(t.fitid))}
         {@const rev = t.fitid ? reversalMap.get(t.fitid) : undefined}
+        <!-- Estorno recebe uma barra amarela na borda inicial; duplicada
+             desbota. Dois estados distintos, distinguíveis sem cor isolada. -->
         <tr
-          class="border-t border-border-subtle {isDup ? 'opacity-60' : ''} {rev ? 'bg-amber-50/40 dark:bg-amber-950/20' : ''}"
-          style={rev ? 'box-shadow: inset 3px 0 0 var(--color-cat-amarelo);' : ''}
+          class="row border-t border-border-subtle first:border-t-0 {isDup ? 'opacity-50' : ''}"
+          style={rev
+            ? "box-shadow: inset 3px 0 0 var(--color-cat-amarelo); background: color-mix(in oklch, var(--color-cat-amarelo) 6%, transparent);"
+            : ""}
           title={rev ? reversalTooltip(rev.role) : undefined}
         >
-          <td class="px-3 py-2 pl-4">
+          <td class="pl-4 pr-2 py-2">
             <input
               type="checkbox"
               checked={isSel}
               disabled={!t.fitid}
               onchange={() => t.fitid && ontoggle(t.fitid)}
+              aria-label={t.description}
+              class="accent-[var(--color-accent)]"
             />
           </td>
-          <td class="px-3 py-2 text-fg-muted tabular">{t.date}</td>
-          <td class="px-3 py-2">
-            {t.description}
-            {#if rev}
-              <span
-                class="ml-2 text-[10px] uppercase tracking-wider font-semibold px-1.5 py-0.5 rounded"
-                style="color: var(--color-cat-amarelo); border: 1px solid var(--color-cat-amarelo); opacity: 0.85;"
-              >
-                {reversalLabel(rev.role)}
-              </span>
-            {/if}
-            {#if isDup}
-              <span class="ml-2 text-[10px] text-fg-faint uppercase tracking-wider">{tr("import.duplicate")}</span>
-            {/if}
+          <td class="px-3 py-2 text-sub text-fg-subtle tabular whitespace-nowrap">
+            {fmtDate(t.date)}
           </td>
-          <td class="px-3 py-2 text-right tabular font-medium {Number(t.amount) >= 0 ? 'text-pos' : 'text-fg'}">
+          <td class="px-3 py-2 text-callout text-fg">
+            <span class="inline-flex items-center gap-2 flex-wrap">
+              <span>{t.description}</span>
+              {#if rev}
+                <span
+                  class="text-cap2 font-semibold px-1.5 py-px rounded-full whitespace-nowrap"
+                  style="color: var(--color-cat-amarelo); background: color-mix(in oklch, var(--color-cat-amarelo) 16%, transparent);"
+                >
+                  {reversalLabel(rev.role)}
+                </span>
+              {/if}
+              {#if isDup}
+                <span class="text-cap2 font-semibold text-fg-subtle px-1.5 py-px rounded-full bg-surface-2">
+                  {tr("import.duplicate")}
+                </span>
+              {/if}
+            </span>
+          </td>
+          <td
+            class="px-4 py-2 text-right text-callout tabular font-medium whitespace-nowrap
+                   {Number(t.amount) >= 0 ? 'text-pos' : 'text-fg'}"
+          >
             {formatMoney(t.amount)}
           </td>
         </tr>
@@ -97,8 +120,12 @@
   </table>
 
   {#if reversalMap.size > 0}
-    <div class="px-3 py-2 border-t border-border-subtle bg-surface-2 text-[11px] text-fg-muted flex items-center gap-2">
-      <span class="inline-block w-2 h-2 rounded" style="background: var(--color-cat-amarelo);"></span>
+    <div
+      class="px-4 py-2.5 border-t border-border-subtle flex items-start gap-2 text-foot text-fg-muted leading-relaxed"
+    >
+      <span class="mt-px shrink-0" style="color: var(--color-cat-amarelo)">
+        <Icon name="info" size={13} stroke={2} />
+      </span>
       <span>
         {reversalMap.size / 2 === 1
           ? tr("import.reversal_legend_one", { n: reversalMap.size / 2 })

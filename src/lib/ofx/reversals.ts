@@ -1,9 +1,9 @@
 import type { ParsedTransaction } from "./types";
 
 /**
- * Papel de uma transação dentro de um par.
- * Quatro valores porque queremos rótulos distintos para estorno vs reembolso
- * na UI, mas todos significam "esta transação faz parte de um par que soma zero".
+ * A transaction's role within a pair. Four values because the UI labels
+ * chargebacks and refunds differently, but all mean "part of a pair summing to
+ * zero".
  */
 export type ReversalRole = "estorno" | "estornada" | "reembolso" | "reembolsada";
 
@@ -16,16 +16,16 @@ export interface ReversalInfo {
 const ESTORNO_PREFIX_RE = /^Estorno\s*-\s*/i;
 const REEMBOLSO_PREFIX_RE = /^Reembolso recebido pelo Pix\s*-\s*/i;
 const PIX_ENVIADO_PREFIX_RE = /^Transferência enviada pelo Pix\s*-\s*/i;
-/** Estorno do cartão de crédito Nubank: `Estorno de "Merchant" (Merchant)`. */
+/** Nubank credit-card chargeback: `Estorno de "Merchant" (Merchant)`. */
 const ESTORNO_CC_RE = /^Estorno\s+de\s+"([^"]+)"\s*(?:\([^)]+\))?\s*$/i;
 
-/** Extrai o merchant entre aspas do formato `Estorno de "Merchant" (Merchant)`. */
+/** Takes the quoted merchant out of `Estorno de "Merchant" (Merchant)`. */
 function extractEstornoCcMerchant(description: string): string | null {
   const m = description.match(ESTORNO_CC_RE);
   return m ? m[1].trim() : null;
 }
 
-/** Distância em dias entre duas datas ISO YYYY-MM-DD. */
+/** Distance in days between two ISO YYYY-MM-DD dates. */
 function daysBetween(a: string, b: string): number {
   const da = Date.parse(a + "T00:00:00Z");
   const db = Date.parse(b + "T00:00:00Z");
@@ -34,12 +34,11 @@ function daysBetween(a: string, b: string): number {
 }
 
 /**
- * De uma description Pix `<Prefixo> - NOME - ID - BANCO/AG/CONTA`, extrai
- * `ID - BANCO/AG/CONTA` (tudo depois do nome). Isso identifica unicamente a
- * contraparte mesmo quando o NOME varia (razão social vs nome fantasia, como
- * acontece em reembolsos da Amazon).
+ * From a Pix description `<Prefix> - NAME - ID - BANK/BRANCH/ACCOUNT`, takes
+ * everything after the name. That identifies the counterparty uniquely even
+ * when the NAME varies (legal vs trade name, as Amazon refunds do).
  *
- * Retorna `null` se a descrição não começa com um prefixo Pix conhecido.
+ * `null` when the description does not start with a known Pix prefix.
  */
 function pixCounterpartySignature(description: string): string | null {
   let body: string | null = null;
@@ -57,23 +56,22 @@ function pixCounterpartySignature(description: string): string | null {
 }
 
 /**
- * Encontra pares (estorno↔revertida e reembolso↔revertida) numa lista de
- * transações OFX. Três fases:
+ * Finds reversal pairs in a list of OFX transactions. Three phases:
  *
- * **Fase 1 — Estornos (CA)**: description "Estorno - X". Casa com tx cuja
- * description é X exato. Janela: ±7 dias.
+ * **Phase 1 — checking-account chargebacks**: description "Estorno - X", paired
+ * with the tx whose description is exactly X. Window: +/-7 days.
  *
- * **Fase 2 — Reembolsos (Pix)**: description "Reembolso recebido pelo Pix - ".
- * Par via **assinatura da contraparte** (CNPJ + dados bancários), não pelo nome
- * — Amazon manda "AMAZON.COM.BR" no Pix saindo e "AMAZON SERVICOS DE VAREJO..."
- * no reembolso. Janela: ±30 dias.
+ * **Phase 2 — Pix refunds**: description "Reembolso recebido pelo Pix - ".
+ * Paired by counterparty signature (tax id plus bank details) rather than name
+ * — Amazon sends one trade name on the outgoing Pix and the legal name on the
+ * refund. Window: +/-30 days.
  *
- * **Fase 3 — Estornos (CC Nubank)**: description `Estorno de "Merchant" (Merchant)`.
- * Casa com a compra original cujo MEMO == "Merchant" (case-insensitive, trim).
- * Janela: ±30 dias.
+ * **Phase 3 — Nubank card chargebacks**: description `Estorno de "Merchant"`,
+ * paired with the original purchase whose MEMO equals the quoted merchant
+ * (case-insensitive). Window: +/-30 days.
  *
- * Em todas as fases, valores precisam ser opostos em sinal e iguais em magnitude.
- * Pareamento FIFO quando há múltiplos candidatos.
+ * In every phase amounts must be opposite in sign and equal in magnitude.
+ * FIFO pairing when several candidates exist.
  */
 export function detectReversalPairs(
   txs: ParsedTransaction[],
@@ -81,7 +79,7 @@ export function detectReversalPairs(
   const result = new Map<string, ReversalInfo>();
   const used = new Set<string>();
 
-  // Fase 1: estornos (match por descrição exata).
+  // Phase 1: chargebacks (exact description match).
   for (const e of txs) {
     if (!e.fitid || used.has(e.fitid)) continue;
     if (!ESTORNO_PREFIX_RE.test(e.description)) continue;
@@ -119,7 +117,7 @@ export function detectReversalPairs(
 
     const candidate = txs.find((t) => {
       if (!t.fitid || used.has(t.fitid) || t.fitid === r.fitid) return false;
-      // O original é um "Transferência enviada pelo Pix" com a mesma assinatura.
+      // The original is an outgoing Pix with the same signature.
       if (!PIX_ENVIADO_PREFIX_RE.test(t.description)) return false;
       const otherSig = pixCounterpartySignature(t.description);
       if (otherSig !== sig) return false;
@@ -137,10 +135,10 @@ export function detectReversalPairs(
     }
   }
 
-  // Fase 3: estornos de cartão de crédito (Nubank).
+  // Phase 3: credit-card chargebacks (Nubank).
   // Formato: `Estorno de "Merchant" (Merchant)` (CREDIT, positivo).
-  // Casamento: tx anterior cuja description normalizada (lowercase, trim) é
-  // igual ao merchant entre aspas, mesmo amount em magnitude oposta, ±30 dias.
+  // Pairing: an earlier tx whose normalized description (lowercase, trimmed) is
+  // equal to the quoted merchant, opposite sign, same magnitude, +/-30 days.
   for (const e of txs) {
     if (!e.fitid || used.has(e.fitid)) continue;
     const merchant = extractEstornoCcMerchant(e.description);

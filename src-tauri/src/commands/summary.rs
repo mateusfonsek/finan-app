@@ -17,8 +17,8 @@ pub fn summary_kpis(db: State<'_, Db>, month: Option<String>) -> AppResult<KpiSu
     let conn = db.conn.lock().expect("db mutex poisoned");
     let pattern: Option<String> = month.as_ref().map(|m| format!("{m}-%"));
 
-    // Excluímos tx cujo category.kind = 'transfer' (movimentações internas como
-    // pagamento de fatura ou aplicação em poupança). Categoria NULL conta normal.
+    // Excludes tx whose category.kind = 'transfer' (internal moves like paying
+    // a card bill or moving money to savings). A NULL category counts normally.
     let mut stmt = conn.prepare(
         "SELECT t.amount
          FROM transactions t
@@ -88,7 +88,9 @@ pub fn summary_by_category(
         }
         let abs = -d;
         total_expense += abs;
-        let display_name = name.unwrap_or_else(|| "Sem categoria".to_string());
+        // No label invented here: `category_id: None` already means
+        // "uncategorized", and the wording belongs to the locale pack.
+        let display_name = name.unwrap_or_default();
         let entry = by
             .entry(cat_id)
             .or_insert((display_name, color, Decimal::ZERO));
@@ -173,7 +175,7 @@ pub fn investment_summary(
     let conn = db.conn.lock().expect("db mutex poisoned");
     let pattern: Option<String> = month.as_ref().map(|m| format!("{m}-%"));
 
-    // Aggregação do mês.
+    // Month aggregation.
     let mut stmt = conn.prepare(
         "SELECT t.amount
          FROM transactions t
@@ -202,8 +204,8 @@ pub fn investment_summary(
         }
     }
 
-    // Saldo acumulado all-time. Agregamos em Decimal em Rust pra preservar
-    // a precisão monetária (rust_decimal não casa bem com SQL SUM em TEXT).
+    // All-time running balance, aggregated as Decimal in Rust to keep monetary
+    // precision (rust_decimal does not pair well with SQL SUM over TEXT).
     let saldo: Decimal = {
         let mut all_stmt = conn.prepare(
             "SELECT t.amount FROM transactions t
@@ -217,7 +219,8 @@ pub fn investment_summary(
         for amt in &all_rows {
             let d = Decimal::from_str(amt)
                 .map_err(|e| AppError::Invalid(format!("bad amount '{amt}': {e}")))?;
-            // amount negativo (aplicação) → -d positivo → aumenta saldo investido.
+            // A negative amount (a deposit) flips positive and raises the
+            // invested balance.
             // amount positivo (resgate)   → -d negativo → diminui saldo investido.
             s += -d;
         }
@@ -275,9 +278,9 @@ pub fn transfer_summary(
     })
 }
 
-/// Agrega entradas (`amount > 0`, kind != 'transfer') do mês por contraparte.
-/// Marca como recorrente quando a fonte também apareceu nos DOIS meses
-/// imediatamente anteriores ao mês exibido (ver `is_recurring`).
+/// Aggregates the month's inflows (`amount > 0`, kind != 'transfer') by
+/// counterparty. Marks a source recurring when it also appeared in BOTH months
+/// immediately before the displayed one (see `is_recurring`).
 #[tauri::command]
 #[specta::specta]
 pub fn income_sources(
@@ -288,8 +291,8 @@ pub fn income_sources(
     let conn = db.conn.lock().expect("db mutex poisoned");
     let pack = locale.pack.lock().expect("locale mutex poisoned");
 
-    // Carrega TODAS as entradas reais (positivas, não-transfer) de toda a DB.
-    // Precisamos do histórico completo pra detectar recorrência.
+    // Loads ALL real inflows (positive, non-transfer) from the whole DB — the
+    // full history is needed to detect recurrence.
     let mut stmt = conn.prepare(
         "SELECT t.date, t.amount, t.description
          FROM transactions t
@@ -304,9 +307,8 @@ pub fn income_sources(
 
     let target_prefix = month.as_deref().map(|m| format!("{m}-"));
 
-    // Pra cada chave normalizada, rastreia:
-    // - meses únicos onde apareceu (pra recorrência)
-    // - agregado do mês filtrado (total, count, label)
+    // Per normalized key, tracks the distinct months it appeared in (for
+    // recurrence) and the filtered month's aggregate (total, count, label).
     struct Agg {
         label: String,
         total: Decimal,
@@ -385,7 +387,8 @@ fn compute_cutoff(months_back: u32) -> String {
     format!("{:04}-{:02}-01", y, m)
 }
 
-/// Desloca um ano/mês por `delta` meses, normalizando virada de ano. Devolve "YYYY-MM".
+/// Shifts a year/month by `delta` months, handling year rollover. Returns
+/// "YYYY-MM".
 fn shift_month(year: i32, month: u32, delta: i32) -> String {
     let zero_based = year * 12 + (month as i32 - 1) + delta;
     let y = zero_based.div_euclid(12);
@@ -393,8 +396,8 @@ fn shift_month(year: i32, month: u32, delta: i32) -> String {
     format!("{:04}-{:02}", y, m)
 }
 
-/// Para um mês "YYYY-MM", devolve (M-1, M-2) como "YYYY-MM". `None` se a string
-/// não for um mês válido (ex.: filtro por ano "YYYY" ou vazio).
+/// For a "YYYY-MM" month, returns (M-1, M-2). `None` when the string is not a
+/// valid month (e.g. a year-only filter or empty).
 fn prev_two_months(month: &str) -> Option<(String, String)> {
     let (y, m) = month.split_once('-')?;
     if m.len() != 2 {
@@ -408,10 +411,10 @@ fn prev_two_months(month: &str) -> Option<(String, String)> {
     Some((shift_month(year, mon, -1), shift_month(year, mon, -2)))
 }
 
-/// Decide recorrência relativa ao mês exibido `anchor`: a fonte só é recorrente
-/// se apareceu nos DOIS meses imediatamente anteriores (M-1 e M-2). Um gap em
-/// qualquer um deles quebra a recorrência. Sem âncora mensal (filtro por ano ou
-/// "tudo"), usa o sinal grosso: ≥2 meses distintos no histórico.
+/// Recurrence relative to the displayed month `anchor`: a source is recurring
+/// only if it appeared in BOTH immediately preceding months (M-1 and M-2). A
+/// gap in either breaks it. With no month anchor (year filter or "all"), falls
+/// back to the coarse signal: >= 2 distinct months in history.
 fn is_recurring(months_seen: &HashSet<String>, anchor: Option<&str>) -> bool {
     match anchor.and_then(prev_two_months) {
         Some((m1, m2)) => months_seen.contains(&m1) && months_seen.contains(&m2),
@@ -504,7 +507,7 @@ mod tests {
 
         insert_tx(&conn, acc, "2026-04-05", "-50.00", Some(mercado));
         insert_tx(&conn, acc, "2026-04-10", "-30.00", Some(mercado));
-        // Tx positiva sem categoria — renda não é categorizada após migration 0008.
+        // Positive tx with no category — income is uncategorized since 0008.
         insert_tx(&conn, acc, "2026-04-15", "5000.00", None);
         insert_tx(&conn, acc, "2026-04-20", "-10.00", None);
 
@@ -550,7 +553,7 @@ mod tests {
         let mercado = cat_id(&conn, "Mercado");
 
         // Real spending and income, plus a transfer that should be ignored.
-        // Renda fica sem categoria (categorias só pra gastos).
+        // Income stays uncategorized (categories are for spending).
         insert_tx(&conn, acc, "2026-04-05", "-100.00", Some(mercado));
         insert_tx(&conn, acc, "2026-04-10", "5000.00", None);
         insert_tx(&conn, acc, "2026-04-15", "-732.52", Some(transferencias)); // pagamento de fatura
@@ -581,7 +584,7 @@ mod tests {
         }
         assert_eq!(income, Decimal::from_str("5000.00").unwrap());
         assert_eq!(expense, Decimal::from_str("100.00").unwrap(),
-            "Transferências (-732.52 -1000.00) devem ser ignoradas");
+            "transfers (-732.52 -1000.00) must be ignored");
         assert_eq!(rows.len(), 2);
     }
 
@@ -591,14 +594,14 @@ mod tests {
 
     #[test]
     fn recurring_requires_both_preceding_months() {
-        // Waldimayre: pix em jan, fev e mar. Em março → recorrente (jan+fev presentes).
+        // Pix in Jan, Feb and Mar. In March it is recurring (Jan and Feb present).
         let s = seen(&["2026-01", "2026-02", "2026-03"]);
         assert!(is_recurring(&s, Some("2026-03")));
     }
 
     #[test]
     fn recurring_breaks_on_gap() {
-        // Pix em mar e mai, pulou abr. Em maio → NÃO recorrente (falta abr).
+        // Pix in Mar and May, skipped Apr. In May → NOT recurring.
         let s = seen(&["2026-03", "2026-05"]);
         assert!(!is_recurring(&s, Some("2026-05")));
     }
@@ -612,7 +615,7 @@ mod tests {
 
     #[test]
     fn recurring_fallback_without_month_anchor() {
-        // Sem âncora mensal (tudo) ou filtro por ano: ≥2 meses distintos.
+        // No month anchor (all) or a year filter: >= 2 distinct months.
         let s = seen(&["2026-01", "2026-06"]);
         assert!(is_recurring(&s, None));
         assert!(is_recurring(&s, Some("2026")));

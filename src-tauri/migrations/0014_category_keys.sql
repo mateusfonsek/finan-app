@@ -1,13 +1,13 @@
--- Chave estável, independente de idioma, pra cada categoria. É o pivô entre a
--- lógica de classificação (cnae_map, seed_rules do locale pack) e o nome exibido:
--- as regras referenciam a `key`, nunca o `name`, então classificar continua
--- funcionando em qualquer idioma.
+-- A stable, language-independent key per category. It is the pivot between
+-- classification logic (the locale pack's cnae_map and seed_rules) and the
+-- displayed name: rules reference `key`, never `name`, so classification keeps
+-- working in any language.
 --
--- Categorias criadas pelo usuário ficam com key NULL (o índice único permite
--- múltiplos NULLs no SQLite) — elas não participam da classificação automática.
+-- User-created categories keep a NULL key (SQLite's unique index allows many
+-- NULLs) and take no part in automatic classification.
 ALTER TABLE categories ADD COLUMN key TEXT;
 
--- Backfill das categorias seedadas pelas migrations, pelo nome PT atual.
+-- Backfills migration-seeded categories by their current Portuguese name.
 UPDATE categories SET key = 'market'       WHERE key IS NULL AND name = 'Mercado';
 UPDATE categories SET key = 'restaurant'   WHERE key IS NULL AND name = 'Restaurante';
 UPDATE categories SET key = 'transport'    WHERE key IS NULL AND name = 'Transporte';

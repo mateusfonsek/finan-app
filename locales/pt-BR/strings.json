@@ -1,7 +1,41 @@
 {
-  "months": ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"],
-  "months_short": ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"],
-  "weekdays_short": ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"],
+  "months": [
+    "Janeiro",
+    "Fevereiro",
+    "Março",
+    "Abril",
+    "Maio",
+    "Junho",
+    "Julho",
+    "Agosto",
+    "Setembro",
+    "Outubro",
+    "Novembro",
+    "Dezembro"
+  ],
+  "months_short": [
+    "Jan",
+    "Fev",
+    "Mar",
+    "Abr",
+    "Mai",
+    "Jun",
+    "Jul",
+    "Ago",
+    "Set",
+    "Out",
+    "Nov",
+    "Dez"
+  ],
+  "weekdays_short": [
+    "Dom",
+    "Seg",
+    "Ter",
+    "Qua",
+    "Qui",
+    "Sex",
+    "Sáb"
+  ],
   "menu": {
     "app_name": "finan app",
     "about": "Sobre o finan app",
@@ -35,7 +69,10 @@
     "edit": "Editar",
     "close": "Fechar",
     "language": "Idioma",
-    "loading": "Carregando…"
+    "loading": "Carregando…",
+    "actions": "Ações",
+    "create": "Criar",
+    "retry": "Tentar de novo"
   },
   "month_stepper": {
     "prev_year": "Ano anterior",
@@ -50,9 +87,9 @@
   "calendar": {
     "outflow": "Saída",
     "inflow": "Entrada",
-    "legend_pending": "○ pendente",
-    "legend_overdue": "! vencida",
-    "legend_paid": "✓ paga",
+    "legend_pending": "pendente",
+    "legend_overdue": "vencida",
+    "legend_paid": "paga",
     "more": "+{n} mais",
     "day_aria": "Dia {day}",
     "day_aria_flow": "Dia {day} — entradas {inflow}, saídas {outflow}",
@@ -67,7 +104,7 @@
     "selected_day": "Dia selecionado",
     "select_day": "Selecione um dia",
     "empty_select": "Clique em qualquer dia do calendário pra ver as transações desse dia.",
-    "empty_none": "Nenhuma transação nesse dia.",
+    "empty_none": "Nada aconteceu neste dia",
     "due_bills": "Contas com vencimento",
     "income": "Renda",
     "expenses": "Gastos",
@@ -85,10 +122,22 @@
     "promise": "Sem conta, sem nuvem, sem internet. Tudo que você registra fica no seu computador e só você vê.",
     "disclaimer": "Serve pra você organizar suas finanças pessoais. Não dá conselhos de investimento nem funciona como banco.",
     "specs": [
-      { "label": "Sem internet", "value": "Funciona sem precisar de conexão" },
-      { "label": "Sem conta", "value": "Nada de cadastro nem senha" },
-      { "label": "Sem custo", "value": "Grátis e sem anúncios" },
-      { "label": "Sem pegadinha", "value": "Você vê tudo que ele faz" }
+      {
+        "label": "Sem internet",
+        "value": "Funciona sem precisar de conexão"
+      },
+      {
+        "label": "Sem conta",
+        "value": "Nada de cadastro nem senha"
+      },
+      {
+        "label": "Sem custo",
+        "value": "Grátis e sem anúncios"
+      },
+      {
+        "label": "Sem pegadinha",
+        "value": "Você vê tudo que ele faz"
+      }
     ]
   },
   "kind": {
@@ -105,18 +154,25 @@
     "description": "Descrição",
     "category": "Categoria",
     "amount": "Valor",
-    "empty": "Nenhuma transação ainda.",
-    "import_link": "Importar um OFX"
+    "empty": "Nenhuma transação ainda",
+    "import_link": "Importar um OFX",
+    "empty_desc": "Importe o extrato .ofx do seu banco e as transações aparecem aqui, já categorizadas pelas suas regras.",
+    "sort_by": "Ordenar por {col}",
+    "sort_asc": "{col} — do menor pro maior",
+    "sort_desc": "{col} — do maior pro menor",
+    "sort_date_asc": "Data — da mais antiga pra mais recente",
+    "sort_date_desc": "Data — da mais recente pra mais antiga"
   },
   "tx_filter": {
-    "all_categories": "Todas as categorias"
+    "all_categories": "Todas as categorias",
+    "clear_all": "Limpar filtros"
   },
   "category_picker": {
     "no_category": "Sem categoria",
     "search_or_create": "Buscar ou criar…",
     "remove_category": "Remover categoria",
     "create_prefix": "Criar",
-    "empty": "Nenhuma categoria."
+    "empty": "Nenhuma categoria"
   },
   "categories": {
     "col_category": "Categoria",
@@ -124,7 +180,7 @@
     "col_transactions": "Transações",
     "edit": "Editar",
     "delete": "Apagar",
-    "empty": "Sem categorias.",
+    "empty": "Nenhuma categoria ainda",
     "form_edit": "Editar categoria",
     "form_new": "Nova categoria",
     "name": "Nome",
@@ -134,23 +190,36 @@
     "name_required": "Nome não pode ser vazio.",
     "saving": "Salvando…",
     "save": "Salvar",
-    "add": "Adicionar"
+    "add": "Adicionar",
+    "empty_desc": "Categorias agrupam seus gastos no dashboard e nos relatórios. Crie a primeira no formulário acima."
   },
   "rules": {
-    "col_pattern": "Pattern",
+    "col_pattern": "Trecho da descrição",
+    "more_patterns": "+{n}",
+    "more_patterns_title": "Esta regra tem mais {n} descrição(ões)",
     "col_category": "Categoria",
-    "col_due": "Vence",
-    "col_priority": "Prio",
+    "col_due": "Dia do vencimento",
+    "col_priority": "Prioridade",
+    "col_transactions": "Transações",
+    "reach_title": "Transações cuja descrição casa algum trecho desta regra — inclusive as que você categorizou na mão ou que outra regra de prioridade maior levou.",
+    "reach_none": "Nenhuma transação casa esta regra. O trecho pode estar escrito diferente do extrato.",
+    "sort_asc": "{col} — crescente",
+    "sort_desc": "{col} — decrescente",
     "due_day": "dia {day}",
     "edit": "Editar",
     "delete": "Apagar",
-    "empty": "Nenhuma regra ainda. Crie uma acima — ex. pattern \"uber\" → Transporte."
+    "empty": "Uma regra diz \"se a descrição contém X, use a categoria Y\" — e passa a valer sozinha em todo import. Ex.: \"uber\" → Transporte.",
+    "empty_title": "Nenhuma regra ainda"
   },
   "rule_form": {
     "form_edit": "Editar regra",
     "form_new": "Nova regra",
-    "pattern_label": "Pattern (descrição contém)",
+    "pattern_label": "Trecho da descrição",
+    "patterns_label": "Trechos da descrição",
     "pattern_placeholder": "ex: uber",
+    "pattern_placeholder_more": "outro jeito que o banco descreve",
+    "add_pattern": "Adicionar outra descrição",
+    "remove_pattern": "Remover esta descrição",
     "category": "Categoria",
     "select_placeholder": "— selecione —",
     "priority": "Prioridade",
@@ -167,12 +236,12 @@
     "expenses": "Gastos",
     "income": "Renda",
     "no_category": "sem categoria",
-    "no_expenses_period": "Sem gastos no período.",
-    "no_income_period": "Sem entradas no período.",
+    "no_expenses_period": "Sem gastos no período",
+    "no_income_period": "Sem entradas no período",
     "recurring": "recorrente",
     "recurring_title": "Recorrente · {months} meses distintos",
-    "no_data_12m": "Sem dados nos últimos 12 meses.",
-    "empty_tx": "Nenhuma transação ainda.",
+    "no_data_12m": "Sem dados nos últimos 12 meses",
+    "empty_tx": "Nenhuma transação ainda",
     "kpi_income": "Renda",
     "kpi_expenses": "Gastos",
     "kpi_balance": "Saldo do mês",
@@ -237,7 +306,7 @@
     "reversal_legend_many": "{n} pares estorno/reembolso ↔ original detectados — desmarcados por padrão porque a soma é zero (não é gasto nem renda real). Marque manualmente se quiser importar mesmo assim.",
     "preparing": "Preparando…",
     "importing": "Importando…",
-    "resolving_cnpj": "Resolvendo CNPJs novos…",
+    "resolving_cnpj": "Buscando empresas por {taxId}…",
     "result_title": "Resultado do import",
     "imported_one": "transação importada",
     "imported_many": "transações importadas",
@@ -274,21 +343,37 @@
     "neutralized_pairs": "Pares neutralizados",
     "neutralized_pairs_title": "Pares estorno/reembolso ↔ transação revertida (desmarcados por padrão)",
     "import_n_one": "Importar {n} transação",
-    "import_n_many": "Importar {n} transações"
+    "import_n_many": "Importar {n} transações",
+    "toggle_all": "Selecionar todas as transações"
   },
   "tx_notes": {
     "detail": "Detalhe",
-    "create_rule_cta": "+ Criar regra desta transação",
+    "create_rule_cta": "Criar regra desta transação",
     "new_rule": "Nova regra",
-    "pattern_title": "LIKE substring que será gravado na regra",
+    "pattern_title": "Trecho que será procurado dentro da descrição de cada transação",
     "creating": "Criando…",
     "create_apply": "Criar e aplicar",
-    "notes": "Notes",
+    "notes": "Anotações",
     "notes_placeholder": "Anotações sobre essa transação…"
   },
   "transactions_page": {
     "count_one": "{n} transação",
     "count_many": "{n} transações"
+  },
+  "kind_guide": {
+    "title": "O que significa cada tipo?",
+    "expense": "O que você gasta.",
+    "income": "O que você recebe.",
+    "transfer": "Dinheiro mudando de lugar: fatura do cartão, entre suas contas, investimento. Fica fora da renda, dos gastos e do saldo."
+  },
+  "category_panel": {
+    "title": "Editar categoria",
+    "tx_none": "Nenhuma transação nesta categoria",
+    "tx_one": "1 transação nesta categoria",
+    "tx_many": "{n} transações nesta categoria",
+    "kind_hint": "Só “Transferência” muda os cálculos: fica fora da renda, dos gastos e do saldo.",
+    "color_hint": "A cor identifica a categoria no dashboard e nos gráficos.",
+    "scope_note": "Renomear ou trocar a cor vale na hora em todas as transações desta categoria."
   },
   "categories_page": {
     "desc": "Crie, edite ou apague qualquer categoria. As 9 categorias iniciais vêm pré-criadas mas podem ser modificadas ou removidas livremente — apagar deixa as transações vinculadas sem categoria.",
@@ -296,10 +381,56 @@
     "delete_confirm_one": "Apagar \"{name}\"? {n} transação ficará sem categoria.",
     "delete_confirm_many": "Apagar \"{name}\"? {n} transações ficarão sem categoria."
   },
+  "rule_panel": {
+    "title": "Editar regra",
+    "if_contains": "Se a descrição contém",
+    "if_contains_any": "Se a descrição contém qualquer uma destas",
+    "or": "ou",
+    "then_use": "usar a categoria",
+    "no_category": "— nenhuma —",
+    "pattern_hint": "Procurado dentro da descrição, em qualquer posição. Não diferencia maiúsculas de minúsculas.",
+    "patterns_hint": "A regra vale quando QUALQUER uma destas aparecer na descrição. Use trechos curtos e estáveis — colar a linha inteira do extrato quebra se o banco mudar um número.",
+    "due_day_hint": "Dia do mês em que a conta vence — é o que coloca a regra no calendário. Vazio = sem prazo fixo.",
+    "priority_hint": "Quando duas regras batem na mesma transação, vale a de maior prioridade.",
+    "scope_note": "Alterar a regra não mexe no que já foi categorizado. Use “Aplicar a existentes” pra reprocessar as transações sem categoria."
+  },
+  "rule_matches": {
+    "cta": "Ver transações desta regra",
+    "title": "Transações da regra",
+    "count_one": "1 transação",
+    "count_many": "{n} transações",
+    "total": "{value} no total",
+    "loading": "Carregando…",
+    "empty_title": "Nenhuma transação casa esta regra",
+    "empty_desc": "Nenhuma descrição do seu extrato contém os trechos desta regra. Confira se estão escritos como o banco escreve.",
+    "no_category": "Sem categoria",
+    "note": "Casa qualquer trecho da regra, independente da categoria em que a transação está hoje."
+  },
+  "rule_apply": {
+    "title": "Revisar alterações",
+    "subtitle_one": "1 transação muda de categoria se você aplicar as regras.",
+    "subtitle_many": "{n} transações mudam de categoria se você aplicar as regras.",
+    "group_uncategorized": "Sem categoria",
+    "group_override": "Já têm outra categoria",
+    "group_override_note": "Aplicar a regra substitui a categoria atual. O app não registra quem a definiu — pode ter sido você ou uma regra que mudou desde então. Por isso nenhuma vem marcada.",
+    "select_all": "Todas",
+    "no_category": "Sem categoria",
+    "by_rule": "regra “{rule}”",
+    "apply_one": "Aplicar 1 alteração",
+    "apply_many": "Aplicar {n} alterações",
+    "apply_none": "Aplicar",
+    "selected_count": "{n} de {total} selecionadas",
+    "selected_none": "Nenhuma selecionada",
+    "applying": "Aplicando…",
+    "nothing_to_do": "As regras já estão aplicadas — nenhuma transação mudaria de categoria.",
+    "applied_one": "1 transação recategorizada.",
+    "applied_many": "{n} transações recategorizadas.",
+    "checking": "Verificando…"
+  },
   "rules_page": {
     "desc": "Regras \"se descrição contém X, categoria Y\" são aplicadas automaticamente em cada import. Categorização manual nunca é sobrescrita.",
-    "applying": "Aplicando…",
-    "apply": "Aplicar a existentes",
+    "applying": "Verificando…",
+    "apply": "Revisar e aplicar",
     "save_changes": "Salvar alterações",
     "delete_confirm": "Apagar regra \"{pattern}\"?",
     "applied_none": "Nenhuma transação foi categorizada (nenhum pattern bateu).",
@@ -313,7 +444,8 @@
     "inflows": "Entradas",
     "outflows": "Saídas",
     "loading": "carregando…",
-    "net": "Líquido"
+    "net": "Líquido",
+    "subtitle": "Entradas e saídas reais do mês, dia a dia (transferências e investimentos ficam de fora). Clique num dia pra ver tudo que aconteceu nele."
   },
   "onboarding": {
     "title": "Suas finanças, no seu Mac.",
@@ -328,7 +460,7 @@
     "recurring_no_category": "Recorrências sem categoria",
     "min_occurrences": "mín. ocorrências",
     "empty": "Nada por aqui — todas as contrapartes recorrentes já têm categoria, ou aumente o filtro de ocorrências.",
-    "pattern_label": "Pattern",
+    "pattern_label": "Trecho",
     "create": "Criar",
     "badge_cnpj": "CNPJ",
     "badge_debito": "DÉBITO",
@@ -337,7 +469,9 @@
     "badge_ted_in": "TRANSF. ←",
     "badge_boleto": "BOLETO",
     "badge_system": "SISTEMA",
-    "badge_other": "OUTRO"
+    "badge_other": "OUTRO",
+    "subtitle": "Gastos recorrentes que ainda não têm categoria — débito de cartão, Pix entre pessoas, boletos. CNPJs já são resolvidos na importação; entradas ficam no Dashboard, em Fontes de renda.",
+    "empty_title": "Nada pendente por aqui"
   },
   "settings": {
     "title": "Configurações",
@@ -360,7 +494,13 @@
     "about_line": "finanças pessoais 100% locais no Mac.",
     "shortcuts_label": "Atalhos:",
     "shortcut_search": "Buscar",
-    "shortcut_open_ofx": "Abrir OFX"
+    "shortcut_open_ofx": "Abrir OFX",
+    "restore_ok": "Substituir",
+    "enrich_title": "Buscar empresa por {taxId}",
+    "enrich_desc": "Durante o import, consulta um serviço externo pra descobrir a empresa por trás de cada {taxId} na descrição e sugerir categoria. Requer internet.",
+    "enrich_provider": "Consulta: {provider}",
+    "enrich_on": "Ativado",
+    "enrich_off": "Desativado"
   },
   "watch": {
     "section_title": "Importação automática",
@@ -397,7 +537,7 @@
     "toast_meta_one": "{n} transação · {from} → {to}",
     "toast_meta_many": "{n} transações · {from} → {to}",
     "toast_review": "Revisar",
-    "toast_ignore": "ignorar",
+    "toast_ignore": "Ignorar",
     "toast_collapse": "Encolher",
     "toast_expand": "Ver o extrato encontrado",
     "queue_next": "Próximo extrato ({n} na fila)",

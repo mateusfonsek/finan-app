@@ -1,9 +1,9 @@
--- Limpa regras criadas pra CNPJs que só têm tx de ENTRADA (renda).
--- Categorizar renda não faz sentido — renda é rastreada por contraparte
--- na seção "Fontes de Renda" do Dashboard, não por categoria.
+-- Clears rules created for tax ids that only ever have INFLOW transactions.
+-- Categorizing income makes no sense — it is tracked by counterparty in the
+-- Dashboard's income sources panel, not by category.
 --
--- Critério: pattern é um CNPJ no formato canônico AND não existe tx de saída
--- (amount<0) cuja description contém esse CNPJ. Idempotente.
+-- Criterion: the pattern is a canonical CNPJ AND no outflow (amount<0) exists
+-- whose description contains it. Idempotent.
 DELETE FROM rules
 WHERE pattern GLOB '[0-9][0-9].[0-9][0-9][0-9].[0-9][0-9][0-9]/[0-9][0-9][0-9][0-9]-[0-9][0-9]'
   AND NOT EXISTS (

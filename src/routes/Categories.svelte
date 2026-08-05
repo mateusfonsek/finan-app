@@ -3,7 +3,13 @@
 
   const t = locale.t;
   import { onMount } from "svelte";
+  import { confirm } from "@tauri-apps/plugin-dialog";
+  import Page from "$lib/components/ui/Page.svelte";
+  import Loading from "$lib/components/ui/Loading.svelte";
+  import ErrorNote from "$lib/components/ui/ErrorNote.svelte";
   import CategoryForm from "$lib/components/categories/CategoryForm.svelte";
+  import CategoryPanel from "$lib/components/categories/CategoryPanel.svelte";
+  import KindGuide from "$lib/components/categories/KindGuide.svelte";
   import CategoriesList from "$lib/components/categories/CategoriesList.svelte";
   import {
     listCategoriesWithCount,
@@ -37,24 +43,33 @@
     await refresh();
   }
 
-  async function onUpdate(data: { name: string; colorToken: string; kind: string }) {
-    if (!editing) return;
-    await updateCategory(editing.id, {
+  async function onUpdate(
+    categoryId: number,
+    data: { name: string; colorToken: string; kind: string },
+  ) {
+    await updateCategory(categoryId, {
       name: data.name,
       color_token: data.colorToken,
       kind: data.kind,
     });
-    editing = null;
     await refresh();
   }
 
+  /** Deleting is irreversible, so it confirms via a native macOS alert — the
+   *  webview's `confirm()` looks like the web and clashes in a desktop app. */
   async function onDelete(c: CategoryWithCount) {
     const msg = c.transaction_count > 0
       ? (c.transaction_count === 1
           ? t("categories_page.delete_confirm_one", { name: c.name, n: c.transaction_count })
           : t("categories_page.delete_confirm_many", { name: c.name, n: c.transaction_count }))
       : t("categories_page.delete_confirm", { name: c.name });
-    if (!confirm(msg)) return;
+    const ok = await confirm(msg, {
+      title: t("categories.delete"),
+      kind: "warning",
+      okLabel: t("common.delete"),
+      cancelLabel: t("common.cancel"),
+    });
+    if (!ok) return;
     try {
       await deleteCategory(c.id);
       await refresh();
@@ -64,37 +79,35 @@
   }
 </script>
 
-<section class="p-8 max-w-4xl mx-auto flex flex-col gap-5">
-  <header>
-    <h2 class="text-xl font-semibold tracking-tight" style="font-family: var(--font-display)">
-      {t("nav.categories")}
-    </h2>
-    <p class="text-xs text-fg-faint max-w-xl mt-1">
-      {t("categories_page.desc")}
-    </p>
-  </header>
-
+<Page title={t("nav.categories")} subtitle={t("categories_page.desc")}>
   {#if loading}
-    <div class="text-fg-faint text-sm">{t("common.loading")}</div>
+    <Loading />
   {:else}
     {#if error}
-      <div class="rounded-lg border border-border bg-surface p-3 text-sm text-neg">{error}</div>
+      <ErrorNote message={error} />
     {/if}
 
-    {#if editing}
-      <CategoryForm
-        initial={editing}
-        onSave={onUpdate}
-        onCancel={() => (editing = null)}
-      />
-    {:else}
-      <CategoryForm onSave={onCreate} />
-    {/if}
+    <!-- Above the form because the question arises while filling in "kind",
+         and the answer has to come before the question. -->
+    <KindGuide />
+
+    <!-- The page form creates; editing happens in the side panel, so "new"
+         never changes identity halfway through. -->
+    <CategoryForm onSave={onCreate} />
 
     <CategoriesList
       {categories}
       onEdit={(c) => (editing = c)}
       {onDelete}
+      selectedId={editing?.id ?? null}
     />
   {/if}
-</section>
+</Page>
+
+{#if editing}
+  <CategoryPanel
+    category={editing}
+    onClose={() => (editing = null)}
+    onSave={onUpdate}
+  />
+{/if}

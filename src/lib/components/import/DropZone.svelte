@@ -1,6 +1,8 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { getCurrentWebview } from "@tauri-apps/api/webview";
+  import Icon from "$lib/components/ui/Icon.svelte";
+  import Spinner from "$lib/components/ui/Spinner.svelte";
   import { decodeOfxFile } from "$lib/ofx/normalize";
   import { parseOfx } from "$lib/ofx/parse";
   import { readFileBytes } from "$lib/api/files";
@@ -34,20 +36,19 @@
     try {
       await setAppSetting(WATCH_HINT_DISMISSED_KEY, "1");
     } catch {
-      // Este componente não tem superfície de erro (não é um fluxo de import
-      // que já mostra `error`) — dispensar a isca é cosmético, não vale um
-      // toast. Mas se a escrita falhar silenciosamente, `hintDismissed` local
-      // ficaria mentindo: a isca reaparece no próximo boot (nunca foi salva)
-      // enquanto o usuário acha que já dispensou. Desfazer o otimismo local
-      // mantém a UI honesta com o disco, sem inventar uma superfície de erro
-      // nova só pra isso.
+      // This component has no error surface (it is not an import flow already
+      // showing `error`), and dismissing the hint is cosmetic — not worth a
+      // toast. But if the write fails silently, a local `hintDismissed` would
+      // lie: the hint returns on the next boot (it was never saved) while the
+      // user believes it was dismissed. Undoing the optimistic update keeps the
+      // UI honest with disk without inventing a new error surface.
       hintDismissed = false;
     }
   }
 
-  // Drag-and-drop nativo: o Tauri intercepta o drop do Finder e entrega só o
-  // caminho (não um File), via evento da webview. Lemos os bytes e reusamos o
-  // mesmo pipeline do file picker construindo um File a partir deles.
+  // Native drag-and-drop: Tauri intercepts the Finder drop and delivers only
+  // the path (not a File), via a webview event. The bytes are read and a File is
+  // built from them so the file-picker pipeline is reused.
   async function handlePath(path: string) {
     try {
       const bytes = await readFileBytes(path);
@@ -116,6 +117,9 @@
   }
 </script>
 
+<!-- The zone reacts to the drag BEFORE the drop: the frame lights up, the icon
+     rises and the surface takes the accent. The target confirms it accepts
+     before you let go. -->
 <div
   role="button"
   tabindex="0"
@@ -124,28 +128,37 @@
   ondrop={onDrop}
   onclick={() => fileInput?.click()}
   onkeydown={(e) => (e.key === "Enter" || e.key === " ") && fileInput?.click()}
-  class="rounded-xl border border-dashed p-9 flex flex-col items-center gap-3 transition-colors text-center
-         {active ? 'border-accent bg-accent-soft' : 'border-border bg-surface hover:bg-surface-2'}"
+  class="group rounded-[var(--radius-2xl)] border border-dashed p-10 flex flex-col items-center gap-3 text-center
+         transition-[background-color,border-color,transform] duration-[var(--dur)] ease-[var(--ease-snap)]
+         active:scale-[0.995]
+         {active
+    ? 'border-accent bg-accent-soft'
+    : 'border-border bg-surface hover:bg-surface-2 hover:border-fg-faint'}"
 >
-  <div class="w-14 h-14 rounded-2xl grid place-items-center"
-       style="background: var(--color-surface-2); border: 1px solid var(--color-border); color: var(--color-accent-hi)">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"
-         stroke-linecap="round" stroke-linejoin="round" class="w-7 h-7">
-      <path d="M12 4v11m0 0 4-4m-4 4-4-4" />
-      <path d="M4 17v2.5A1.5 1.5 0 0 0 5.5 21h13a1.5 1.5 0 0 0 1.5-1.5V17" />
-    </svg>
+  <div
+    class="w-14 h-14 rounded-[var(--radius-xl)] grid place-items-center border
+           transition-[transform,color,background-color,border-color] duration-[var(--dur)] ease-[var(--ease-snap)]
+           {active
+      ? 'bg-accent text-accent-on border-transparent -translate-y-1 scale-105'
+      : 'bg-surface-2 border-border text-accent group-hover:-translate-y-0.5'}"
+  >
+    <Icon name="download" size={26} stroke={1.6} />
   </div>
 
-  <h3 class="text-base font-semibold tracking-tight" style="font-family: var(--font-display)">
+  <h3 class="text-title3 font-semibold text-fg">
     {t("import.dropzone_title")}
   </h3>
-  <p class="text-fg-muted text-xs max-w-sm">
+  <p class="text-sub text-fg-muted max-w-sm leading-relaxed">
     {t("import.dropzone_desc_1")}
-    <strong class="text-fg">.ofx</strong> {t("import.dropzone_desc_2")}
+    <strong class="text-fg font-semibold">.ofx</strong>
+    {t("import.dropzone_desc_2")}
   </p>
 
   {#if busy}
-    <p class="text-fg-faint text-xs mt-2">{t("import.reading")}</p>
+    <p class="text-sub text-fg-faint mt-1 flex items-center gap-2">
+      <Spinner size={13} />
+      {t("import.reading")}
+    </p>
   {/if}
 
   <input
@@ -158,23 +171,29 @@
 </div>
 
 {#if !watch.enabled && !hintDismissed}
-  <!-- Fora da dropzone: o elemento acima tem onclick pro file picker, então a
-       isca precisa ser irmã, não filha, senão o clique nela abriria o picker. -->
-  <div class="flex items-center justify-center gap-2 mt-3 text-[11.5px] text-fg-faint">
+  <!-- Outside the dropzone: the element above has an onclick for the file
+       picker, so the hint must be a sibling, not a child, or clicking it would
+       open the picker. -->
+  <div class="flex items-center justify-center gap-1 mt-3 text-sub text-fg-subtle">
     <button
       type="button"
       onclick={() => push("/settings")}
-      class="hover:text-fg transition-colors"
+      class="inline-flex items-center gap-1.5 px-2 py-1 rounded-[var(--radius-sm)] text-left
+             hover:text-fg hover:bg-hover transition-colors duration-[var(--dur-fast)]"
     >
-      ⚡ {t("watch.hint_dropzone")} →
+      <Icon name="zap" size={12} class="shrink-0" />
+      <span>{t("watch.hint_dropzone")}</span>
+      <Icon name="chevronRight" size={11} stroke={2} class="shrink-0" />
     </button>
     <button
       type="button"
       onclick={dismissHint}
       title={t("watch.hint_dismiss")}
-      class="hover:text-fg transition-colors px-1"
+      aria-label={t("watch.hint_dismiss")}
+      class="press w-5 h-5 grid place-items-center rounded-full hover:text-fg hover:bg-hover
+             transition-colors duration-[var(--dur-fast)]"
     >
-      ×
+      <Icon name="x" size={10} stroke={2.4} />
     </button>
   </div>
 {/if}

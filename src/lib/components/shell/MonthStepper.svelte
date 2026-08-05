@@ -1,11 +1,14 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import Icon from "$lib/components/ui/Icon.svelte";
   import { locale } from "$lib/i18n/locale.svelte";
+  import { popover } from "$lib/motion";
+  import { portal } from "$lib/actions/portal";
 
   const t = locale.t;
 
   type Props = {
-    /** "YYYY-MM" = mês específico, "YYYY" = ano inteiro, null = todos os períodos */
+    /** "YYYY-MM" = one month, "YYYY" = a whole year, null = all periods */
     month: string | null;
     onChange: (m: string | null) => void;
   };
@@ -35,7 +38,8 @@
     !month || month.length === 7 ? "month" : "year",
   );
 
-  // Se a store vier null (legado), normaliza pro mês atual sem expor o "all" no UI.
+  // A null from the store (legacy) normalizes to the current month without
+  // exposing "all" in the UI.
   $effect(() => {
     if (month === null) {
       const y = currentYear();
@@ -49,10 +53,10 @@
   function computeLabel(m: string | null, mo: "month" | "year"): string {
     if (mo === "year" && m) return m;
     if (mo === "month" && m && m.length === 7) {
-      return `${monthShort(Number(m.slice(5, 7)) - 1)}/${m.slice(0, 4)}`;
+      return `${monthShort(Number(m.slice(5, 7)) - 1)} ${m.slice(0, 4)}`;
     }
-    // fallback: mês atual (enquanto $effect ainda não normalizou)
-    return `${monthShort(currentMonth() - 1)}/${currentYear()}`;
+    // Fallback: current month, while the $effect has not normalized yet.
+    return `${monthShort(currentMonth() - 1)} ${currentYear()}`;
   }
 
   function shift(delta: number) {
@@ -80,11 +84,11 @@
   let popoverEl: HTMLDivElement | undefined = $state();
   let pickerYear = $state(currentYear());
 
-  const POPOVER_W = 260;
+  const POPOVER_W = 268;
   const POPOVER_MARGIN = 8;
   let popoverStyle = $state("");
 
-  /** Calcula a posição do popover relativa ao trigger button. Síncrono. */
+  /** Popover position relative to the trigger button. Synchronous. */
   function computePopoverStyle(): string {
     if (!triggerEl) return "";
     const r = triggerEl.getBoundingClientRect();
@@ -98,7 +102,7 @@
         left = vw - POPOVER_W - POPOVER_MARGIN;
       }
     }
-    const top = r.bottom + 4;
+    const top = r.bottom + 6;
     return `position: fixed; top: ${top}px; left: ${left}px;`;
   }
 
@@ -139,14 +143,22 @@
         pickerOpen = false;
       }
     }
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === "Escape" && pickerOpen) {
+        pickerOpen = false;
+        triggerEl?.focus();
+      }
+    }
     function handleResize() {
       if (pickerOpen) popoverStyle = computePopoverStyle();
     }
     document.addEventListener("mousedown", handleClick);
+    document.addEventListener("keydown", handleKey);
     window.addEventListener("resize", handleResize);
     window.addEventListener("scroll", handleResize, true);
     return () => {
       document.removeEventListener("mousedown", handleClick);
+      document.removeEventListener("keydown", handleKey);
       window.removeEventListener("resize", handleResize);
       window.removeEventListener("scroll", handleResize, true);
     };
@@ -154,28 +166,37 @@
 
   let selMonth = $derived(parseMonth(month));
   let selYear = $derived(parseYear(month));
+
+  const STEP =
+    "w-6 h-6 grid place-items-center rounded-[5px] text-fg-subtle " +
+    "hover:bg-hover hover:text-fg active:scale-[0.94] " +
+    "transition-[background-color,color,transform] duration-[var(--dur-instant)] ease-[var(--ease-snap)]";
 </script>
 
-<div class="inline-flex items-center gap-2 relative">
-  <div class="inline-flex items-center gap-px rounded-md border border-border bg-surface-2">
+<div class="inline-flex items-center gap-1.5 relative">
+  <!-- macOS segmented control: ‹ label › in a single frame. -->
+  <div
+    class="inline-flex items-center gap-0.5 h-7 px-0.5 rounded-[var(--radius-md)] border border-border
+           bg-surface-2 shadow-[var(--shadow-raised)]"
+  >
     <button
       type="button"
-      class="px-2 py-1 text-fg-muted hover:bg-hover rounded-l-md"
+      class={STEP}
       onclick={() => shift(-1)}
       aria-label={mode === "year" ? t("month_stepper.prev_year") : t("month_stepper.prev_month")}
     >
-      ‹
+      <Icon name="chevronLeft" size={13} stroke={2} />
     </button>
-    <span class="px-2.5 text-[12px] font-medium tabular min-w-[88px] text-center">
+    <span class="px-2 text-callout font-medium tabular min-w-[80px] text-center text-fg">
       {label}
     </span>
     <button
       type="button"
-      class="px-2 py-1 text-fg-muted hover:bg-hover rounded-r-md"
+      class={STEP}
       onclick={() => shift(1)}
       aria-label={mode === "year" ? t("month_stepper.next_year") : t("month_stepper.next_month")}
     >
-      ›
+      <Icon name="chevronRight" size={13} stroke={2} />
     </button>
   </div>
 
@@ -183,55 +204,55 @@
     bind:this={triggerEl}
     type="button"
     onclick={togglePicker}
-    class="w-7 h-7 grid place-items-center rounded-md border border-border bg-surface-2 text-fg-muted hover:bg-hover hover:text-fg transition-colors"
+    aria-expanded={pickerOpen}
+    aria-haspopup="dialog"
+    class="press w-7 h-7 grid place-items-center rounded-[var(--radius-md)] border border-border
+           bg-surface-2 shadow-[var(--shadow-raised)] transition-colors duration-[var(--dur-fast)]
+           {pickerOpen ? 'bg-hover text-fg border-accent' : 'text-fg-subtle hover:bg-hover hover:text-fg'}"
     aria-label={t("month_stepper.calendar")}
   >
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      stroke-width="1.7"
-      stroke-linecap="round"
-      stroke-linejoin="round"
-      class="w-3.5 h-3.5"
-    >
-      <rect x="3" y="4" width="18" height="18" rx="2" />
-      <path d="M16 2v4M8 2v4M3 10h18" />
-    </svg>
+    <Icon name="calendar" size={14} />
   </button>
 
   {#if pickerOpen}
+    <!-- Grows from the button that opened it, not from its own centre. -->
     <div
       bind:this={popoverEl}
-      class="z-30 w-[260px] rounded-lg border border-border bg-surface p-3 flex flex-col gap-2.5"
-      style="{popoverStyle}; box-shadow: 0 12px 32px -8px rgba(0,0,0,.55), 0 0 0 1px var(--color-border);"
+      use:portal
+      transition:popover={{ origin: "top right" }}
+      role="dialog"
+      aria-label={t("month_stepper.calendar")}
+      class="material-pop z-30 w-[268px] p-2.5 flex flex-col gap-2"
+      style={popoverStyle}
     >
       <div class="flex items-center justify-between">
         <button
           type="button"
           onclick={() => (pickerYear -= 1)}
-          class="w-7 h-7 grid place-items-center text-fg-muted hover:bg-hover rounded-md"
+          class={STEP}
           aria-label={t("month_stepper.prev_year")}
         >
-          ‹
+          <Icon name="chevronLeft" size={13} stroke={2} />
         </button>
         <button
           type="button"
           onclick={() => pickYearOnly(pickerYear)}
-          class="text-[13.5px] font-semibold tabular tracking-tight hover:bg-hover rounded-md px-3 py-0.5
-                 {selYear === pickerYear && selMonth === null ? 'bg-accent-soft text-fg' : 'text-fg'}"
+          class="text-title3 font-semibold tabular rounded-[var(--radius-sm)] px-3 py-0.5
+                 transition-colors duration-[var(--dur-fast)]
+                 {selYear === pickerYear && selMonth === null
+            ? 'bg-accent text-accent-on'
+            : 'text-fg hover:bg-hover'}"
           title={t("month_stepper.filter_year")}
-          style="font-family: var(--font-display)"
         >
           {pickerYear}
         </button>
         <button
           type="button"
           onclick={() => (pickerYear += 1)}
-          class="w-7 h-7 grid place-items-center text-fg-muted hover:bg-hover rounded-md"
+          class={STEP}
           aria-label={t("month_stepper.next_year")}
         >
-          ›
+          <Icon name="chevronRight" size={13} stroke={2} />
         </button>
       </div>
 
@@ -239,11 +260,17 @@
         {#each locale.months as name, i}
           {@const monthNum = i + 1}
           {@const isSelected = selYear === pickerYear && selMonth === monthNum}
+          {@const isNow = pickerYear === currentYear() && monthNum === currentMonth()}
           <button
             type="button"
             onclick={() => pickMonth(pickerYear, monthNum)}
-            class="px-2 py-1.5 text-[11.5px] rounded-md transition-colors
-                   {isSelected ? 'bg-accent text-accent-on font-medium' : 'text-fg-muted hover:bg-hover hover:text-fg'}"
+            class="press h-7 rounded-[var(--radius-sm)] text-sub font-medium
+                   transition-colors duration-[var(--dur-fast)]
+                   {isSelected
+              ? 'bg-accent text-accent-on'
+              : isNow
+                ? 'text-accent hover:bg-hover'
+                : 'text-fg-muted hover:bg-hover hover:text-fg'}"
             title={name}
           >
             {monthShort(i)}
@@ -251,7 +278,9 @@
         {/each}
       </div>
 
-      <div class="flex items-center justify-between border-t border-border-subtle pt-2.5 text-[11px]">
+      <div class="hairline mt-0.5"></div>
+
+      <div class="flex items-center justify-between text-foot">
         {#if mode === "month"}
           <button
             type="button"
@@ -259,7 +288,8 @@
               toggleToYear();
               closePicker();
             }}
-            class="text-fg-faint hover:text-fg-muted underline-offset-2 hover:underline"
+            class="text-fg-subtle hover:text-fg transition-colors duration-[var(--dur-fast)]
+                   underline-offset-2 hover:underline px-1 py-0.5"
           >
             {t("month_stepper.all_months")}
           </button>
@@ -269,7 +299,8 @@
         <button
           type="button"
           onclick={pickCurrentMonth}
-          class="text-accent hover:underline underline-offset-2"
+          class="text-accent hover:underline underline-offset-2 px-1 py-0.5 font-medium
+                 transition-colors duration-[var(--dur-fast)]"
         >
           {t("month_stepper.current_month")}
         </button>
@@ -277,4 +308,3 @@
     </div>
   {/if}
 </div>
-

@@ -76,9 +76,9 @@ describe("watch store", () => {
   });
 
   it("falha de leitura não marca invalid — o arquivo continua pendente", async () => {
-    // Stub do iCloud que voltou a ser placeholder, arquivo movido, permissão
-    // negada: `invalid` é permanente e enterraria o extrato pra sempre, já que
-    // a chave é o hash do conteúdo (spec §5.4).
+    // An iCloud stub evicted back to a placeholder, a moved file, permission
+    // denied: `invalid` is permanent and would bury the statement forever, since
+    // the key is the content hash.
     api.scanWatchedFolders.mockResolvedValue([discovered("h6", "nubank.ofx")]);
     loadOfxFromPath.mockRejectedValue(
       new OfxReadError("/tmp/nubank.ofx", new Error("No such file or directory")),
@@ -101,7 +101,7 @@ describe("watch store", () => {
     await store.refresh();
     expect(store.pendingCount).toBe(0);
 
-    // iCloud terminou o download: a mesma descoberta agora lê e parseia.
+    // iCloud finished downloading: the same discovery now reads and parses.
     loadOfxFromPath.mockResolvedValue(parsed(12));
     await store.refresh({ force: true });
 
@@ -244,9 +244,9 @@ describe("watch store", () => {
     const store = createWatchStore();
     const refreshPromise = store.refresh();
 
-    // Espera a varredura realmente começar (i.e. scanWatchedFolders já foi
-    // chamado) antes de resolver o arquivo — só assim o cenário testado
-    // (resolve() enquanto o scan está em voo) de fato acontece.
+    // Waits for the scan to actually start (scanWatchedFolders already called)
+    // before resolving the file — only then does the tested scenario (resolve()
+    // while a scan is in flight) really happen.
     while (api.scanWatchedFolders.mock.calls.length === 0) {
       await Promise.resolve();
     }

@@ -1,5 +1,5 @@
--- Distingue conta corrente (extrato bancário) de cartão de crédito (fatura).
--- Determina como o app exibe a conta (badge no Import, listagens) e dá base
--- pra queries futuras tipo "saldo do CC vs saldo da CA".
+-- Separates a checking account (bank statement) from a credit card (bill).
+-- Drives how the account is shown (Import badge, listings) and enables future
+-- queries like "card balance vs account balance".
 ALTER TABLE accounts ADD COLUMN kind TEXT NOT NULL DEFAULT 'checking'
   CHECK(kind IN ('checking','credit_card'));

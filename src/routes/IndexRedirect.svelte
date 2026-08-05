@@ -1,9 +1,7 @@
 <script lang="ts">
-  import { locale } from "$lib/i18n/locale.svelte";
-
-  const t = locale.t;
   import { onMount } from "svelte";
   import { push } from "svelte-spa-router";
+  import Loading from "$lib/components/ui/Loading.svelte";
   import { listTransactions } from "$lib/api/transactions";
 
   let checking = $state(true);
@@ -27,5 +25,9 @@
 </script>
 
 {#if checking}
-  <section class="p-8 text-fg-faint text-sm">{t("common.loading")}</section>
+  <!-- A decision route: gone in milliseconds. A centred indicator avoids the
+       flash of stray corner text this used to show. -->
+  <div class="h-full grid place-items-center">
+    <Loading />
+  </div>
 {/if}

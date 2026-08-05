@@ -8,7 +8,7 @@ use crate::error::{AppError, AppResult};
 fn validate_kind(kind: &str) -> AppResult<()> {
     if !matches!(kind, "checking" | "credit_card") {
         return Err(AppError::Invalid(format!(
-            "kind inválido '{kind}' (esperado 'checking' ou 'credit_card')"
+            "invalid kind '{kind}' (expected 'checking' or 'credit_card')"
         )));
     }
     Ok(())
@@ -39,7 +39,7 @@ pub fn list_accounts(db: State<'_, Db>) -> AppResult<Vec<Account>> {
 }
 
 /// Returns existing account matching `ofx_acctid` if any, otherwise creates one.
-/// `kind` é preservado quando a conta já existe (não sobrescreve).
+/// `kind` is preserved when the account already exists.
 #[tauri::command]
 #[specta::specta]
 pub fn create_or_get_account(db: State<'_, Db>, input: NewAccount) -> AppResult<Account> {
@@ -155,6 +155,6 @@ mod tests {
             "INSERT INTO accounts (name, bank, ofx_acctid, kind) VALUES (?1, ?2, ?3, ?4)",
             params!["x", "y", "z", "garbage"],
         );
-        assert!(result.is_err(), "CHECK deveria bloquear kind inválido");
+        assert!(result.is_err(), "CHECK should reject an invalid kind");
     }
 }

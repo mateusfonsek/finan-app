@@ -1,13 +1,28 @@
 @import "tailwindcss";
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   finan app — design foundations
+   ---------------------------------------------------------------------------
+   Written in the spirit of Apple's HIG: a type scale with per-size tracking
+   and leading, concentric radii, translucent materials for the floating layer,
+   and motion that responds to the gesture rather than performing.
+   The PALETTE is the app's original — no hue was changed.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
 @theme {
-  /* surfaces */
+  /* ── surfaces ───────────────────────────────────────────────────────────
+     Depth order: bg (window) < surface (card) < surface-2 (field/header) <
+     surface-3 (raised) < hover. */
   --color-bg: oklch(19% 0.005 240);
   --color-bg-translucent: oklch(19% 0.005 240 / 0.72);
   --color-surface: oklch(22% 0.006 240);
   --color-surface-2: oklch(25% 0.006 240);
   --color-surface-3: oklch(28% 0.007 240);
   --color-hover: oklch(30% 0.008 240);
+
+  /* Sidebar: structural material, heavier than the content (HIG: dark
+     materials separate regions, light ones highlight controls). */
+  --color-sidebar: oklch(17% 0.005 240);
 
   /* borders */
   --color-border: oklch(32% 0.009 240);
@@ -45,55 +60,120 @@
   --color-pos: oklch(70% 0.13 145);
   --color-neg: oklch(68% 0.13 25);
 
-  /* radii */
-  --radius-sm: 4px;
-  --radius-md: 6px;
-  --radius-lg: 8px;
-  --radius-xl: 12px;
-  --radius-2xl: 16px;
+  /* ── radii ──────────────────────────────────────────────────────────────
+     Concentric: a 12px card with 12px padding wants 6px inside. Small controls
+     sit at 7px; floating surfaces go up to 18px. */
+  --radius-xs: 4px;
+  --radius-sm: 5px;
+  --radius-md: 7px;
+  --radius-lg: 10px;
+  --radius-xl: 13px;
+  --radius-2xl: 18px;
 
-  /* fonts */
+  /* ── typography ─────────────────────────────────────────────────────────
+     One scale, with tracking and leading per size. Large text wants negative
+     tracking (letters "open up" as they grow); small text wants positive
+     tracking so it does not clog. */
   --font-display: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Inter", system-ui, sans-serif;
   --font-body: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", system-ui, sans-serif;
   --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
+
+  --text-display: 28px;
+  --text-display--line-height: 1.12;
+  --text-display--letter-spacing: -0.022em;
+
+  --text-title1: 22px;
+  --text-title1--line-height: 1.18;
+  --text-title1--letter-spacing: -0.019em;
+
+  --text-title2: 17px;
+  --text-title2--line-height: 1.25;
+  --text-title2--letter-spacing: -0.014em;
+
+  --text-title3: 15px;
+  --text-title3--line-height: 1.3;
+  --text-title3--letter-spacing: -0.01em;
+
+  --text-body: 13px;
+  --text-body--line-height: 1.45;
+  --text-body--letter-spacing: -0.005em;
+
+  --text-callout: 12.5px;
+  --text-callout--line-height: 1.4;
+  --text-callout--letter-spacing: -0.003em;
+
+  --text-sub: 11.5px;
+  --text-sub--line-height: 1.38;
+  --text-sub--letter-spacing: 0em;
+
+  --text-foot: 11px;
+  --text-foot--line-height: 1.36;
+  --text-foot--letter-spacing: 0.003em;
+
+  --text-cap: 10.5px;
+  --text-cap--line-height: 1.32;
+  --text-cap--letter-spacing: 0.008em;
+
+  --text-cap2: 9.5px;
+  --text-cap2--line-height: 1.28;
+  --text-cap2--letter-spacing: 0.014em;
+
+  /* ── motion ─────────────────────────────────────────────────────────────
+     Curves approximating springs: `snap` is critically damped (no overshoot,
+     the UI default); `spring` has the slight overshoot that only suits motion
+     carrying momentum from a gesture. */
+  --ease-snap: cubic-bezier(0.32, 0.72, 0, 1);
+  --ease-out-soft: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1);
+
+  --animate-pop-in: pop-in 0.26s var(--ease-snap) both;
+  --animate-sheet-in: sheet-in 0.34s var(--ease-snap) both;
+  --animate-scrim-in: scrim-in 0.24s ease-out both;
+  --animate-dialog-in: dialog-in 0.34s var(--ease-snap) both;
+  --animate-toast-in: toast-in 0.4s var(--ease-snap) both;
+  --animate-rise-in: rise-in 0.32s var(--ease-snap) both;
 }
 
-html {
+/* Durations and shadows live outside @theme because they change between light
+   and dark (@theme seeds :root only once). */
+:root {
+  --dur-instant: 90ms;
+  --dur-fast: 140ms;
+  --dur: 220ms;
+  --dur-slow: 340ms;
+
+  /* Space reserved at the top for the macOS traffic lights (titleBarStyle
+     "Overlay": the window has no bar and content reaches the top). */
+  --titlebar-h: 44px;
+
+  /* Elevation: diffuse shadow plus a 1px ring. Heavy shadow in dark; almost
+     only the ring in light, where a strong shadow reads as dirt. */
+  --shadow-raised: 0 1px 2px oklch(0% 0 0 / 0.28);
+  --shadow-pop:
+    0 8px 24px -6px oklch(0% 0 0 / 0.5),
+    0 2px 6px -2px oklch(0% 0 0 / 0.3);
+  --shadow-sheet: -16px 0 44px -12px oklch(0% 0 0 / 0.55);
+  --shadow-dialog:
+    0 28px 72px -18px oklch(0% 0 0 / 0.68),
+    0 4px 12px -4px oklch(0% 0 0 / 0.4);
+
+  /* Floating-layer materials. */
+  --material-chrome: oklch(19% 0.005 240 / 0.72);
+  --material-pop: oklch(24% 0.006 240 / 0.82);
+  --material-blur: saturate(180%) blur(24px);
+  /* Bright top edge on the material = light catching the surface. */
+  --material-edge: oklch(100% 0 0 / 0.07);
+
+  --focus-ring: 0 0 0 3.5px var(--color-accent-ring);
+
   color-scheme: light dark;
+  accent-color: var(--color-accent);
 }
 
-body {
-  margin: 0;
-  background: var(--color-bg);
-  color: var(--color-fg);
-  font-family: var(--font-body);
-  font-size: 13px;
-  line-height: 1.5;
-  letter-spacing: -0.01em;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  font-feature-settings: "calt", "ss01", "cv11";
-}
-
-::selection {
-  background: var(--color-accent-soft);
-  color: var(--color-fg);
-}
-
-.tabular {
-  font-variant-numeric: tabular-nums;
-}
-
-/* macOS nativo: o cursor não vira mãozinha em links/controles — só a seta.
-   Anchors e <summary> são os que o navegador transforma em pointer por padrão. */
-a[href],
-summary {
-  cursor: default;
-}
-
-/* Light mode: respeita o tema do sistema. Sobrescreve apenas surfaces, bordas e
-   texto; cores categóricas/semânticas (mid-lightness) funcionam nos dois temas.
-   accent escurece um pouco pra manter contraste sobre fundo claro. */
+/* ═══════════════════════════════════════════════════════════════════════════
+   Light theme — surfaces, borders, text and elevation only. The categorical
+   and semantic colours are mid-luminance and work in both.
+   ═══════════════════════════════════════════════════════════════════════════ */
 @media (prefers-color-scheme: light) {
   :root {
     --color-bg: oklch(97% 0.003 240);
@@ -102,6 +182,7 @@ summary {
     --color-surface-2: oklch(96.5% 0.004 240);
     --color-surface-3: oklch(93.5% 0.005 240);
     --color-hover: oklch(92% 0.006 240);
+    --color-sidebar: oklch(94.5% 0.004 240);
 
     --color-border: oklch(86% 0.008 240);
     --color-border-subtle: oklch(91% 0.006 240);
@@ -113,12 +194,397 @@ summary {
 
     --color-accent: oklch(54% 0.15 145);
     --color-accent-hi: oklch(47% 0.16 145);
-    /* No light, o botão primário é verde com texto branco (no dark o texto é escuro). */
+    /* In light the primary button is green with white text (dark in dark). */
     --color-accent-on: oklch(100% 0 0);
+
+    --shadow-raised: 0 1px 1.5px oklch(0% 0 0 / 0.07);
+    --shadow-pop:
+      0 8px 24px -8px oklch(0% 0 0 / 0.16),
+      0 1px 3px -1px oklch(0% 0 0 / 0.1);
+    --shadow-sheet: -16px 0 44px -16px oklch(0% 0 0 / 0.18);
+    --shadow-dialog:
+      0 28px 72px -22px oklch(0% 0 0 / 0.26),
+      0 3px 10px -4px oklch(0% 0 0 / 0.12);
+
+    --material-chrome: oklch(97% 0.003 240 / 0.75);
+    --material-pop: oklch(100% 0 0 / 0.86);
+    --material-edge: oklch(100% 0 0 / 0.6);
   }
 }
 
-/* Respeita "Reduzir movimento" do sistema. */
+/* ═══════════════════════════════════════════════════════════════════════════
+   Base
+   ═══════════════════════════════════════════════════════════════════════════ */
+html {
+  color-scheme: light dark;
+}
+
+/* The window itself never scrolls; the content pane does. Without this, a
+   popover escaping the edge would scroll the whole document. */
+html,
+body {
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  margin: 0;
+  background: var(--color-bg);
+  color: var(--color-fg);
+  font-family: var(--font-body);
+  font-size: var(--text-body);
+  line-height: 1.45;
+  letter-spacing: -0.005em;
+  font-optical-sizing: auto;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: "calt", "ss01", "cv11";
+  /* Desktop app: interface text is not selectable, as on macOS. Fields and
+     marked content opt back in below. */
+  -webkit-user-select: none;
+  user-select: none;
+  overscroll-behavior: none;
+}
+
+input,
+textarea,
+[contenteditable="true"],
+.selectable {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-display);
+  margin: 0;
+  font-weight: 600;
+}
+
+::selection {
+  background: var(--color-accent-soft);
+  color: var(--color-fg);
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Native macOS: the cursor never becomes a hand over links or controls. */
+a[href],
+summary,
+button,
+[role="button"] {
+  cursor: default;
+}
+
+/* The whole window chrome drags, except what is clickable inside it.
+
+   The drag is done by the script Tauri injects, reading
+   `data-tauri-drag-region="deep"`. It already skips buttons, links and fields
+   while walking up the tree, so there is no "no-drag" rule to write here.
+   `-webkit-app-region` is a Chromium property: in WKWebView (this app's webview
+   on macOS) it does nothing, and having it here only suggested the drag was
+   solved in CSS. */
+[data-tauri-drag-region] {
+  cursor: default;
+}
+
+/* ── Focus ───────────────────────────────────────────────────────────────
+   One ring, identical everywhere. `:focus-visible` keeps it off mouse clicks,
+   as on macOS. */
+:focus {
+  outline: none;
+}
+:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+  border-color: var(--color-accent);
+  z-index: 1;
+  position: relative;
+}
+
+/* ── macOS-style overlay scrollbars ───────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 11px;
+  height: 11px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: color-mix(in oklch, var(--color-fg) 20%, transparent);
+  border-radius: 999px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in oklch, var(--color-fg) 34%, transparent);
+  background-clip: content-box;
+}
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Primitivas — as formas que se repetem em toda a interface.
+   ═══════════════════════════════════════════════════════════════════════════ */
+@layer components {
+  /* ── Card ───────────────────────────────────────────────────────────── */
+  .card {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border-subtle);
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-raised);
+  }
+
+  /* A card nested inside another: smaller radius, no shadow. */
+  .card-inset {
+    background: color-mix(in oklch, var(--color-surface-2) 55%, transparent);
+    border: 1px solid var(--color-border-subtle);
+    border-radius: var(--radius-lg);
+  }
+
+  /* ── Section heading ────────────────────────────────────────────────── */
+  /* All-caps micro type is a dashboard tic, not a macOS app: sentence case,
+     semibold, at caption size. */
+  .section-title {
+    font-size: var(--text-sub);
+    line-height: var(--text-sub--line-height);
+    letter-spacing: var(--text-sub--letter-spacing);
+    font-weight: 600;
+    color: var(--color-fg-muted);
+  }
+
+  .section-note {
+    font-size: var(--text-foot);
+    line-height: var(--text-foot--line-height);
+    letter-spacing: var(--text-foot--letter-spacing);
+    color: var(--color-fg-subtle);
+  }
+
+  /* Table column header. */
+  .col-head {
+    font-size: var(--text-foot);
+    line-height: var(--text-foot--line-height);
+    letter-spacing: var(--text-foot--letter-spacing);
+    font-weight: 500;
+    color: var(--color-fg-subtle);
+  }
+
+  /* ── Campos ─────────────────────────────────────────────────────────── */
+  .field {
+    background: var(--color-surface-2);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    color: var(--color-fg);
+    font-size: var(--text-callout);
+    line-height: 1.4;
+    letter-spacing: var(--text-callout--letter-spacing);
+    padding: 5px 8px;
+    transition:
+      border-color var(--dur-fast) var(--ease-snap),
+      background-color var(--dur-fast) var(--ease-snap),
+      box-shadow var(--dur-fast) var(--ease-snap);
+  }
+  .field::placeholder {
+    color: var(--color-fg-faint);
+  }
+  .field:hover:not(:disabled):not(:focus) {
+    border-color: color-mix(in oklch, var(--color-border) 65%, var(--color-fg-faint));
+  }
+  .field:focus,
+  .field:focus-visible {
+    background: var(--color-bg);
+    border-color: var(--color-accent);
+    box-shadow: var(--focus-ring);
+  }
+  .field:disabled {
+    opacity: 0.5;
+  }
+
+  /* <select> gets our own chevron, like the macOS pop-up button. */
+  select.field {
+    appearance: none;
+    padding-right: 24px;
+    background-image: linear-gradient(45deg, transparent 50%, currentColor 50%),
+      linear-gradient(135deg, currentColor 50%, transparent 50%);
+    background-position:
+      calc(100% - 13px) calc(50% + 2px),
+      calc(100% - 9px) calc(50% + 2px);
+    background-size: 4px 4px, 4px 4px;
+    background-repeat: no-repeat;
+    color: var(--color-fg);
+  }
+
+  /* ── Materiais flutuantes ───────────────────────────────────────────── */
+  /* Popovers/menus: glass over content, with a bright top edge. */
+  .material-pop {
+    background: var(--material-pop);
+    -webkit-backdrop-filter: var(--material-blur);
+    backdrop-filter: var(--material-blur);
+    border: 1px solid var(--color-border);
+    border-top-color: var(--material-edge);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-pop);
+  }
+
+  /* Fixed chrome (page header, action footer): content passes underneath
+     rather than being cut off by an opaque strip. */
+  .material-chrome {
+    background: var(--material-chrome);
+    -webkit-backdrop-filter: var(--material-blur);
+    backdrop-filter: var(--material-blur);
+  }
+
+  /* Instead of a permanent 1px rule under the sticky header, an edge that only
+     appears when content passes beneath it. */
+  .scroll-edge::after {
+    content: "";
+    position: absolute;
+    inset-inline: 0;
+    bottom: -1px;
+    height: 1px;
+    background: var(--color-border-subtle);
+    opacity: 0;
+    transition: opacity var(--dur) var(--ease-snap);
+  }
+  .scroll-edge[data-scrolled="true"]::after,
+  [data-scrolled="true"] .scroll-edge::after {
+    opacity: 1;
+  }
+
+  /* ── Press feedback ─────────────────────────────────────────────────── */
+  /* HIG: the highlight starts on pointer-down, not on release. */
+  .press {
+    transition: transform var(--dur-instant) var(--ease-snap);
+  }
+  .press:active:not(:disabled) {
+    transform: scale(0.97);
+  }
+  .press-sm:active:not(:disabled) {
+    transform: scale(0.985);
+  }
+
+  /* ── List / table row ───────────────────────────────────────────────── */
+  .row {
+    transition: background-color var(--dur-fast) var(--ease-snap);
+  }
+  .row:hover {
+    background: var(--color-hover);
+  }
+
+  /* ── Divisor ────────────────────────────────────────────────────────── */
+  .hairline {
+    height: 1px;
+    background: var(--color-border-subtle);
+  }
+
+  /* ── Pastilha ───────────────────────────────────────────────────────── */
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    border-radius: 999px;
+    border: 1px solid var(--color-border);
+    background: var(--color-surface-2);
+    padding: 2px 8px;
+    font-size: var(--text-foot);
+    line-height: 1.4;
+    letter-spacing: var(--text-foot--letter-spacing);
+    font-weight: 500;
+    white-space: nowrap;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Choreography — symmetric enter and exit (HIG: what leaves by one path comes
+   back by the same one).
+   ═══════════════════════════════════════════════════════════════════════════ */
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes dialog-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+@keyframes sheet-in {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: none;
+  }
+}
+
+@keyframes scrim-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Materialize rather than merely appear: blur arrives with the scale. */
+@keyframes material-in {
+  from {
+    opacity: 0;
+    backdrop-filter: saturate(100%) blur(0px);
+    -webkit-backdrop-filter: saturate(100%) blur(0px);
+  }
+  to {
+    opacity: 1;
+    backdrop-filter: var(--material-blur);
+    -webkit-backdrop-filter: var(--material-blur);
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Acessibilidade do sistema
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* "Reduce motion" is not the absence of response, it is response without
+   displacement. The fade stays; sliding and overshoot go. */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -128,9 +594,40 @@ summary {
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+
+  .press:active:not(:disabled),
+  .press-sm:active:not(:disabled) {
+    transform: none;
+  }
 }
 
-/* Respeita "Aumentar contraste" do sistema: bordas e texto mais fortes. */
+/* "Reduce transparency": the material turns solid and the blur goes. */
+@media (prefers-reduced-transparency: reduce) {
+  :root {
+    --material-chrome: var(--color-bg);
+    --material-pop: var(--color-surface);
+    --material-blur: none;
+  }
+  .material-pop,
+  .material-chrome {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+
+/* "Aumentar contraste": bordas e texto mais fortes, materiais mais opacos. */
+@media (prefers-contrast: more) {
+  :root {
+    --material-chrome: var(--color-bg);
+    --material-pop: var(--color-surface);
+  }
+  .card,
+  .card-inset,
+  .field {
+    border-color: var(--color-border);
+  }
+}
+
 @media (prefers-contrast: more) and (prefers-color-scheme: dark) {
   :root {
     --color-border: oklch(46% 0.01 240);

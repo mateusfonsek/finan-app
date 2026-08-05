@@ -24,7 +24,7 @@ async listAccounts() : Promise<Result<Account[], string>> {
 },
 /**
  * Returns existing account matching `ofx_acctid` if any, otherwise creates one.
- * `kind` é preservado quando a conta já existe (não sobrescreve).
+ * `kind` is preserved when the account already exists.
  */
 async createOrGetAccount(input: NewAccount) : Promise<Result<Account, string>> {
     try {
@@ -67,7 +67,7 @@ async updateCategory(categoryId: number, input: UpdateCategory) : Promise<Result
 }
 },
 /**
- * Apaga uma categoria. Transações que a referenciavam ficam com category_id=NULL.
+ * Deletes a category. Transactions referencing it get category_id=NULL.
  */
 async deleteCategory(categoryId: number) : Promise<Result<null, string>> {
     try {
@@ -88,9 +88,9 @@ async listTransactions(filters: TransactionFilters | null) : Promise<Result<Tran
 /**
  * Insert a batch of new transactions. Returns counts of inserted vs skipped (duplicates).
  * Dedup happens via UNIQUE(account_id, ofx_fitid, date, amount) + INSERT OR IGNORE.
- * A tripla casa transações realmente idênticas — mesmo FITID com valor ou data
- * diferentes (caso típico do Nubank: compra original + estorno) entra como tx
- * distinta.
+ * The triple matches genuinely identical transactions — the same FITID with a
+ * different amount or date (typical Nubank case: original purchase plus
+ * refund) is stored as a distinct tx.
  */
 async insertTransactions(accountId: number, txs: NewTransaction[]) : Promise<Result<InsertResult, string>> {
     try {
@@ -101,10 +101,10 @@ async insertTransactions(accountId: number, txs: NewTransaction[]) : Promise<Res
 }
 },
 /**
- * Dado uma lista de triplas `(fitid, date, amount)`, devolve o subconjunto que
- * já existe nessa conta. O FE usa a tripla como chave de "duplicada" porque a
- * UNIQUE da tabela é composta — mesmo FITID com valor/data diferentes é uma
- * transação distinta (e.g., compra original vs estorno).
+ * Given `(fitid, date, amount)` triples, returns the subset already present in
+ * this account. The frontend uses the triple as the duplicate key because the
+ * table's UNIQUE is composite — the same FITID with a different amount/date is a
+ * distinct transaction (e.g. an original purchase vs its refund).
  */
 async checkExistingTxKeys(accountId: number, keys: TxKey[]) : Promise<Result<TxKey[], string>> {
     try {
@@ -115,11 +115,10 @@ async checkExistingTxKeys(accountId: number, keys: TxKey[]) : Promise<Result<TxK
 }
 },
 /**
- * Maiores gastos do mês (ou de todo o histórico, se `month` for None).
- * Filtros: amount < 0 (saídas), categoria com `kind != 'transfer'` (exclui
- * pagamento de fatura, transferências internas, aplicações em investimento).
- * Ordem: do mais caro pro mais barato (CAST AS REAL ASC porque amounts são
- * negativos — quanto menor o número, maior o gasto).
+ * The month's largest expenses (or all-time when `month` is None).
+ * Filters: amount < 0, category `kind != 'transfer'` (excludes bill payments,
+ * internal transfers and investment deposits). Ordered most to least expensive
+ * (CAST AS REAL ASC, since amounts are negative).
  */
 async topExpenses(month: string | null, limit: number | null) : Promise<Result<ExpenseRow[], string>> {
     try {
@@ -153,6 +152,19 @@ async listRules() : Promise<Result<Rule[], string>> {
     else return { status: "error", error: e  as any };
 }
 },
+/**
+ * Like `list_rules` but with each rule's reach. A separate command because
+ * the count scans transactions — callers that only need the rules (import,
+ * suggestions, calendar) should not pay for it.
+ */
+async listRulesWithCount() : Promise<Result<RuleWithCount[], string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("list_rules_with_count") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async createRule(input: NewRule) : Promise<Result<Rule, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("create_rule", { input }) };
@@ -179,8 +191,9 @@ async deleteRule(ruleId: number) : Promise<Result<null, string>> {
 },
 /**
  * Deletes a rule AND clears category_id from any transaction that was likely
- * categorized BY this rule (description matches the pattern + category_id is
- * this rule's category). Then re-applies remaining rules to pick alternatives.
+ * categorized BY this rule (description matches ANY of its patterns +
+ * category_id is this rule's category). Then re-applies remaining rules to
+ * pick alternatives.
  * 
  * Used by the import screen when the user wants to undo an auto-created rule.
  * Returns the count of transactions whose category was cleared.
@@ -208,17 +221,65 @@ async applyRulesToUncategorized(accountId: number | null) : Promise<Result<numbe
 }
 },
 /**
- * Cruza regras × transações do mês pra montar eventos do calendário.
+ * The transactions a rule reaches, newest first.
  * 
- * Para cada regra:
- * - Se `due_day` set: gera evento com vencimento (mesmo sem casar transação)
- * - Se houver transação no mês cujo description casa o pattern: enriquece
- * o evento com paid_day + paid_amount + paid_transaction_id
- * - Se due_day=NULL e sem match: regra NÃO aparece (semântica do usuário:
- * "só aparece quando paga")
+ * Uses the SAME `EXISTS` over `rule_patterns` as the count in
+ * `list_rules_with_count`: the number the table shows promises what this list
+ * contains, and the two diverging would be a silent lie.
+ */
+async transactionsMatchingRule(ruleId: number) : Promise<Result<RuleMatches, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("transactions_matching_rule", { ruleId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Everything applying the rules WOULD change, without writing anything.
  * 
- * Quando múltiplas transações casam a mesma regra no mesmo mês, pega a
- * primeira (data ascendente).
+ * Unlike `apply_rules_to_uncategorized`, which only touches uncategorized
+ * rows, this also includes transactions that already have a category whose
+ * winning rule points elsewhere — the ones the review screen must show before
+ * overwriting anything.
+ * 
+ * Transactions where the winning rule already agrees with the current category
+ * are left out: they are not changes, and listing them would only make the
+ * review look bigger than it is.
+ */
+async previewRuleApplication(accountId: number | null) : Promise<Result<RulePreviewRow[], string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("preview_rule_application", { accountId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Writes only the changes the user ticked in the review.
+ * 
+ * Takes the target category along rather than re-querying the rules: what gets
+ * written is exactly what was shown, even if a rule changed meanwhile.
+ */
+async applyRuleChoices(choices: RuleChoice[]) : Promise<Result<number, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("apply_rule_choices", { choices }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Crosses rules with the month's transactions to build calendar events.
+ * 
+ * Per rule:
+ * - `due_day` set: emits an event with the due date, even with no match
+ * - a matching transaction in the month: enriches it with paid_day,
+ * paid_amount and paid_transaction_id
+ * - `due_day` NULL and no match: the rule does NOT appear ("only shows when
+ * paid", which is the user's mental model)
+ * 
+ * With several matches in the same month, the earliest one wins.
  */
 async calendarEvents(month: string) : Promise<Result<CalendarEvent[], string>> {
     try {
@@ -240,9 +301,8 @@ async resolveCnpj(cnpj: string) : Promise<Result<CnpjResolution, string>> {
  * Returns groups of uncategorized OUTFLOW transactions whose normalized key
  * repeats at least `min_count` times. Sorted by absolute total descending.
  * 
- * **Importante**: só considera tx com `amount < 0` (saídas). Entradas não
- * precisam de categoria — renda é rastreada por contraparte no painel
- * "Fontes de Renda" do Dashboard.
+ * Only considers `amount < 0` (outflows). Inflows need no category — income is
+ * tracked by counterparty in the Dashboard's income sources panel.
  */
 async suggestRules(minCount: number) : Promise<Result<RuleSuggestion[], string>> {
     try {
@@ -253,12 +313,27 @@ async suggestRules(minCount: number) : Promise<Result<RuleSuggestion[], string>>
 }
 },
 /**
- * Pattern sugerido (LIKE substring) pra uma única descrição — mesma lógica
- * da aba de Sugestões, exposta pra criar uma regra direto do painel de detalhe
- * de uma transação.
+ * Suggested pattern for a single description — same logic as the Suggestions
+ * tab, exposed so a rule can be created from a transaction's detail panel.
  */
 async suggestPatternFor(description: string) : Promise<string> {
     return await TAURI_INVOKE("suggest_pattern_for", { description });
+},
+async enrichmentStatus() : Promise<Result<EnrichmentStatus, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("enrichment_status") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async setEnrichmentEnabled(enabled: boolean) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("set_enrichment_enabled", { enabled }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
 },
 /**
  * For every uncategorized OUTFLOW transaction with a CNPJ in its description:
@@ -267,9 +342,9 @@ async suggestPatternFor(description: string) : Promise<string> {
  * 3. If CNAE maps to a category → create rule (priority 10) and apply.
  * 4. Else collect into `unresolved` for the UI to handle manually.
  * 
- * **Importante**: só considera tx com `amount < 0` (saídas). Categorizar entradas
- * (salário/freela vindos de um CNPJ) não faz sentido — entradas são rastreadas
- * por contraparte no painel "Fontes de Renda", não por categoria.
+ * Only considers `amount < 0` (outflows). Categorizing inflows (salary or
+ * freelance paid by a company) makes no sense — those are tracked by
+ * counterparty in the income sources panel, not by category.
  */
 async autoClassifyWithCnpj(accountId: number | null) : Promise<Result<AutoClassifyReport, string>> {
     try {
@@ -320,9 +395,9 @@ async transferSummary(month: string | null) : Promise<Result<TransferSummary, st
 }
 },
 /**
- * Agrega entradas (`amount > 0`, kind != 'transfer') do mês por contraparte.
- * Marca como recorrente quando a fonte também apareceu nos DOIS meses
- * imediatamente anteriores ao mês exibido (ver `is_recurring`).
+ * Aggregates the month's inflows (`amount > 0`, kind != 'transfer') by
+ * counterparty. Marks a source recurring when it also appeared in BOTH months
+ * immediately before the displayed one (see `is_recurring`).
  */
 async incomeSources(month: string | null) : Promise<Result<IncomeSource[], string>> {
     try {
@@ -344,8 +419,8 @@ async dbPath() : Promise<Result<string, string>> {
 }
 },
 /**
- * Lê os bytes crus de um arquivo do disco. Usado pelo drag-and-drop de OFX:
- * o evento de drop do Tauri entrega só o caminho, não o conteúdo do arquivo.
+ * Reads a file's raw bytes. Used by OFX drag-and-drop: Tauri's drop event
+ * delivers only the path, not the contents.
  */
 async readFileBytes(path: string) : Promise<Result<number[], string>> {
     try {
@@ -356,8 +431,8 @@ async readFileBytes(path: string) : Promise<Result<number[], string>> {
 }
 },
 /**
- * Drena (retorna e limpa) os caminhos pendentes. O frontend chama isso ao
- * montar e a cada evento `open-ofx`.
+ * Drains the pending paths. The frontend calls this on mount and on every
+ * `open-ofx` event.
  */
 async takePendingOfx() : Promise<string[]> {
     return await TAURI_INVOKE("take_pending_ofx");
@@ -436,12 +511,12 @@ async removeWatchedFolder(id: number) : Promise<Result<null, string>> {
 }
 },
 /**
- * Cria uma pasta se ela não existir. Existe só pro preset "iCloud Drive ›
- * finan", que é a ÚNICA escrita em disco da feature — e mesmo assim só roda
- * depois da confirmação explícita do usuário na UI.
+ * Creates a folder if missing. Exists only for the "iCloud Drive › finan"
+ * preset, the feature's only disk write, and even then only after explicit
+ * confirmation in the UI.
  * 
- * Três linhas aqui evitam adicionar o plugin `tauri-plugin-fs` inteiro
- * (que abriria acesso a arquivo muito além do necessário).
+ * Three lines here avoid pulling in the whole `tauri-plugin-fs`, which would
+ * open far more file access than needed.
  */
 async ensureDir(path: string) : Promise<Result<null, string>> {
     try {
@@ -452,18 +527,16 @@ async ensureDir(path: string) : Promise<Result<null, string>> {
 }
 },
 /**
- * Permite à UI perguntar "criar a pasta?" apenas quando ela realmente não
- * existe, em vez de perguntar sempre.
+ * Lets the UI ask "create the folder?" only when it really is missing.
  */
 async dirExists(path: string) : Promise<boolean> {
     return await TAURI_INVOKE("dir_exists", { path });
 },
 /**
- * A varredura roda no foco da janela — exatamente quando o usuário está
- * voltando pra interagir. Por isso o mutex do banco é pego em dois momentos
- * curtos (ler as pastas / gravar o resultado) e **solto** durante o trabalho
- * de disco: segurá-lo do começo ao fim travaria toda a UI, que compartilha
- * essa mesma mutex.
+ * The scan runs on window focus — exactly when the user is coming back to
+ * interact. So the DB mutex is taken in two short moments (read the folders /
+ * write the result) and **released** during disk work: holding it end to end
+ * would freeze the whole UI, which shares that same mutex.
  */
 async scanWatchedFolders() : Promise<Result<DiscoveredFile[], string>> {
     try {
@@ -509,66 +582,89 @@ async setActiveLocale(code: string) : Promise<Result<null, string>> {
 
 export type Account = { id: number; name: string; bank: string | null; ofx_acctid: string | null; 
 /**
- * `"checking"` (conta corrente) ou `"credit_card"` (cartão de crédito).
- * Distingue como o app exibe e categoriza tx originárias dessa conta.
+ * `"checking"` or `"credit_card"`. Drives how the app displays and
+ * categorizes transactions from this account.
  */
 kind: string; created_at: string }
 export type AutoClassifyReport = { created_rules: Rule[]; txs_classified: number; unresolved: CnpjResolution[] }
 /**
- * Evento que aparece no calendário: combinação de uma regra
- * + (opcional) dia de vencimento + (opcional) transação que casou.
+ * A calendar event: a rule plus an optional due day plus an optional matching
+ * transaction.
  */
-export type CalendarEvent = { rule_id: number; pattern: string; category_name: string; category_color_token: string | null; due_day: number | null; paid_day: number | null; paid_amount: string | null; paid_transaction_id: number | null }
+export type CalendarEvent = { rule_id: number; 
+/**
+ * The snippet that actually matched — or the rule's first one, when the
+ * event exists only because of `due_day` and nothing matched yet.
+ */
+pattern: string; category_name: string; category_color_token: string | null; due_day: number | null; paid_day: number | null; paid_amount: string | null; paid_transaction_id: number | null }
 export type Category = { id: number; name: string; color_token: string | null; kind: string; is_investment: boolean; created_at: string }
 export type CategorySpend = { category_id: number | null; name: string; color_token: string | null; total: string; percent: number }
 export type CategoryWithCount = { id: number; name: string; color_token: string | null; kind: string; created_at: string; transaction_count: number }
+/**
+ * Brazilian field names on purpose: this is the UI contract, not the core.
+ */
 export type CnpjResolution = { cnpj: string; razao_social: string | null; nome_fantasia: string | null; cnae_fiscal: string | null; cnae_fiscal_descricao: string | null; suggested_category_id: number | null }
 export type DiscoveredFile = { id: number; content_hash: string; path: string; file_name: string; size: number; status: string; seen_at: string }
+export type EnrichmentStatus = { 
 /**
- * Linha do widget "Maiores gastos do mês" — transação com categoria
- * resolvida inline (nome + token de cor) pra evitar segundo round-trip.
+ * Active locale has a tax-id format and a known provider. When `false`
+ * the UI hides the setting instead of showing an inert switch.
+ */
+available: boolean; enabled: boolean; 
+/**
+ * e.g. "CNPJ" — so the screen names the id the way the user knows it.
+ */
+tax_id_name: string; 
+/**
+ * e.g. "brasilapi" — shown before opting in, so the user knows who is
+ * being called.
+ */
+provider: string }
+/**
+ * A row in the "largest expenses" widget — a transaction with its category
+ * resolved inline (name plus colour token) to avoid a second round-trip.
  */
 export type ExpenseRow = { id: number; date: string; amount: string; description: string; category_id: number | null; category_name: string | null; category_color_token: string | null }
 export type HealthInfo = { version: string; db_path: string; category_count: number }
 /**
- * Fonte de renda agregada (alguém que te paga). Substitui a ideia de
- * "categoria de renda" — pra entradas, o que importa é **quem pagou**.
+ * An aggregated income source (someone who pays you). Replaces the idea of an
+ * "income category" — for inflows what matters is **who paid**.
  */
 export type IncomeSource = { 
 /**
- * Chave estável de agrupamento (CNPJ, CPF mascarado ou nome).
+ * Stable grouping key (tax id, masked personal id, or name).
  */
 key: string; 
 /**
- * Rótulo legível pra UI.
+ * Readable label for the UI.
  */
 label: string; 
 /**
- * Total recebido desta fonte no mês.
+ * Total received from this source in the month.
  */
 total: string; 
 /**
- * Quantas tx desta fonte no mês.
+ * How many tx from this source in the month.
  */
 count: number; 
 /**
- * % do total de entradas do mês.
+ * Share of the month's total inflows.
  */
 percent: number; 
 /**
- * True se esta fonte apareceu em ≥2 meses distintos no histórico.
+ * True when this source appeared in >= 2 distinct months of history.
  */
 is_recurring: boolean; 
 /**
- * Quantos meses distintos esta fonte apareceu no histórico (all-time).
+ * How many distinct months this source appeared in, all-time.
  */
 recurring_months: number }
 export type InsertResult = { inserted: number; skipped_duplicates: number; auto_categorized: number }
 /**
- * Tudo relativo a categorias com kind='transfer' AND is_investment=1.
- * `saldo_acumulado` = soma de (aplicado - resgatado) ao longo de TODO o histórico
- * disponível na DB (não apenas o mês). Representa o capital líquido que entrou
- * no investimento, sem considerar rendimentos (que a OFX não traz).
+ * Everything about categories with kind='transfer' AND is_investment=1.
+ * `saldo_acumulado` sums (deposited - withdrawn) over the WHOLE history in the
+ * DB, not just the month. It is net capital put in, excluding returns, which
+ * OFX does not carry.
  */
 export type InvestmentSummary = { aplicado_no_mes: string; resgatado_no_mes: string; aplicacoes_count: number; resgates_count: number; saldo_acumulado: string }
 export type KpiSummary = { income: string; expense: string; net: string; transaction_count: number }
@@ -576,28 +672,88 @@ export type LocaleInfo = { code: string; name: string; flag: string }
 export type MonthSummary = { month: string; income: string; expense: string }
 export type NewAccount = { name: string; bank: string | null; ofx_acctid: string | null; 
 /**
- * Default `"checking"` quando o frontend não enviar (compat retroativa).
+ * Defaults to `"checking"` when the frontend omits it (back-compat).
  */
 kind?: string }
 export type NewCategory = { name: string; color_token: string | null; kind: string }
-export type NewRule = { pattern: string; category_id: number; priority: number; due_day: number | null; display_name?: string | null }
+export type NewRule = { patterns: string[]; category_id: number; priority: number; due_day: number | null; display_name?: string | null }
 export type NewTransaction = { date: string; 
 /**
  * Decimal as string. Backend converts via rust_decimal.
  */
 amount: string; description: string; ofx_fitid: string | null }
-export type Rule = { id: number; pattern: string; category_id: number; priority: number; 
+export type Rule = { id: number; 
 /**
- * Dia do mês (1-31) em que a obrigação vence. NULL = sem prazo —
- * a regra só aparece no calendário quando casa com uma transação.
+ * Snippets searched in the description, OR'd: the rule matches when the
+ * description contains ANY of them. Never empty.
+ */
+patterns: string[]; category_id: number; priority: number; 
+/**
+ * Day of month (1-31) the bill is due. NULL means no due date — the rule
+ * only shows on the calendar when it matches a transaction.
  */
 due_day: number | null; 
 /**
- * Rótulo amigável da regra (ex: razão social vinda do CNPJ). NULL
- * = nenhum rótulo definido; a UI cai pra `pattern`.
+ * Friendly label (e.g. legal name from a CNPJ lookup). NULL means none,
+ * and the UI falls back to the first pattern.
  */
 display_name: string | null; created_at: string }
+/**
+ * A user's choice on the review screen: this transaction goes to this
+ * category.
+ * 
+ * The category is explicit rather than recomputed at apply time — if rules
+ * change between review and click, what was reviewed is what gets written.
+ */
+export type RuleChoice = { transaction_id: number; category_id: number }
+/**
+ * The transactions a rule reaches, plus their total.
+ * 
+ * "Reach" is the same criterion as the count in [`RuleWithCount`], and the two
+ * MUST agree — the number in the table is what promises this list's contents.
+ */
+export type RuleMatches = { transactions: Transaction[]; 
+/**
+ * Sum of the amounts, added with `rust_decimal` — never f64, which would
+ * accumulate error over a long list.
+ */
+total: string }
+/**
+ * A change applying the rules would cause. Material for the review screen —
+ * nothing is written until the user chooses.
+ */
+export type RulePreviewRow = { transaction_id: number; date: string; 
+/**
+ * Decimal as string, like everywhere else. Never f64.
+ */
+amount: string; description: string; 
+/**
+ * `None` means uncategorized. Anything else means applying the rule
+ * REPLACES the current category.
+ * 
+ * Note: the DB does not record who set the category, so this cannot tell
+ * "the user picked it" from "an earlier rule set it". The UI must not
+ * claim authorship — only that a category exists and would change.
+ */
+current_category_id: number | null; new_category_id: number; rule_id: number; 
+/**
+ * Label of the winning rule: `display_name` when set, otherwise the
+ * snippet that actually matched this description.
+ */
+rule_label: string }
 export type RuleSuggestion = { key: string; label: string; suggested_pattern: string; count: number; total: string; sample_description: string; transaction_ids: number[] }
+/**
+ * A rule plus how many transactions it reaches — for the Rules screen, where
+ * the question is "is this rule catching anything?".
+ */
+export type RuleWithCount = { id: number; patterns: string[]; category_id: number; priority: number; due_day: number | null; display_name: string | null; created_at: string; 
+/**
+ * Transactions whose description matches ANY of the rule's snippets,
+ * regardless of their current category. This is reach, not authorship: a
+ * manually categorized transaction still counts, and so does one a
+ * higher-priority rule took.
+ */
+transaction_count: number }
 export type Transaction = { id: number; account_id: number; date: string; 
 /**
  * Decimal serialized as string (e.g. "-123.45"). Never f64.
@@ -605,27 +761,27 @@ export type Transaction = { id: number; account_id: number; date: string;
 amount: string; description: string; category_id: number | null; notes: string | null; ofx_fitid: string | null; imported_at: string }
 export type TransactionFilters = { account_id: number | null; month: string | null; category_id: number | null; q: string | null; limit: number | null }
 /**
- * Breakdown de transferências internas (kind='transfer' AND is_investment=0)
- * — pagamento de fatura, autotransferências, etc. Serve pra dar transparência
- * no Dashboard sobre o que foi excluído dos KPIs.
+ * Breakdown of internal transfers (kind='transfer' AND is_investment=0)
+ * — card bill payments, self-transfers, etc. Gives the Dashboard a way to be
+ * transparent about what was excluded from the KPIs.
  */
 export type TransferSummary = { total_out: string; total_in: string; count: number }
 /**
- * Tripla usada pra dedup contra a UNIQUE composta
+ * Triple used to dedupe against the composite UNIQUE
  * `(account_id, ofx_fitid, date, amount)` da tabela `transactions`.
  */
 export type TxKey = { ofx_fitid: string; date: string; amount: string }
 export type UpdateCategory = { name: string; color_token: string | null; kind: string }
-export type UpdateRule = { pattern: string; category_id: number; priority: number; due_day: number | null; display_name?: string | null }
+export type UpdateRule = { patterns: string[]; category_id: number; priority: number; due_day: number | null; display_name?: string | null }
 export type WatchedFolder = { id: number; path: string; 
 /**
- * Nome curto pra exibir ("finan", "Downloads"). Derivado do último
- * componente do caminho no momento em que a pasta foi adicionada.
+ * Short display name ("finan", "Downloads"), derived from the last path
+ * component when the folder was added.
  */
 label: string; 
 /**
- * `false` quando a pasta sumiu ou foi desmontada — a linha vira estado de
- * erro na UI, mas as outras pastas seguem funcionando.
+ * `false` when the folder is gone or unmounted — the row shows an error
+ * state but the other folders keep working.
  */
 exists: boolean; imported_count: number; last_imported_at: string | null }
 

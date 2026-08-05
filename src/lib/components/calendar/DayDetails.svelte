@@ -1,6 +1,7 @@
 <script lang="ts">
   import { formatMoney } from "$lib/format/money";
   import { locale } from "$lib/i18n/locale.svelte";
+  import EmptyState from "$lib/components/ui/EmptyState.svelte";
   import type { CalendarEvent, Category, Transaction } from "$lib/bindings";
 
   const t = locale.t;
@@ -9,9 +10,9 @@
     selectedDate: string | null;
     transactions: Transaction[];
     categories: Category[];
-    /** Eventos de regras do mês (pra mostrar contas vencendo no dia selecionado). */
+    /** The month's rule events, to show bills due on the selected day. */
     events?: CalendarEvent[];
-    /** Hoje YYYY-MM-DD pra decidir overdue vs pending. */
+    /** Today as YYYY-MM-DD, to decide overdue vs pending. */
     today?: string;
   };
 
@@ -29,7 +30,7 @@
   function billState(e: CalendarEvent): BillState {
     if (e.paid_day != null) return "paid";
     if (!selectedDate || !today) return "pending";
-    // Overdue se o dia selecionado é anterior a hoje E não foi paga.
+    // Overdue when the selected day is before today AND it is unpaid.
     return selectedDate < today.slice(0, 10) ? "overdue" : "pending";
   }
 
@@ -75,7 +76,7 @@
     const out: Group[] = [
       { bucket: "renda",        label: t("day_details.income"),       color: "var(--color-pos)",        txs: [], total: 0 },
       { bucket: "gastos",       label: t("day_details.expenses"),     color: "var(--color-neg)",        txs: [], total: 0 },
-      { bucket: "transfer",     label: t("day_details.transfers"),    color: "var(--color-fg-faint)",   txs: [], total: 0 },
+      { bucket: "transfer",     label: t("day_details.transfers"),    color: "var(--color-fg-subtle)", txs: [], total: 0 },
       { bucket: "investimento", label: t("day_details.investments"),  color: "var(--color-cat-investimento)", txs: [], total: 0 },
     ];
     for (const t of day) {
@@ -102,8 +103,8 @@
   }
 
   function categoryToken(id: number | null): string {
-    const t = id == null ? null : categories.find((c) => c.id === id)?.color_token;
-    return t ? `var(${t})` : "var(--color-fg-faint)";
+    const tok = id == null ? null : categories.find((c) => c.id === id)?.color_token;
+    return tok ? `var(${tok})` : "var(--color-fg-faint)";
   }
 
   function formatDateLong(d: string): string {
@@ -119,29 +120,29 @@
   let hasAny = $derived(groups.length > 0 || dueOnSelectedDay.length > 0);
 </script>
 
-<div class="rounded-lg border border-border-subtle bg-surface flex flex-col">
-  <header class="px-4 pt-3 pb-2 flex flex-col gap-0.5 border-b border-border-subtle">
-    <div class="text-[10.5px] uppercase tracking-wider font-semibold text-fg-faint">
+<div class="card flex flex-col overflow-hidden">
+  <header class="px-4 pt-3.5 pb-3 flex flex-col gap-0.5 border-b border-border-subtle">
+    <div class="section-title">
       {selectedDate ? t("day_details.selected_day") : t("day_details.select_day")}
     </div>
     {#if selectedDate}
-      <div class="text-[13px] font-medium text-fg">{formatDateLong(selectedDate)}</div>
+      <!-- Capitalized first letter: `toLocaleDateString` returns a lowercase
+           weekday in pt-BR, and a title starting lowercase reads as a bug. -->
+      <div class="text-title3 font-semibold text-fg first-letter:uppercase">
+        {formatDateLong(selectedDate)}
+      </div>
     {/if}
   </header>
 
   {#if !selectedDate}
-    <div class="px-4 py-6 text-[12px] text-fg-faint italic">
-      {t("day_details.empty_select")}
-    </div>
+    <EmptyState icon="calendar" title={t("day_details.select_day")} description={t("day_details.empty_select")} compact />
   {:else if !hasAny}
-    <div class="px-4 py-6 text-[12px] text-fg-faint italic">
-      {t("day_details.empty_none")}
-    </div>
+    <EmptyState icon="inbox" title={t("day_details.empty_none")} compact />
   {:else}
     {#if dueOnSelectedDay.length > 0}
       <!-- Contas com vencimento neste dia, com estado visual claro -->
       <section class="border-b border-border-subtle">
-        <div class="px-4 py-1.5 bg-surface-2/50 text-[10.5px] uppercase tracking-wider font-semibold text-fg-faint">
+        <div class="px-4 py-1.5 bg-surface-2/60 text-cap font-semibold text-fg-subtle">
           {t("day_details.due_bills")}
         </div>
         <ul>
@@ -149,7 +150,7 @@
             {@const state = billState(e)}
             {@const color = billColor(state)}
             <li
-              class="px-4 py-2 border-t border-border-subtle first:border-t-0 flex items-start gap-2 min-w-0"
+              class="px-4 py-2 border-t border-border-subtle first:border-t-0 flex items-start gap-2.5 min-w-0"
               style={state === "paid"
                 ? "background: color-mix(in oklch, var(--color-pos) 6%, transparent);"
                 : state === "overdue"
@@ -157,21 +158,21 @@
                   : ""}
             >
               <span
-                class="w-4 h-4 rounded-full grid place-items-center text-[10px] font-bold shrink-0 border"
-                style="color: {color}; border-color: {color};"
+                class="w-[17px] h-[17px] mt-px rounded-full grid place-items-center text-cap2 font-bold shrink-0"
+                style="color: {color}; background: color-mix(in oklch, {color} 18%, transparent);"
               >
-                {state === "paid" ? "✓" : state === "overdue" ? "!" : "○"}
+                {state === "paid" ? "✓" : state === "overdue" ? "!" : "•"}
               </span>
               <div class="flex-1 min-w-0 flex flex-col gap-0.5">
-                <span class="text-[12px] text-fg font-medium truncate" title={e.pattern}>
+                <span class="text-sub text-fg font-medium truncate" title={e.pattern}>
                   {e.pattern}
                 </span>
-                <span class="text-[10px]" style="color: {color};">
+                <span class="text-cap" style="color: {color};">
                   {billStatusText(e, state)}
                 </span>
               </div>
               {#if state === "paid" && e.paid_amount}
-                <span class="text-[11.5px] tabular shrink-0" style="color: {color};">
+                <span class="text-sub tabular shrink-0 font-medium" style="color: {color};">
                   {formatMoney(e.paid_amount)}
                 </span>
               {/if}
@@ -182,66 +183,68 @@
     {/if}
 
     {#if groups.length > 0}
-    <!-- Totais REAIS (excluem transfer/investimento) — alinhado com KPIs do Dashboard -->
-    <div class="px-4 py-3 grid grid-cols-3 gap-2 border-b border-border-subtle">
-      <div class="flex flex-col gap-0.5">
-        <span class="text-[9.5px] uppercase tracking-wider text-fg-faint">{t("day_details.income")}</span>
-        <span class="text-[11.5px] tabular text-pos font-medium">
-          {totals.renda > 0 ? formatMoney(String(totals.renda)) : "—"}
-        </span>
-      </div>
-      <div class="flex flex-col gap-0.5">
-        <span class="text-[9.5px] uppercase tracking-wider text-fg-faint">{t("day_details.expenses")}</span>
-        <span class="text-[11.5px] tabular text-neg font-medium">
-          {totals.gastos > 0 ? formatMoney(String(totals.gastos)) : "—"}
-        </span>
-      </div>
-      <div class="flex flex-col gap-0.5">
-        <span class="text-[9.5px] uppercase tracking-wider text-fg-faint">{t("day_details.balance")}</span>
-        <span class="text-[11.5px] tabular font-semibold {totals.net >= 0 ? 'text-pos' : 'text-neg'}">
-          {formatMoney(String(totals.net))}
-        </span>
-      </div>
-    </div>
-
-    <!-- Grupos: cada um com header colorido + lista de tx -->
-    {#each groups as g}
-      <section class="border-b border-border-subtle last:border-b-0">
-        <div class="px-4 py-1.5 bg-surface-2/50 flex items-center justify-between text-[10.5px]">
-          <span class="uppercase tracking-wider font-semibold flex items-center gap-1.5">
-            <span class="w-1.5 h-1.5 rounded-full" style="background: {g.color};"></span>
-            <span style="color: {g.color};">{g.label}</span>
-            <span class="text-fg-faint">· {g.txs.length}</span>
-          </span>
-          <span class="tabular text-fg-faint">
-            {formatMoney(String(g.total))}
+      <!-- Totais REAIS (excluem transfer/investimento) — alinhado com KPIs do Dashboard -->
+      <div class="px-4 py-3 grid grid-cols-3 gap-2 border-b border-border-subtle">
+        <div class="flex flex-col gap-0.5">
+          <span class="text-cap text-fg-subtle">{t("day_details.income")}</span>
+          <span class="text-sub tabular text-pos font-medium">
+            {totals.renda > 0 ? formatMoney(String(totals.renda)) : "—"}
           </span>
         </div>
-        <ul>
-          {#each g.txs as t (t.id)}
-            {@const n = Number(t.amount)}
-            <li class="px-4 py-2 border-t border-border-subtle first:border-t-0 flex items-start gap-2 min-w-0">
-              <span
-                class="w-2 h-2 rounded-full shrink-0 mt-1.5"
-                style="background: {categoryToken(t.category_id)}"
-                title={categoryName(t.category_id)}
-              ></span>
-              <div class="flex-1 min-w-0 flex flex-col gap-0.5">
-                <span class="text-[12px] text-fg truncate" title={t.description}>
-                  {t.description}
-                </span>
-                <span class="text-[10px] text-fg-faint">
-                  {categoryName(t.category_id)}
-                </span>
-              </div>
-              <span class="text-[11.5px] tabular shrink-0 font-medium {n >= 0 ? 'text-pos' : 'text-fg'}">
-                {formatMoney(t.amount)}
+        <div class="flex flex-col gap-0.5">
+          <span class="text-cap text-fg-subtle">{t("day_details.expenses")}</span>
+          <span class="text-sub tabular text-neg font-medium">
+            {totals.gastos > 0 ? formatMoney(String(totals.gastos)) : "—"}
+          </span>
+        </div>
+        <div class="flex flex-col gap-0.5">
+          <span class="text-cap text-fg-subtle">{t("day_details.balance")}</span>
+          <span class="text-sub tabular font-semibold {totals.net >= 0 ? 'text-pos' : 'text-neg'}">
+            {formatMoney(String(totals.net))}
+          </span>
+        </div>
+      </div>
+
+      <!-- Groups: each with a coloured header plus its transactions -->
+      <div class="overflow-y-auto">
+        {#each groups as g}
+          <section class="border-b border-border-subtle last:border-b-0">
+            <div class="px-4 py-1.5 bg-surface-2/60 flex items-center justify-between text-cap">
+              <span class="font-semibold flex items-center gap-1.5">
+                <span class="w-1.5 h-1.5 rounded-full" style="background: {g.color};"></span>
+                <span style="color: {g.color};">{g.label}</span>
+                <span class="text-fg-subtle">· {g.txs.length}</span>
               </span>
-            </li>
-          {/each}
-        </ul>
-      </section>
-    {/each}
+              <span class="tabular text-fg-subtle">{formatMoney(String(g.total))}</span>
+            </div>
+            <ul>
+              {#each g.txs as t (t.id)}
+                {@const n = Number(t.amount)}
+                <li
+                  class="px-4 py-2 border-t border-border-subtle first:border-t-0 flex items-start gap-2.5 min-w-0"
+                >
+                  <span
+                    class="w-2 h-2 rounded-full shrink-0 mt-1.5"
+                    style="background: {categoryToken(t.category_id)}"
+                    title={categoryName(t.category_id)}
+                  ></span>
+                  <div class="flex-1 min-w-0 flex flex-col gap-0.5">
+                    <span class="text-sub text-fg truncate" title={t.description}>
+                      {t.description}
+                    </span>
+                    <span class="text-cap text-fg-subtle">{categoryName(t.category_id)}</span>
+                  </div>
+                  <span
+                    class="text-sub tabular shrink-0 font-medium {n >= 0 ? 'text-pos' : 'text-fg'}"
+                  >
+                    {formatMoney(t.amount)}
+                  </span>
+                </li>
+              {/each}
+            </ul>
+          </section>
+        {/each}
+      </div>
     {/if}
   {/if}
 </div>

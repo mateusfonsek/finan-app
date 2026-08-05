@@ -1,18 +1,17 @@
--- Remove a categoria 'Renda' (vestigial).
--- Renda passou a ser rastreada por contraparte ("Fontes de Renda" no Dashboard)
--- em vez de categoria. A categoria não tem mais propósito funcional — nenhum
--- código checa `kind='income'`, era decorativa.
+-- Removes the vestigial 'Renda' category.
+-- Income is now tracked by counterparty (the Dashboard's income sources panel)
+-- rather than by category. No code checks `kind='income'` — it was decorative.
 --
--- Idempotente: se Renda já foi removida, todos os comandos viram no-op.
+-- Idempotent: if it is already gone, every statement is a no-op.
 
--- Tira o link de tx que estavam categorizadas como Renda (mantém as tx).
+-- Unlinks tx categorized as Renda, keeping the tx.
 UPDATE transactions
 SET category_id = NULL
 WHERE category_id IN (SELECT id FROM categories WHERE name = 'Renda');
 
--- Apaga regras que apontavam pra Renda (raro, mas seguro).
+-- Drops rules pointing at Renda (rare, but safe).
 DELETE FROM rules
 WHERE category_id IN (SELECT id FROM categories WHERE name = 'Renda');
 
--- Remove a categoria.
+-- Removes the category.
 DELETE FROM categories WHERE name = 'Renda';

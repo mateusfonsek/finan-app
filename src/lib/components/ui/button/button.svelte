@@ -3,26 +3,43 @@
 	import type { HTMLAnchorAttributes, HTMLButtonAttributes } from "svelte/elements";
 	import { type VariantProps, tv } from "tailwind-variants";
 
+	// A button in the macOS spirit: standard control height (28px), control
+	// radius (7px), the app's body type — and the press highlight happens on
+	// PRESS, not on release (HIG: latency kills the sense of directness).
+	// The recoil is a subtle scale, not a 1px offset — real objects sink under
+	// the finger, they do not jump down.
 	export const buttonVariants = tv({
-		base: "rounded-lg border border-transparent bg-clip-padding text-sm font-medium inline-flex shrink-0 items-center justify-center whitespace-nowrap transition-colors outline-none select-none disabled:pointer-events-none disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 focus-visible:ring-offset-bg active:translate-y-px [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+		base: [
+			"relative inline-flex shrink-0 items-center justify-center whitespace-nowrap select-none",
+			"rounded-[var(--radius-md)] border border-transparent bg-clip-padding",
+			"text-callout font-medium",
+			"transition-[background-color,border-color,color,box-shadow,transform] duration-[var(--dur-fast)] ease-[var(--ease-snap)]",
+			"outline-none active:scale-[0.97]",
+			"disabled:pointer-events-none disabled:opacity-40",
+			"[&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-3.5",
+		],
 		variants: {
 			variant: {
-				default: "bg-accent text-accent-on hover:bg-accent-hi",
-				outline: "border border-border bg-surface hover:bg-surface-2 text-fg",
-				secondary: "bg-surface-2 text-fg-muted hover:bg-hover",
-				ghost: "hover:bg-hover text-fg-muted hover:text-fg",
-				destructive: "bg-neg/10 hover:bg-neg/20 text-neg",
+				// Primary action: filled with the accent. One per screen.
+				default: "bg-accent text-accent-on hover:bg-accent-hi shadow-[var(--shadow-raised)]",
+				// Secondary action: the standard macOS push button.
+				outline:
+					"border-border bg-surface-2 text-fg hover:bg-hover shadow-[var(--shadow-raised)]",
+				secondary: "bg-surface-2 text-fg-muted hover:bg-hover hover:text-fg",
+				// Tertiary: no frame until touched.
+				ghost: "text-fg-muted hover:bg-hover hover:text-fg",
+				destructive: "bg-neg/10 text-neg hover:bg-neg/18",
 				link: "text-accent underline-offset-4 hover:underline",
 			},
 			size: {
-				default: "h-8 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2",
-				xs: "h-6 gap-1 rounded-[min(var(--radius-md),10px)] px-2 text-xs in-data-[slot=button-group]:rounded-lg has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 [&_svg:not([class*='size-'])]:size-3",
-				sm: "h-7 gap-1 rounded-[min(var(--radius-md),12px)] px-2.5 text-[0.8rem] in-data-[slot=button-group]:rounded-lg has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 [&_svg:not([class*='size-'])]:size-3.5",
-				lg: "h-9 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2",
-				icon: "size-8",
-				"icon-xs": "size-6 rounded-[min(var(--radius-md),10px)] in-data-[slot=button-group]:rounded-lg [&_svg:not([class*='size-'])]:size-3",
-				"icon-sm": "size-7 rounded-[min(var(--radius-md),12px)] in-data-[slot=button-group]:rounded-lg",
-				"icon-lg": "size-9",
+				default: "h-7 gap-1.5 px-2.5",
+				xs: "h-5.5 gap-1 rounded-[var(--radius-sm)] px-1.5 text-cap [&_svg:not([class*='size-'])]:size-3",
+				sm: "h-6.5 gap-1 px-2 text-sub [&_svg:not([class*='size-'])]:size-3",
+				lg: "h-8 gap-2 px-3.5 text-body",
+				icon: "size-7",
+				"icon-xs": "size-5.5 rounded-[var(--radius-sm)] [&_svg:not([class*='size-'])]:size-3",
+				"icon-sm": "size-6.5 [&_svg:not([class*='size-'])]:size-3",
+				"icon-lg": "size-8",
 			},
 		},
 		defaultVariants: {

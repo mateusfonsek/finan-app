@@ -33,7 +33,6 @@
     "@tauri-apps/plugin-opener": "^2.5.4",
     "bits-ui": "^2.18.1",
     "clsx": "^2.1.1",
-    "lucide-svelte": "^1.0.1",
     "ofx-data-extractor": "^1.5.0",
     "svelte-spa-router": "^5.1.0",
     "tailwind-merge": "^3.6.0",

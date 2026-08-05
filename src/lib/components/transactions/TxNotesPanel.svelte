@@ -1,12 +1,14 @@
 <script lang="ts">
-  import { locale } from "$lib/i18n/locale.svelte";
-
-  const t = locale.t;
   import { tick } from "svelte";
+  import Icon from "$lib/components/ui/Icon.svelte";
   import { Button } from "$lib/components/ui/button";
+  import { locale } from "$lib/i18n/locale.svelte";
   import { formatMoney } from "$lib/format/money";
+  import { rise, scrim, sheet } from "$lib/motion";
   import { suggestPatternFor } from "$lib/api/suggestions";
   import type { Category, Transaction } from "$lib/bindings";
+
+  const t = locale.t;
 
   type Props = {
     transaction: Transaction;
@@ -22,12 +24,23 @@
   let busy = $state(false);
   let textarea: HTMLTextAreaElement | undefined = $state();
 
-  // Mini-form de criação de regra (expansível).
+  // Expandable mini-form for creating a rule.
   let ruleOpen = $state(false);
   let rulePattern = $state("");
   let ruleCategoryId = $state<number | null>(null);
   let ruleBusy = $state(false);
   let ruleError = $state<string | null>(null);
+
+  let category = $derived(categories.find((c) => c.id === transaction.category_id));
+
+  function fmtDate(iso: string): string {
+    const [y, m, d] = iso.split("-").map(Number);
+    return new Date(y, m - 1, d).toLocaleDateString(locale.dateLocale, {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    });
+  }
 
   async function openRuleForm() {
     ruleError = null;
@@ -81,110 +94,176 @@
   $effect(() => {
     void focusTextarea();
   });
+
+  function onkeydown(e: KeyboardEvent) {
+    if (e.key === "Escape") {
+      e.preventDefault();
+      if (ruleOpen) ruleOpen = false;
+      else onClose();
+    }
+    // Cmd+Enter saves — the standard macOS confirm shortcut in edit panels.
+    if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+      e.preventDefault();
+      void save();
+    }
+  }
 </script>
 
+<svelte:window {onkeydown} />
+
+<!-- Side panel: always enters from the right and leaves to the right. The
+     scrim is light because the task is focused, not blocking. -->
 <button
   type="button"
   aria-label={t("common.close")}
   onclick={onClose}
-  class="fixed inset-0 z-20 bg-black/30"
+  transition:scrim
+  class="fixed inset-0 z-50 bg-black/25"
 ></button>
 
-<aside
-  class="fixed right-0 top-0 bottom-0 z-30 w-[360px] bg-surface border-l border-border-subtle flex flex-col"
-  style="box-shadow: -12px 0 32px -8px rgba(0,0,0,.55)"
+<div
+  transition:sheet={{ side: "right" }}
+  class="fixed right-0 top-0 bottom-0 z-60 w-[372px] bg-surface border-l border-border-subtle
+         flex flex-col shadow-[var(--shadow-sheet)]"
+  role="dialog"
+  aria-label={t("tx_notes.detail")}
 >
-  <header class="flex items-center justify-between px-4 py-3 border-b border-border-subtle">
-    <span class="text-[10.5px] uppercase tracking-wider font-semibold text-fg-faint">{t("tx_notes.detail")}</span>
-    <button type="button" onclick={onClose} class="text-fg-muted hover:text-fg" aria-label={t("common.close")}>
-      ✕
+  <header
+    data-tauri-drag-region="deep"
+    class="flex items-center justify-between px-4 pb-3 border-b border-border-subtle"
+    style="padding-top: max(12px, var(--titlebar-h))"
+  >
+    <span class="section-title">{t("tx_notes.detail")}</span>
+    <button
+      type="button"
+      onclick={onClose}
+      aria-label={t("common.close")}
+      class="press w-6 h-6 grid place-items-center rounded-full text-fg-faint
+             hover:text-fg hover:bg-hover transition-colors duration-[var(--dur-fast)]"
+    >
+      <Icon name="x" size={13} stroke={2} />
     </button>
   </header>
 
-  <div class="p-4 flex flex-col gap-3 text-[12px]">
-    <div class="flex justify-between">
-      <span class="text-fg-muted">{t("tx_table.date")}</span>
-      <span class="tabular">{transaction.date}</span>
-    </div>
-    <div class="flex justify-between">
-      <span class="text-fg-muted">{t("tx_table.amount")}</span>
-      <span class="tabular font-semibold {Number(transaction.amount) >= 0 ? 'text-pos' : 'text-fg'}">
+  <div class="flex-1 overflow-y-auto">
+    <!-- The amount is the panel's subject: it opens the read, the rest gives
+         context. -->
+    <div class="px-4 pt-4 pb-3 flex flex-col gap-1">
+      <span
+        class="text-display font-semibold tabular {Number(transaction.amount) >= 0
+          ? 'text-pos'
+          : 'text-fg'}"
+      >
         {formatMoney(transaction.amount)}
       </span>
+      <span class="text-sub text-fg-subtle tabular">{fmtDate(transaction.date)}</span>
     </div>
-    <div class="flex flex-col gap-1">
-      <span class="text-fg-muted">{t("tx_table.description")}</span>
-      <span class="text-fg">{transaction.description}</span>
-    </div>
-    {#if transaction.ofx_fitid}
-      <div class="flex justify-between">
-        <span class="text-fg-muted">FITID</span>
-        <span class="font-mono text-[11px] text-fg-faint">{transaction.ofx_fitid}</span>
-      </div>
-    {/if}
-  </div>
 
-  <div class="px-4 pb-3 border-b border-border-subtle">
-    {#if !ruleOpen}
-      <Button variant="ghost" onclick={openRuleForm} class="w-full justify-center">
-        {t("tx_notes.create_rule_cta")}
-      </Button>
-    {:else}
-      <div class="flex flex-col gap-2 rounded-md border border-border-subtle bg-surface-2/50 p-3">
-        <span class="text-[10.5px] uppercase tracking-wider font-semibold text-fg-faint">{t("tx_notes.new_rule")}</span>
-        <label class="flex flex-col gap-1">
-          <span class="text-[11px] text-fg-muted">{t("rule_form.pattern_label")}</span>
-          <input
-            bind:value={rulePattern}
-            class="rounded-md border border-border bg-surface px-2 py-1 text-[12px] text-fg font-mono focus:outline-none focus:border-accent"
-            title={t("tx_notes.pattern_title")}
-          />
-        </label>
-        <label class="flex flex-col gap-1">
-          <span class="text-[11px] text-fg-muted">{t("rule_form.category")}</span>
-          <select
-            value={ruleCategoryId === null ? "" : String(ruleCategoryId)}
-            onchange={(e) => {
-              const v = (e.currentTarget as HTMLSelectElement).value;
-              ruleCategoryId = v === "" ? null : Number(v);
-            }}
-            class="rounded-md border border-border bg-surface px-2 py-1 text-[12px] text-fg"
-          >
-            <option value="">{t("rule_form.select_placeholder")}</option>
-            {#each categories as c}
-              <option value={String(c.id)}>{c.name}</option>
-            {/each}
-          </select>
-        </label>
-        {#if ruleError}
-          <div class="text-[11px] text-neg">{ruleError}</div>
+    <div class="px-4 pb-4 flex flex-col gap-3">
+      <div class="flex flex-col gap-1">
+        <span class="text-foot text-fg-subtle">{t("tx_table.description")}</span>
+        <span class="text-callout text-fg leading-relaxed selectable">{transaction.description}</span>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <span class="text-foot text-fg-subtle">{t("tx_table.category")}</span>
+        {#if category}
+          <span class="chip text-fg">
+            <span
+              class="w-2 h-2 rounded-full"
+              style="background: var({category.color_token ?? '--color-cat-outros'})"
+            ></span>
+            {category.name}
+          </span>
+        {:else}
+          <span class="text-foot text-fg-subtle">{t("category_picker.no_category")}</span>
         {/if}
-        <div class="flex justify-end gap-2">
-          <Button variant="ghost" onclick={() => (ruleOpen = false)} disabled={ruleBusy}>{t("common.cancel")}</Button>
-          <Button onclick={createRule} disabled={ruleBusy}>
-            {ruleBusy ? t("tx_notes.creating") : t("tx_notes.create_apply")}
-          </Button>
-        </div>
       </div>
-    {/if}
+
+      {#if transaction.ofx_fitid}
+        <div class="flex items-baseline justify-between gap-3">
+          <span class="text-foot text-fg-subtle">FITID</span>
+          <span class="font-mono text-cap text-fg-subtle truncate selectable">
+            {transaction.ofx_fitid}
+          </span>
+        </div>
+      {/if}
+    </div>
+
+    <div class="hairline"></div>
+
+    <div class="px-4 py-3">
+      {#if !ruleOpen}
+        <Button variant="outline" onclick={openRuleForm} class="w-full justify-center">
+          <Icon name="wandSparkles" size={13} />
+          {t("tx_notes.create_rule_cta")}
+        </Button>
+      {:else}
+        <div class="card-inset p-3 flex flex-col gap-2.5" in:rise>
+          <span class="section-title">{t("tx_notes.new_rule")}</span>
+          <label class="flex flex-col gap-1">
+            <span class="text-foot text-fg-subtle">{t("rule_form.pattern_label")}</span>
+            <input
+              bind:value={rulePattern}
+              class="field font-mono"
+              title={t("tx_notes.pattern_title")}
+            />
+          </label>
+          <label class="flex flex-col gap-1">
+            <span class="text-foot text-fg-subtle">{t("rule_form.category")}</span>
+            <select
+              value={ruleCategoryId === null ? "" : String(ruleCategoryId)}
+              onchange={(e) => {
+                const v = (e.currentTarget as HTMLSelectElement).value;
+                ruleCategoryId = v === "" ? null : Number(v);
+              }}
+              class="field"
+            >
+              <option value="">{t("rule_form.select_placeholder")}</option>
+              {#each categories as c}
+                <option value={String(c.id)}>{c.name}</option>
+              {/each}
+            </select>
+          </label>
+          {#if ruleError}
+            <div class="text-foot text-neg flex items-start gap-1.5">
+              <Icon name="circleAlert" size={12} stroke={2} class="mt-px" />
+              <span>{ruleError}</span>
+            </div>
+          {/if}
+          <div class="flex justify-end gap-2">
+            <Button variant="ghost" onclick={() => (ruleOpen = false)} disabled={ruleBusy}>
+              {t("common.cancel")}
+            </Button>
+            <Button onclick={createRule} disabled={ruleBusy}>
+              {ruleBusy ? t("tx_notes.creating") : t("tx_notes.create_apply")}
+            </Button>
+          </div>
+        </div>
+      {/if}
+    </div>
+
+    <div class="hairline"></div>
+
+    <div class="px-4 pt-3 pb-4">
+      <label class="section-title mb-1.5 block" for="tx-notes">
+        {t("tx_notes.notes")}
+      </label>
+      <textarea
+        id="tx-notes"
+        bind:this={textarea}
+        bind:value={draft}
+        placeholder={t("tx_notes.notes_placeholder")}
+        rows="6"
+        class="field w-full resize-none leading-relaxed"
+      ></textarea>
+    </div>
   </div>
 
-  <div class="px-4 pb-2 pt-3">
-    <label class="text-[10.5px] uppercase tracking-wider font-semibold text-fg-faint mb-1 block" for="tx-notes">
-      {t("tx_notes.notes")}
-    </label>
-    <textarea
-      id="tx-notes"
-      bind:this={textarea}
-      bind:value={draft}
-      placeholder={t("tx_notes.notes_placeholder")}
-      rows="6"
-      class="w-full rounded-md border border-border bg-surface-2 p-2 text-[12px] text-fg resize-none focus:outline-none focus:border-accent focus:bg-bg"
-    ></textarea>
-  </div>
-
-  <footer class="mt-auto px-4 py-3 border-t border-border-subtle flex justify-end gap-2">
+  <footer class="px-4 py-3 border-t border-border-subtle flex justify-end gap-2">
     <Button variant="ghost" onclick={onClose}>{t("common.cancel")}</Button>
-    <Button onclick={save} disabled={busy}>{busy ? t("categories.saving") : t("categories.save")}</Button>
+    <Button onclick={save} disabled={busy}>
+      {busy ? t("categories.saving") : t("categories.save")}
+    </Button>
   </footer>
-</aside>
+</div>

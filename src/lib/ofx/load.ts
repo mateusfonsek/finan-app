@@ -5,13 +5,13 @@ import { readFileBytes } from "$lib/api/files";
 import type { ParsedOfx } from "./types";
 
 /**
- * Lê um arquivo .ofx do disco (por caminho) e devolve `{ file, parsed }`,
- * reusando o mesmo decode/parse do file picker. Usado pelo "Abrir com finan".
+ * Reads an .ofx from disk by path and returns `{ file, parsed }`, reusing the
+ * same decode/parse as the file picker. Used by "Open with finan".
  *
- * Falha em duas etapas bem diferentes, e o chamador precisa saber em qual:
- * a leitura em disco (`OfxReadError` — transitório, tenta de novo depois) e o
- * parse (erro comum — o conteúdo não é OFX, e isso não melhora com o tempo).
- * O decode acontece sobre bytes já em memória, então conta como parse.
+ * Fails at two very different stages, and the caller needs to know which: the
+ * disk read (`OfxReadError` — transient, retry later) and the parse (a plain
+ * error — the content is not OFX, and time will not fix it). Decoding happens
+ * over bytes already in memory, so it counts as parse.
  */
 export async function loadOfxFromPath(path: string): Promise<{ file: File; parsed: ParsedOfx }> {
   let bytes: Uint8Array;

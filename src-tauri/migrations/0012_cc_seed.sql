@@ -1,22 +1,21 @@
--- Seed rules pra OFX de cartão de crédito Nubank.
--- Idempotente: NOT EXISTS evita duplicar quando o usuário já criou regra
--- manual com o mesmo pattern.
+-- Seed rules for Nubank credit-card OFX.
+-- Idempotent: NOT EXISTS avoids duplicating a manual rule with the same pattern.
 --
--- Priority alta (15) pra Pagamento recebido (vence outras), 8 pros merchants
--- comuns (perde pra CNPJ-auto=10 e seed-transfer=15 caso conflitem).
+-- High priority (15) for received payments so they win; 8 for common merchants,
+-- which loses to auto tax-id rules (10) and seed transfers (15) on conflict.
 
--- Pagamento da fatura visto pelo lado do cartão. Equivalente do
--- "Pagamento de fatura" da CA (já criado em 0006). Ambos kind=transfer.
+-- The bill payment as seen from the card side. Mirror of the checking-account
+-- rule created in 0006. Both are kind=transfer.
 INSERT INTO rules (pattern, category_id, priority, due_day, display_name)
 SELECT 'Pagamento recebido', c.id, 15, NULL, 'Pagamento de fatura recebido (CC)'
 FROM categories c
 WHERE c.name = 'Transferências'
   AND NOT EXISTS (SELECT 1 FROM rules WHERE pattern = 'Pagamento recebido');
 
--- Merchants comuns no cartão BR. LIKE substring case-insensitive casa
--- variações do processador (Uber* Trip, Uber Uber *Trip Help.U, etc).
+-- Common Brazilian card merchants. Case-insensitive LIKE substring matches
+-- processor variations (Uber* Trip, Uber Uber *Trip Help.U, etc).
 
--- Transporte
+-- Transport
 INSERT INTO rules (pattern, category_id, priority, due_day, display_name)
 SELECT 'UBER', c.id, 8, NULL, 'Uber'
 FROM categories c
@@ -35,7 +34,7 @@ FROM categories c
 WHERE c.name = 'Transporte'
   AND NOT EXISTS (SELECT 1 FROM rules WHERE pattern = 'Dl*Uberrides');
 
--- Restaurante / delivery
+-- Restaurant / delivery
 INSERT INTO rules (pattern, category_id, priority, due_day, display_name)
 SELECT 'IFOOD', c.id, 8, NULL, 'iFood'
 FROM categories c
@@ -48,7 +47,7 @@ FROM categories c
 WHERE c.name = 'Restaurante'
   AND NOT EXISTS (SELECT 1 FROM rules WHERE pattern = 'Ifd*');
 
--- Assinatura
+-- Subscription
 INSERT INTO rules (pattern, category_id, priority, due_day, display_name)
 SELECT 'NETFLIX', c.id, 8, NULL, 'Netflix'
 FROM categories c
@@ -73,7 +72,7 @@ FROM categories c
 WHERE c.name = 'Assinatura'
   AND NOT EXISTS (SELECT 1 FROM rules WHERE pattern = 'AMAZON PRIME');
 
--- Cursos / SaaS / outros
+-- Courses / SaaS / other
 INSERT INTO rules (pattern, category_id, priority, due_day, display_name)
 SELECT 'HUBLA', c.id, 8, NULL, 'Hubla (curso)'
 FROM categories c
