@@ -1,8 +1,9 @@
-//! Orquestração do enriquecimento por tax id.
+//! Tax-id enrichment orchestration.
 //!
-//! Separado dos comandos de propósito: aqui não há `State`, `AppHandle` nem
-//! `Channel`. Só a lógica — que é o que torna possível testar ordem de eventos,
-//! resiliência a falha e cancelamento sem tocar a rede nem subir um app Tauri.
+//! Deliberately separate from the commands: there is no `State`, `AppHandle` or
+//! `Channel` here. Only the logic — which is what makes it possible to test
+//! event ordering, failure resilience and cancellation without touching the
+//! network or booting a Tauri app.
 
 use std::collections::HashSet;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -22,15 +23,15 @@ use crate::enrich::{extract_tax_id, lookup_with};
 use crate::error::AppResult;
 use crate::locale::LocalePack;
 
-/// O que a thread de fundo conta para a interface, em ordem.
+/// What the background thread tells the interface, in order.
 ///
-/// `Started` carrega o denominador — é ele que compra a barra determinada que a
-/// HIG prefere, sem estimativa inventada, porque a lista de tax ids únicos é
-/// conhecida antes da primeira consulta.
+/// `Started` carries the denominator — that is what buys the determinate bar
+/// the HIG prefers, with no invented estimate, because the list of unique tax
+/// ids is known before the first lookup.
 ///
-/// `Failed` e `Aborted` são falhas de naturezas diferentes e a interface precisa
-/// distingui-las: uma consulta que deu errado dentro de um loop que segue
-/// adiante não é o trabalho ter morrido.
+/// `Failed` and `Aborted` are failures of different natures and the interface
+/// needs to tell them apart: a lookup that went wrong inside a loop that keeps
+/// going is not the work having died.
 #[derive(Debug, Clone, Serialize, Type)]
 #[serde(tag = "kind")]
 pub enum EnrichEvent {
@@ -43,11 +44,11 @@ pub enum EnrichEvent {
     Aborted { message: String },
 }
 
-/// Tax ids distintos nas descrições de saídas sem categoria.
+/// Distinct tax ids in the descriptions of uncategorized outflows.
 ///
-/// Ordenado alfabeticamente porque `HashSet` não tem ordem: sem isso, o mesmo
-/// extrato produziria uma sequência de progresso diferente a cada execução, e os
-/// testes de ordem de eventos seriam intermitentes.
+/// Sorted alphabetically because `HashSet` has no order: without this, the same
+/// statement would produce a different progress sequence on every run, and the
+/// event-ordering tests would be flaky.
 pub fn collect_unique_tax_ids(
     conn: &rusqlite::Connection,
     pack: &LocalePack,
@@ -89,11 +90,11 @@ pub fn collect_unique_tax_ids(
     Ok(out)
 }
 
-/// Roda o enriquecimento inteiro, contando o progresso pelo caminho.
+/// Runs the whole enrichment, counting progress along the way.
 ///
-/// Nunca segura o lock do banco através de uma espera de rede: cada trava é por
-/// operação, como no resto do código. É isso que permite a interface continuar
-/// consultando o banco enquanto este job roda.
+/// Never holds the database lock across a network wait: each lock is per
+/// operation, as in the rest of the code. That is what lets the interface keep
+/// querying the database while this job runs.
 pub fn run_enrichment(
     conn: &Mutex<rusqlite::Connection>,
     pack: &LocalePack,
@@ -123,7 +124,7 @@ pub fn run_enrichment(
             break;
         }
 
-        // A regra existente é o cache: se já há uma, não há o que consultar.
+        // The existing rule is the cache: if there is one, there is nothing to look up.
         let has_rule = {
             let c = conn.lock().expect("db mutex poisoned");
             c.query_row(
@@ -138,8 +139,8 @@ pub fn run_enrichment(
             continue;
         }
 
-        // Cortesia só entre consultas de verdade. Contar iterações puladas aqui
-        // faria o job dormir por trabalho que não aconteceu.
+        // Courtesy only between real lookups. Counting skipped iterations here
+        // would make the job sleep for work that never happened.
         if consulted > 0 {
             std::thread::sleep(Duration::from_millis(provider.courtesy_delay_ms()));
         }
@@ -155,8 +156,8 @@ pub fn run_enrichment(
         let enrichment = match enrichment {
             Ok(e) => e,
             Err(_) => {
-                // Falha de uma consulta não derruba o job — mas também não é
-                // engolida: vira evento contável.
+                // A failed lookup does not bring the job down — but it is not
+                // swallowed either: it becomes a countable event.
                 on_event(EnrichEvent::Failed {
                     done,
                     tax_id: tax_id.clone(),
@@ -188,8 +189,8 @@ pub fn run_enrichment(
         }
     }
 
-    // Aplicar as regras acontece mesmo num cancelamento: o que já foi criado
-    // deve valer. Cancelar é parar de trabalhar, não desfazer o trabalho feito.
+    // Applying the rules happens even on cancellation: what was already created
+    // must count. Cancelling is stopping work, not undoing the work done.
     let txs_classified = {
         let mut c = conn.lock().expect("db mutex poisoned");
         apply_rules_internal(&mut c, account_id)?
@@ -210,7 +211,7 @@ pub fn run_enrichment(
     Ok(())
 }
 
-/// Cria a regra do tax id resolvido. Começa com um único trecho: o próprio id.
+/// Creates the rule for the resolved tax id. Starts with a single snippet: the id itself.
 fn insert_rule(
     conn: &Mutex<rusqlite::Connection>,
     tax_id: &str,
@@ -267,7 +268,7 @@ mod tests {
         LocalePack::embedded_pt_br()
     }
 
-    /// Cria uma conta e devolve o id.
+    /// Creates an account and returns its id.
     fn seed_account(conn: &Connection) -> i64 {
         let n: i64 = conn
             .query_row("SELECT COUNT(*) FROM accounts", [], |r| r.get(0))
@@ -281,7 +282,7 @@ mod tests {
         conn.last_insert_rowid()
     }
 
-    /// Transação de saída sem categoria — o único formato que o job olha.
+    /// Uncategorized outflow — the only shape the job looks at.
     fn seed_tx(conn: &Connection, account_id: i64, description: &str) {
         conn.execute(
             "INSERT INTO transactions (account_id, date, amount, description, ofx_fitid, category_id)
@@ -295,7 +296,7 @@ mod tests {
     use std::sync::atomic::AtomicBool;
     use std::sync::Mutex;
 
-    /// Coletor de eventos: os testes afirmam sobre a sequência inteira.
+    /// Event collector: the tests assert over the whole sequence.
     fn collect_events(
         conn: Connection,
         provider: &FakeProvider,
@@ -311,11 +312,11 @@ mod tests {
         (events, guarded)
     }
 
-    /// Quantas regras existem para este tax id.
+    /// How many rules exist for this tax id.
     ///
-    /// Contar `rules` inteira não serve: as migrações 0006 e 0012 semeiam
-    /// regras de transferência e cartão, então um banco recém-migrado já começa
-    /// com 15. O que estes testes afirmam é sobre a regra DESTE tax id.
+    /// Counting the whole `rules` table does not work: migrations 0006 and 0012
+    /// seed transfer and credit-card rules, so a freshly migrated database
+    /// already starts with 15. What these tests assert is about THIS tax id.
     fn rules_for(db: &Mutex<Connection>, tax_id: &str) -> i64 {
         db.lock()
             .unwrap()
@@ -440,7 +441,7 @@ mod tests {
         let acc = seed_account(&conn);
         seed_tx(&conn, acc, "Pix - ENERGISA - 09.095.183/0001-40 - ITAU");
         seed_tx(&conn, acc, "Pix - DEMERGE - 33.967.103/0001-84 - BB");
-        // Só o segundo tem resposta; o primeiro (ordem alfabética) falha.
+        // Only the second has an answer; the first (alphabetical order) fails.
         let fake = FakeProvider::new(&[("33967103000184", "5611201")]);
 
         let (events, _db) = collect_events(conn, &fake, Some(acc), &AtomicBool::new(false));
@@ -469,7 +470,7 @@ mod tests {
             ("09095183000140", "4711301"),
             ("33967103000184", "5611201"),
         ]);
-        // Já cancelado antes da primeira volta: nenhuma consulta deve sair.
+        // Already cancelled before the first pass: no lookup should go out.
         let cancel = AtomicBool::new(true);
 
         let (events, db) = collect_events(conn, &fake, Some(acc), &cancel);
@@ -492,7 +493,7 @@ mod tests {
         ]);
         let cancel = AtomicBool::new(false);
 
-        // Cancela assim que o primeiro resolver: a segunda volta não acontece.
+        // Cancels as soon as the first resolves: the second pass never happens.
         let guarded = Mutex::new(conn);
         let mut events = Vec::new();
         run_enrichment(&guarded, &pack(), &fake, Some(acc), &cancel, &mut |e| {

@@ -1,4 +1,4 @@
-//! Apoio de teste para o enriquecimento. Compilado apenas em `cfg(test)`.
+//! Test support for enrichment. Compiled under `cfg(test)` only.
 
 use std::collections::HashMap;
 use std::sync::Mutex;
@@ -6,11 +6,11 @@ use std::sync::Mutex;
 use crate::enrich::provider::{Company, TaxIdProvider};
 use crate::error::{AppError, AppResult};
 
-/// Provedor determinístico: responde a partir de um mapa em memória e registra
-/// cada chamada, para os testes afirmarem *quantas* consultas houve — que é
-/// metade do que o cancelamento e o pulo por regra existente precisam provar.
+/// Deterministic provider: answers from an in-memory map and records every
+/// call, so tests can assert *how many* lookups happened — which is half of
+/// what cancellation and the skip-on-existing-rule path need to prove.
 pub struct FakeProvider {
-    /// dígitos do CNPJ → código de atividade devolvido.
+    /// Tax-id digits → activity code returned.
     pub by_digits: HashMap<String, String>,
     pub calls: Mutex<Vec<String>>,
 }
@@ -44,14 +44,14 @@ impl TaxIdProvider for FakeProvider {
                 activity_code: Some(code.clone()),
                 activity_label: None,
             }),
-            // Ausente = "não dá pra saber agora", que é o contrato do trait.
+            // Absent = "can't know right now", which is the trait's contract.
             None => Err(AppError::Invalid(format!(
                 "fake: sem resposta para {tax_id_digits}"
             ))),
         }
     }
 
-    /// Zero: nenhum teste deve pagar o pedágio de cortesia.
+    /// Zero: no test should pay the courtesy toll.
     fn courtesy_delay_ms(&self) -> u64 {
         0
     }

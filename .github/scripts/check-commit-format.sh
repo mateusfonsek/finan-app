@@ -1,31 +1,31 @@
 #!/usr/bin/env bash
-# Valida o título da PR e os assuntos de commit contra conventional commits.
+# Validates the PR title and the commit subjects against conventional commits.
 #
-# Existe porque a mensagem de commit virou o INPUT do versionamento: um
-# formato inválido sem gate não daria erro, daria silêncio — "nenhuma release
-# saiu e ninguém entendeu por quê", que é o pior jeito de falhar.
+# Exists because the commit message became the INPUT to versioning: an invalid
+# format with no gate would not raise an error, it would raise silence — "no
+# release came out and nobody understood why", which is the worst way to fail.
 #
-# O título da PR é validado junto porque, com squash merge, os commits da PR
-# desaparecem e sobra um só, cuja mensagem É o título.
+# The PR title is validated alongside because, with squash merge, the PR's
+# commits disappear and one remains, whose message IS the title.
 #
 #   git log --format=%s base..head | PR_TITLE="feat: x" check-commit-format.sh
 set -euo pipefail
 
-# A mesma expressão vive no next-version.sh. A duplicação é deliberada: são
-# dois scripts independentes, e um `source` compartilhado só pra uma constante
-# acoplaria os dois sem ganho real.
+# The same expression lives in next-version.sh. The duplication is deliberate:
+# they are two independent scripts, and a shared `source` for a single constant
+# would couple them with no real gain.
 PATTERN='^[a-z][a-z0-9]*(\([^)]+\))?!?: .+'
 
-# Validar só a FORMA não basta: `feet: adiciona pasta observada` (typo de
-# `feat`) casa no padrão, passa no gate, e depois não gera bump nenhum — o
-# autor recebe PR verde e um merge que misteriosamente não lança nada. É o
-# "nenhuma release saiu e ninguém entendeu por quê" do cabeçalho deste
-# arquivo, só que com uma etapa a mais de disfarce. Daí a lista fechada.
+# Validating only the SHAPE is not enough: `feet: add watched folder` (a typo of
+# `feat`) matches the pattern, passes the gate, and then generates no bump at
+# all — the author gets a green PR and a merge that mysteriously ships nothing.
+# It is the "no release came out and nobody understood why" from this file's
+# header, with one extra layer of disguise. Hence the closed list.
 #
-# A lista mora numa variável só, usada tanto pela checagem quanto pelo texto
-# de ajuda lá embaixo: se ficassem em dois lugares, um tipo novo entraria em
-# um e não no outro. Espaço nas pontas pra permitir o teste de pertinência
-# com `case` (bash 3.2: sem arrays associativos).
+# The list lives in a single variable, used both by the check and by the help
+# text below: were they in two places, a new type would land in one and not the
+# other. Spaces at the edges allow the membership test with `case` (bash 3.2: no
+# associative arrays).
 TYPES='feat fix perf i18n docs chore test ci refactor build style revert'
 
 fail=0
@@ -39,7 +39,7 @@ validate() {
     return
   fi
 
-  # Extrai o tipo: tudo antes do primeiro `(`, `!` ou `:`.
+  # Extracts the type: everything before the first `(`, `!` or `:`.
   type=${msg%%:*}
   type=${type%%\(*}
   type=${type%%!*}
@@ -53,9 +53,9 @@ validate() {
   esac
 }
 
-# Valida que PR_TITLE foi definido e não está vazio, com erro em formato
-# esperado pelo GitHub Actions, não bash bruto (:? falharia silenciosamente
-# para ferramentas que não leem bash errors).
+# Validates that PR_TITLE was set and is not empty, erroring in the format
+# GitHub Actions expects rather than raw bash (:? would fail silently for tools
+# that do not read bash errors).
 if [ -z "${PR_TITLE:-}" ]; then
   printf '::error::PR_TITLE não foi definido ou está vazio\n' >&2
   exit 1
@@ -65,9 +65,9 @@ validate "título da PR" "$PR_TITLE"
 
 while IFS= read -r subject || [ -n "$subject" ]; do
   [ -z "$subject" ] && continue
-  # Pula apenas merges gerados automaticamente por git/GitHub que não seguem
-  # o padrão: são artefatos do workflow, não commits autorais. Qualquer outro
-  # texto que comece com "Merge" (ex: "Merge stuff") deve falhar normalmente.
+  # Skips only the merges git/GitHub generate automatically that do not follow
+  # the pattern: they are workflow artifacts, not authored commits. Any other
+  # text starting with "Merge" (e.g. "Merge stuff") must fail normally.
   case $subject in
     "Merge pull request #"*) continue ;;
     "Merge branch "*)        continue ;;
@@ -77,9 +77,9 @@ while IFS= read -r subject || [ -n "$subject" ]; do
 done
 
 if [ "$fail" -ne 0 ]; then
-  # Heredoc SEM aspas no delimitador de propósito: a lista de tipos vem da
-  # mesma variável que a checagem usa. Reescrever a lista aqui na mão faria
-  # a mensagem e o gate divergirem no dia em que um tipo novo entrasse.
+  # Heredoc with an UNQUOTED delimiter on purpose: the type list comes from the
+  # same variable the check uses. Rewriting the list here by hand would make the
+  # message and the gate diverge the day a new type was added.
   cat >&2 <<EOF
 
 O formato aceito é:  tipo(escopo opcional): descrição

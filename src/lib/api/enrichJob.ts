@@ -8,11 +8,11 @@ function unwrap<T>(result: { status: "ok"; data: T } | { status: "error"; error:
 }
 
 /**
- * Dispara o enriquecimento em segundo plano. Resolve assim que a thread começa
- * — não quando ela termina. O progresso chega por `onEvent`.
+ * Starts the enrichment in the background. Resolves as soon as the thread
+ * begins — not when it finishes. Progress arrives through `onEvent`.
  *
- * O canal é criado por quem chama e precisa viver enquanto o trabalho durar:
- * por isso o dono é o store, nunca um componente.
+ * The channel is created by the caller and must live as long as the work does:
+ * that is why the store owns it, never a component.
  */
 export async function startCnpjEnrichment(
   accountId: number | null,

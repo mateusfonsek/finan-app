@@ -93,9 +93,9 @@
     if (!triggerEl) return "";
     const r = triggerEl.getBoundingClientRect();
     const vw = window.innerWidth;
-    // Prefere alinhar à direita do trigger (popover abre pra esquerda).
+    // Prefers aligning to the trigger's right edge (the popover opens leftwards).
     let left = r.right - POPOVER_W;
-    // Se cortar no edge esquerdo, flipa pra abrir pra direita.
+    // If it would clip on the left edge, flip it to open rightwards.
     if (left < POPOVER_MARGIN) {
       left = r.left;
       if (left + POPOVER_W > vw - POPOVER_MARGIN) {

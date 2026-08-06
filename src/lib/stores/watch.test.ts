@@ -124,7 +124,7 @@ describe("watch store", () => {
 
     expect(store.openRequest).toEqual(discovery);
     expect(store.takeOpenRequest()).toEqual(discovery);
-    // Sem isso, um pedido antigo reabriria um extrato ao voltar pra tela.
+    // Without this, a stale request would reopen a statement on returning to the screen.
     expect(store.takeOpenRequest()).toBeNull();
     expect(store.openRequest).toBeNull();
   });
@@ -226,8 +226,8 @@ describe("watch store", () => {
     api.scanWatchedFolders.mockResolvedValue([]);
     const store = createWatchStore();
 
-    // Nenhum await entre as duas chamadas — simula App.svelte (boot) e o
-    // listener de foco disparando quase ao mesmo tempo.
+    // No await between the two calls — simulates App.svelte (boot) and the
+    // focus listener firing at almost the same time.
     await Promise.all([store.refresh(), store.refresh()]);
 
     expect(api.getAppSetting).toHaveBeenCalledTimes(1);

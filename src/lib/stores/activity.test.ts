@@ -11,7 +11,7 @@ import { createActivityStore } from "./activity.svelte";
 
 const emptyReport = { created_rules: [], txs_classified: 0, unresolved: [] };
 
-/** Deixa o teste no controle de quando cada evento chega. */
+/** Puts the test in control of when each event arrives. */
 function captureEmitter() {
   let emit: (e: EnrichEvent) => void = () => {};
   api.startCnpjEnrichment.mockImplementation(
@@ -28,25 +28,25 @@ beforeEach(() => {
 });
 
 describe("activity store", () => {
-  it("começa ocioso, sem superfície para mostrar", () => {
+  it("starts idle, with no surface to show", () => {
     const s = createActivityStore();
     expect(s.busy).toBe(false);
     expect(s.settled).toBe(false);
   });
 
-  it("fica ocupado só quando o backend confirma o início", async () => {
+  it("only becomes busy once the backend confirms the start", async () => {
     const s = createActivityStore();
     const ch = captureEmitter();
 
     await s.start(1);
-    expect(s.busy).toBe(false); // ainda nada — nenhum evento chegou
+    expect(s.busy).toBe(false); // nothing yet — no event has arrived
 
     ch.send({ kind: "Started", total: 3 });
     expect(s.busy).toBe(true);
     expect(s.enrich.total).toBe(3);
   });
 
-  it("guarda o relatório ao terminar e sai de ocupado", async () => {
+  it("keeps the report on finish and leaves the busy state", async () => {
     const s = createActivityStore();
     const ch = captureEmitter();
 
@@ -59,7 +59,7 @@ describe("activity store", () => {
     expect(s.enrich.report).toEqual(emptyReport);
   });
 
-  it("o estado sobrevive à tela — nada aqui depende de componente montado", async () => {
+  it("state outlives the screen — nothing here depends on a mounted component", async () => {
     const s = createActivityStore();
     const ch = captureEmitter();
 
@@ -67,27 +67,27 @@ describe("activity store", () => {
     ch.send({ kind: "Started", total: 10 });
     ch.send({ kind: "Resolved", done: 4, label: "ENERGISA", rule: {} as never });
 
-    // Nenhum ciclo de vida de componente é envolvido: ler depois devolve o mesmo.
+    // No component lifecycle is involved: reading later returns the same.
     expect(s.enrich.done).toBe(4);
     expect(s.enrich.label).toBe("ENERGISA");
   });
 
-  it("uma falha ao iniciar vira estado de erro, não exceção vazando", async () => {
+  it("a failure to start becomes an error state, not a leaking exception", async () => {
     const s = createActivityStore();
-    api.startCnpjEnrichment.mockRejectedValue(new Error("já em andamento"));
+    api.startCnpjEnrichment.mockRejectedValue(new Error("enrichment already running"));
 
     await s.start(1);
 
     expect(s.enrich.phase).toBe("failed");
-    expect(s.enrich.error).toBe("já em andamento");
+    expect(s.enrich.error).toBe("enrichment already running");
   });
 
-  it("com o enriquecimento desligado, nada aparece na tela", async () => {
+  it("with enrichment off, nothing shows on screen", async () => {
     const s = createActivityStore();
     const ch = captureEmitter();
 
-    // O que o backend emite quando a funcionalidade está off: um par
-    // Started/Finished vazio, só para a tela ter um caminho único.
+    // What the backend emits when the feature is off: an empty
+    // Started/Finished pair, only so the screen has a single path.
     await s.start(1);
     ch.send({ kind: "Started", total: 0 });
     ch.send({ kind: "Finished", report: emptyReport });
@@ -96,7 +96,7 @@ describe("activity store", () => {
     expect(s.visible).toBe(false);
   });
 
-  it("um trabalho de verdade que termina continua visível", async () => {
+  it("real work that finishes stays visible", async () => {
     const s = createActivityStore();
     const ch = captureEmitter();
 
@@ -107,9 +107,9 @@ describe("activity store", () => {
     expect(s.visible).toBe(true);
   });
 
-  it("erro aparece mesmo sem nenhuma consulta ter acontecido", async () => {
+  it("an error shows even when no lookup ever happened", async () => {
     const s = createActivityStore();
-    api.startCnpjEnrichment.mockRejectedValue(new Error("já em andamento"));
+    api.startCnpjEnrichment.mockRejectedValue(new Error("enrichment already running"));
 
     await s.start(1);
 
@@ -117,13 +117,13 @@ describe("activity store", () => {
     expect(s.visible).toBe(true);
   });
 
-  it("cancel pede parada ao backend", async () => {
+  it("cancel asks the backend to stop", async () => {
     const s = createActivityStore();
     await s.cancel();
     expect(api.cancelCnpjEnrichment).toHaveBeenCalledOnce();
   });
 
-  it("patchReport troca o relatório sem tocar o resto do estado", async () => {
+  it("patchReport swaps the report without touching the rest of the state", async () => {
     const s = createActivityStore();
     const ch = captureEmitter();
     await s.start(1);
@@ -137,7 +137,7 @@ describe("activity store", () => {
     expect(s.enrich.phase).toBe("done");
   });
 
-  it("clear volta ao início", async () => {
+  it("clear returns to the initial state", async () => {
     const s = createActivityStore();
     const ch = captureEmitter();
     await s.start(1);

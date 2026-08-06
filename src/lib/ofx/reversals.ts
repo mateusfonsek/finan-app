@@ -149,7 +149,7 @@ export function detectReversalPairs(
 
     const candidate = txs.find((t) => {
       if (!t.fitid || used.has(t.fitid) || t.fitid === e.fitid) return false;
-      // Compra original do CC: description == merchant (case-insensitive trim).
+      // Original card purchase: description == merchant (case-insensitive trim).
       if (t.description.trim().toLowerCase() !== merchantLower) return false;
       const amt = Number(t.amount);
       if (!Number.isFinite(amt)) return false;

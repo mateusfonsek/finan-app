@@ -1,9 +1,10 @@
 /**
- * Estado do enriquecimento em segundo plano, como redução dos eventos que a
- * thread do backend emite.
+ * State of the background enrichment, as a reduction of the events the backend
+ * thread emits.
  *
- * Fora do `.svelte` pelo mesmo motivo de `toastState.ts`: é a parte com regras,
- * e é a que precisa de teste. O componente só desenha o que sai daqui.
+ * Outside the `.svelte` for the same reason as `toastState.ts`: this is the
+ * part with real rules, and the part that needs tests. The component only draws
+ * whatever comes out of here.
  */
 import type { AutoClassifyReport, EnrichEvent } from "$lib/bindings";
 
@@ -11,14 +12,14 @@ export type EnrichPhase = "idle" | "running" | "done" | "cancelled" | "failed";
 
 export type EnrichState = {
   phase: EnrichPhase;
-  /** Consultas processadas — inclui as que falharam e as puladas por já ter regra. */
+  /** Lookups processed — includes failed ones and those skipped for having a rule. */
   done: number;
-  /** Conhecido antes da primeira consulta: é ele que permite barra determinada. */
+  /** Known before the first lookup: this is what allows a determinate bar. */
   total: number;
-  /** Última empresa identificada. `null` até a primeira resolver. */
+  /** Last company identified. `null` until the first one resolves. */
   label: string | null;
   failed: number;
-  /** Só existe num estado terminal de sucesso ou cancelamento. */
+  /** Only exists in a terminal success or cancellation state. */
   report: AutoClassifyReport | null;
   error: string | null;
 };
@@ -39,8 +40,8 @@ export function isTerminal(phase: EnrichPhase): boolean {
 
 export function reduceEnrich(state: EnrichState, event: EnrichEvent): EnrichState {
   switch (event.kind) {
-    // Zera tudo: um job novo não pode herdar contagem, rótulo nem erro do
-    // anterior. Reaproveitar o estado antigo faria a barra começar cheia.
+    // Resets everything: a new job cannot inherit the count, label or error of
+    // the previous one. Reusing the old state would start the bar full.
     case "Started":
       return { ...initialEnrichState, phase: "running", total: event.total };
 
@@ -57,9 +58,9 @@ export function reduceEnrich(state: EnrichState, event: EnrichEvent): EnrichStat
     case "Failed":
       return { ...state, done: event.done, failed: state.failed + 1 };
 
-    // `done: state.total` fecha a barra: consultas puladas por já terem regra
-    // não emitem evento, então o contador pode parar antes do total e a barra
-    // congelaria em 80% num trabalho que terminou.
+    // `done: state.total` closes the bar: lookups skipped for already having a
+    // rule emit no event, so the counter can stop short of the total and the bar
+    // would freeze at 80% on work that finished.
     case "Finished":
       return { ...state, phase: "done", done: state.total, report: event.report };
 

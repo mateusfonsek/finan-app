@@ -47,10 +47,10 @@
 
   // Post-import state
   let importResult = $state<InsertResult | null>(null);
-  /** O relatório é do store, não desta tela: o enriquecimento continua rodando
-   *  depois que a pessoa navega para outro lugar, e um `$state` local seria
-   *  apagado no desmonte — voltar para cá mostraria uma tela vazia no meio de
-   *  um trabalho em andamento. */
+  /** The report belongs to the store, not to this screen: the enrichment keeps
+   *  running after the user navigates elsewhere, and a local `$state` would be
+   *  dropped on unmount — coming back here would show an empty screen in the
+   *  middle of work in progress. */
   let autoReport = $derived(activity.enrich.report);
   let categories = $state<Category[]>([]);
   /** category chosen per unresolved CNPJ (keyed by cnpj) */
@@ -164,10 +164,11 @@
       busyMsg = "";
     }
 
-    // Depois do `finally`, e sem `await`: a tela de resultado já pode aparecer.
-    // O backend decide sozinho se há o que fazer — com o enriquecimento
-    // desligado o job termina na hora com relatório vazio, o que elimina a ida
-    // ao backend que este trecho fazia só para perguntar se valia a pena.
+    // After the `finally`, and without `await`: the result screen can appear
+    // already. The backend decides on its own whether there is anything to do —
+    // with enrichment off the job finishes at once with an empty report, which
+    // removes the backend round-trip this block used to make just to ask
+    // whether the call was worth it.
     if (!error && account) {
       activity.clear();
       void activity.start(account.id);
@@ -293,11 +294,11 @@
     duplicateKeys = new Set();
     reversalMap = new Map();
     importResult = null;
-    // Um import novo não herda o relatório do anterior.
+    // A new import does not inherit the previous report.
     activity.clear();
     chosen = {};
-    // Sem isso, "importar outro" com um arquivo solto (DropZone) herdaria o
-    // hash do extrato anterior vindo da pasta observada.
+    // Without this, "import another" with a loose file (DropZone) would inherit
+    // the previous statement's hash coming from the watched folder.
     watchHash = undefined;
   }
 
@@ -380,10 +381,10 @@
           {importResult.inserted === 1 ? t("import.imported_one") : t("import.imported_many")}
         </div>
         <div class="text-sub text-fg-muted">
-          <!-- O relatório chega depois do import: até ele existir, esta linha
-               mostra só o que já é verdade. E com o enriquecimento desligado
-               ele chega zerado — anunciar "0 categorizadas" seria ruído sobre
-               uma etapa que nem rodou. -->
+          <!-- The report arrives after the import: until it exists, this line
+               shows only what is already true. And with enrichment off it
+               arrives zeroed — announcing "0 categorized" would be noise about
+               a step that never ran. -->
           {#if autoReport && autoReport.txs_classified > 0}
             <span class="text-fg font-medium">{autoReport.txs_classified}</span>
             {autoReport.txs_classified === 1

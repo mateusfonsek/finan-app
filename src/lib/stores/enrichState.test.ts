@@ -9,20 +9,20 @@ function run(events: EnrichEvent[]) {
 }
 
 describe("reduceEnrich", () => {
-  it("começa parado, sem total e sem relatório", () => {
+  it("starts idle, with no total and no report", () => {
     expect(initialEnrichState.phase).toBe("idle");
     expect(initialEnrichState.total).toBe(0);
     expect(initialEnrichState.report).toBeNull();
   });
 
-  it("Started define o total e entra em execução", () => {
+  it("Started sets the total and enters the running phase", () => {
     const s = run([{ kind: "Started", total: 42 }]);
     expect(s.phase).toBe("running");
     expect(s.total).toBe(42);
     expect(s.done).toBe(0);
   });
 
-  it("Resolved avança o contador e guarda o rótulo mostrado", () => {
+  it("Resolved advances the counter and keeps the displayed label", () => {
     const s = run([
       { kind: "Started", total: 2 },
       { kind: "Resolved", done: 1, label: "ENERGISA", rule: {} as never },
@@ -31,7 +31,7 @@ describe("reduceEnrich", () => {
     expect(s.label).toBe("ENERGISA");
   });
 
-  it("Unresolved usa a razão social como rótulo", () => {
+  it("Unresolved uses the legal name as the label", () => {
     const s = run([
       { kind: "Started", total: 2 },
       {
@@ -51,7 +51,7 @@ describe("reduceEnrich", () => {
     expect(s.label).toBe("FAZENDA LTDA");
   });
 
-  it("Failed conta a falha sem sair da execução", () => {
+  it("Failed counts the failure without leaving the running phase", () => {
     const s = run([
       { kind: "Started", total: 2 },
       { kind: "Failed", done: 1, tax_id: "09.095.183/0001-40" },
@@ -61,7 +61,7 @@ describe("reduceEnrich", () => {
     expect(s.done).toBe(1);
   });
 
-  it("Finished guarda o relatório e encerra", () => {
+  it("Finished keeps the report and ends", () => {
     const s = run([
       { kind: "Started", total: 1 },
       { kind: "Finished", report: emptyReport },
@@ -70,9 +70,10 @@ describe("reduceEnrich", () => {
     expect(s.report).toEqual(emptyReport);
   });
 
-  it("Finished fecha a barra mesmo com consultas puladas", () => {
-    // CNPJs que já têm regra não emitem evento: o contador para em 1 mas o
-    // total é 5. Sem o ajuste, a barra congelaria em 20% num trabalho pronto.
+  it("Finished closes the bar even with skipped lookups", () => {
+    // Tax ids that already have a rule emit no event: the counter stops at 1
+    // but the total is 5. Without the adjustment the bar would freeze at 20% on
+    // finished work.
     const s = run([
       { kind: "Started", total: 5 },
       { kind: "Resolved", done: 1, label: "ENERGISA", rule: {} as never },
@@ -81,7 +82,7 @@ describe("reduceEnrich", () => {
     expect(s.done).toBe(5);
   });
 
-  it("Cancelled também guarda o relatório — o parcial vale", () => {
+  it("Cancelled keeps the report too — the partial one counts", () => {
     const s = run([
       { kind: "Started", total: 5 },
       { kind: "Cancelled", report: emptyReport },
@@ -90,7 +91,7 @@ describe("reduceEnrich", () => {
     expect(s.report).toEqual(emptyReport);
   });
 
-  it("Aborted guarda a mensagem e não inventa relatório", () => {
+  it("Aborted keeps the message and invents no report", () => {
     const s = run([
       { kind: "Started", total: 5 },
       { kind: "Aborted", message: "banco indisponível" },
@@ -100,7 +101,7 @@ describe("reduceEnrich", () => {
     expect(s.report).toBeNull();
   });
 
-  it("um Started novo zera o estado anterior por completo", () => {
+  it("a fresh Started wipes the previous state entirely", () => {
     const s = run([
       { kind: "Started", total: 2 },
       { kind: "Failed", done: 1, tax_id: "x" },
@@ -110,7 +111,7 @@ describe("reduceEnrich", () => {
     expect(s).toEqual({ ...initialEnrichState, phase: "running", total: 7 });
   });
 
-  it("isTerminal só é verdadeiro depois que o trabalho acabou", () => {
+  it("isTerminal is only true once the work has ended", () => {
     expect(isTerminal("idle")).toBe(false);
     expect(isTerminal("running")).toBe(false);
     expect(isTerminal("done")).toBe(true);

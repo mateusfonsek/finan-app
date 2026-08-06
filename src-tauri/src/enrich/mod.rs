@@ -101,11 +101,11 @@ pub fn lookup(
     Ok(Some(lookup_with(conn, tax_id, pack, p.as_ref())?))
 }
 
-/// Consulta com o provedor recebido — a forma testável, sem rede.
+/// Lookup with the provider handed in — the testable shape, no network.
 ///
-/// Separada de [`lookup`] porque resolver o provedor a partir do pack lá dentro
-/// tornava impossível exercitar o loop de enriquecimento sem chamar o serviço
-/// externo de verdade.
+/// Separate from [`lookup`] because resolving the provider from the pack inside
+/// it made it impossible to exercise the enrichment loop without calling the
+/// real external service.
 pub fn lookup_with(
     conn: &rusqlite::Connection,
     tax_id: &str,
@@ -145,7 +145,7 @@ mod tests {
     fn lookup_with_uses_the_injected_provider() {
         let conn = fresh_conn();
         let p = pack();
-        // 4711301 = mercado, mapeado no pacote pt-BR.
+        // 4711301 = grocery, mapped in the pt-BR pack.
         let fake = FakeProvider::new(&[("33967103000184", "4711301")]);
 
         let e = lookup_with(&conn, "33.967.103/0001-84", &p, &fake).unwrap();
@@ -165,7 +165,7 @@ mod tests {
     fn lookup_with_maps_unknown_activity_to_no_category() {
         let conn = fresh_conn();
         let p = pack();
-        // 0111301 = cultivo de cereais, fora do cnae_map.
+        // 0111301 = grain farming, outside the cnae_map.
         let fake = FakeProvider::new(&[("33967103000184", "0111301")]);
 
         let e = lookup_with(&conn, "33.967.103/0001-84", &p, &fake).unwrap();

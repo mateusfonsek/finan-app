@@ -10,9 +10,9 @@
 
   let e = $derived(activity.enrich);
 
-  // Fração para a barra. A guarda contra total 0 não é paranoia: com o
-  // enriquecimento desligado o backend emite `Started { total: 0 }`, e sem ela
-  // o transform receberia NaN — a barra sumiria sem erro nenhum no console.
+  // Fraction for the bar. The guard against a 0 total is not paranoia: with
+  // enrichment off the backend emits `Started { total: 0 }`, and without it the
+  // transform would get NaN — the bar would vanish with nothing in the console.
   let fraction = $derived(e.total > 0 ? Math.min(1, e.done / e.total) : 0);
 
   let doneLabel = $derived(
@@ -58,9 +58,9 @@
       </span>
       <span class="text-sub text-fg-muted truncate">
         {#if activity.busy}
-          <!-- `tabular` para o contador não dançar a cada incremento: com
-               larguras proporcionais, "14 de 42" e "15 de 42" têm tamanhos
-               diferentes e o nome da empresa ao lado escorrega. -->
+          <!-- `tabular` keeps the counter from dancing on every increment: with
+               proportional widths, "14 de 42" and "15 de 42" have different
+               sizes and the company name beside it slides. -->
           <span class="tabular">
             {t("import.enrich_progress", { done: e.done, total: e.total })}
           </span>
@@ -88,10 +88,10 @@
   </div>
 
   {#if activity.busy}
-    <!-- Barra determinada: o total é conhecido antes da primeira consulta, então
-         não há estimativa inventada aqui. `scaleX` em vez de `width` para a
-         animação ficar no compositor — a barra recebe um evento por CNPJ, e
-         `width` faria layout a cada um deles. -->
+    <!-- Determinate bar: the total is known before the first lookup, so there
+         is no invented estimate here. `scaleX` rather than `width` keeps the
+         animation on the compositor — the bar gets one event per tax id, and
+         `width` would lay out on every one of them. -->
     <div class="h-1 rounded-full bg-surface-2 overflow-hidden">
       <div
         class="h-full origin-left rounded-full bg-accent

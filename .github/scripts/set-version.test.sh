@@ -10,7 +10,7 @@ set_version_script="$script_dir/set-version.sh"
 pass=0
 fail=0
 
-# Cria um diretório temp com a estrutura dos arquivos.
+# Creates a temp directory with the file structure.
 setup_fixture() {
   tmpdir=$(mktemp -d)
   mkdir -p "$tmpdir/src-tauri/src"
@@ -24,7 +24,7 @@ setup_fixture() {
 }
 EOF
 
-  # src-tauri/tauri.conf.json (arrays em uma linha só, como no repo de verdade)
+  # src-tauri/tauri.conf.json (arrays on a single line, as in the real repo)
   cat > "$tmpdir/src-tauri/tauri.conf.json" << 'EOF'
 {
   "build": {
@@ -40,7 +40,7 @@ EOF
 }
 EOF
 
-  # src-tauri/src/main.rs - arquivo mínimo para cargo metadata passar
+  # src-tauri/src/main.rs - minimal file so cargo metadata succeeds
   cat > "$tmpdir/src-tauri/src/main.rs" << 'EOF'
 fn main() {}
 EOF
@@ -73,7 +73,7 @@ cleanup_fixture() {
   rm -rf "$1"
 }
 
-# Test 1: versão válida (1.0.0) reescreve os três arquivos, uma linha cada
+# Test 1: a valid version (1.0.0) rewrites the three files, one line each
 {
   desc="versão válida (1.0.0) reescreve arquivos"
   fixture=$(setup_fixture)
@@ -95,7 +95,7 @@ cleanup_fixture() {
   cleanup_fixture "$fixture"
 }
 
-# Test 2: v1.2.0 é rejeitado, nenhum arquivo modificado
+# Test 2: v1.2.0 is rejected, no file modified
 {
   desc="v1.2.0 é rejeitado (nenhum arquivo modificado)"
   fixture=$(setup_fixture)
@@ -116,7 +116,7 @@ cleanup_fixture() {
   cleanup_fixture "$fixture"
 }
 
-# Test 3: 1.2 é rejeitado (incompleto), nenhum arquivo modificado
+# Test 3: 1.2 is rejected (incomplete), no file modified
 {
   desc="1.2 é rejeitado (incompleto)"
   fixture=$(setup_fixture)
@@ -144,15 +144,15 @@ cleanup_fixture() {
   (cd "$fixture" && $set_version_script 'bad"version' 2>/dev/null)
   ret=$?
 
-  # Confere que falhou
+  # Checks that it failed
   if [ $ret -eq 0 ]; then
     fail=$((fail + 1))
     printf 'FALHOU: %s (deveria ter falhado mas teve sucesso)\n' "$desc"
   else
-    # Confere que arquivos não foram modificados
+    # Checks that no file was modified
     if grep -qF '"version": "0.2.0"' "$fixture/package.json" && \
        grep -qF '"version": "0.2.0"' "$fixture/src-tauri/tauri.conf.json"; then
-      # Confere que JSON permaneça válido
+      # Checks that the JSON stayed valid
       if node -e "require('$fixture/package.json')" 2>/dev/null && \
          node -e "require('$fixture/src-tauri/tauri.conf.json')" 2>/dev/null; then
         pass=$((pass + 1))
@@ -188,7 +188,7 @@ cleanup_fixture() {
   cleanup_fixture "$fixture"
 }
 
-# Test 6: versão válida (1.5.3) reescreve
+# Test 6: a valid version (1.5.3) rewrites
 {
   desc="versão válida (1.5.3) reescreve arquivos"
   fixture=$(setup_fixture)
@@ -209,7 +209,7 @@ cleanup_fixture() {
   cleanup_fixture "$fixture"
 }
 
-# Test 7: [package] version muda, [dependencies] versões não mudam
+# Test 7: the [package] version changes, [dependencies] versions do not
 {
   desc="[package] version muda, [dependencies] versões não mudam"
   fixture=$(setup_fixture)
@@ -230,10 +230,11 @@ cleanup_fixture() {
   cleanup_fixture "$fixture"
 }
 
-# Test 8: Cargo.toml cuja linha de version não casa com o perl => erro
-# (o `^version = ` não bate numa linha indentada). O modo de falha que este
-# teste tranca é o SILENCIOSO: sem a guarda no script, o perl não substitui
-# nada, sai 0, e o script termina com sucesso tendo bumpado só os JSON.
+# Test 8: a Cargo.toml whose version line does not match the perl => error
+# (`^version = ` does not hit an indented line). The failure mode this test
+# pins down is the SILENT one: without the guard in the script, perl substitutes
+# nothing, exits 0, and the script finishes successfully having bumped only the
+# JSON files.
 {
   desc="Cargo.toml não substituído reprova (não fica em silêncio)"
   fixture=$(setup_fixture)
@@ -261,19 +262,19 @@ EOF
   cleanup_fixture "$fixture"
 }
 
-# Test 9: versão pedida é IGUAL à de uma dependência, e a linha [package] não
-# casa com o perl (indentada) => tem que reprovar mesmo assim.
+# Test 9: the requested version is IDENTICAL to a dependency's, and the
+# [package] line does not match the perl (indented) => it must still fail.
 #
-# Este teste existe pra discriminar a âncora `^` da guarda. O teste 8 sozinho
-# não pega isso: seu fixture pede "3.0.0" contra uma dependência em "1.0", que
-# não bate por conteúdo em nenhum jeito de comparação. Aqui a versão pedida é
-# IDÊNTICA à versão da dependência (`tokio = { version = "1.35.0" }`, uma
-# versão real do crate — precisa resolver de verdade pro `cargo metadata`
-# no fim do script não ser o que derruba o teste por um motivo alheio) — uma
-# guarda sem âncora de início de linha (`grep -qF` em vez do `grep -Eq
-# '^version = ...'` atual) encontra "version = \"1.35.0\"" como SUBSTRING
-# dentro da linha da dependência e reporta sucesso, mesmo com [package]
-# intocado. A guarda correta só aceita quando a linha COMEÇA com "version = ".
+# This test exists to discriminate the guard's `^` anchor. Test 8 alone does not
+# catch it: its fixture asks for "3.0.0" against a dependency at "1.0", which
+# does not match by content under any comparison. Here the requested version is
+# IDENTICAL to the dependency's version (`tokio = { version = "1.35.0" }`, a
+# real crate version — it has to resolve for real so the `cargo metadata` at the
+# end of the script is not what fails the test for an unrelated reason) — a
+# guard without a start-of-line anchor (`grep -qF` instead of the current
+# `grep -Eq '^version = ...'`) finds "version = \"1.35.0\"" as a SUBSTRING inside
+# the dependency line and reports success, even with [package] untouched. The
+# correct guard only accepts when the line STARTS with "version = ".
 {
   desc="versão pedida igual à de uma dependência não engana a guarda"
   fixture=$(setup_fixture)

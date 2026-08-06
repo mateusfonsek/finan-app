@@ -2,20 +2,20 @@ name: ci
 
 on:
   pull_request:
-    # `edited` é obrigatório: este gate valida o TÍTULO da PR, e mudança de
-    # título só gera esse tipo de evento. Sem ele, quem tem o título reprovado
-    # corrige e não acontece nada — o check continua vermelho até empurrar um
-    # commit qualquer ou fechar/reabrir a PR, sem nenhuma pista do motivo.
+    # `edited` is mandatory: this gate validates the PR TITLE, and a title
+    # change only produces that event type. Without it, someone whose title was
+    # rejected fixes it and nothing happens — the check stays red until they
+    # push some commit or close/reopen the PR, with no hint as to why.
     types: [opened, synchronize, reopened, edited]
 
-# Um push novo torna a execução anterior irrelevante. Sem isso, cada push numa
-# PR aberta acumula uma suíte macOS completa rodando em paralelo.
+# A new push makes the previous run irrelevant. Without this, every push to an
+# open PR piles up a full macOS suite running in parallel.
 concurrency:
   group: "ci-${{ github.ref }}"
   cancel-in-progress: true
 
-# Estes jobs rodam scripts de lifecycle do pnpm e build scripts do cargo —
-# código de terceiros. Só leitura, nada mais.
+# These jobs run pnpm lifecycle scripts and cargo build scripts — third-party
+# code. Read only, nothing else.
 permissions:
   contents: read
 
@@ -24,12 +24,12 @@ jobs:
     uses: ./.github/workflows/test.yml
 
   commit-format:
-    # Ubuntu aqui: é só git + grep, não precisa de macOS.
+    # Ubuntu here: it is only git + grep, macOS is not needed.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
-          # Precisa do histórico pra comparar base..head.
+          # Needs the history to compare base..head.
           fetch-depth: 0
 
       - name: Validar título da PR e commits
@@ -38,13 +38,13 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
-          # `pipefail` é o que segura este gate de pé: o shell padrão do
-          # Actions é `bash -e {0}`, e num pipeline sem pipefail só o status
-          # do ÚLTIMO comando conta. Se o `git log` falhar (base
-          # force-pushada, SHA inalcançável, clone raso), o script recebe
-          # stdin vazia, valida só o PR_TITLE e sai 0 — o step fica verde com
-          # a metade por-commit do gate nunca tendo rodado, que é exatamente
-          # a falha silenciosa que este job existe pra impedir.
+          # `pipefail` is what holds this gate up: the Actions default shell
+          # is `bash -e {0}`, and in a pipeline without pipefail only the LAST
+          # command's status counts. If `git log` fails (force-pushed base,
+          # unreachable SHA, shallow clone), the script gets empty stdin,
+          # validates only PR_TITLE and exits 0 — the step goes green with the
+          # per-commit half of the gate never having run, which is exactly the
+          # silent failure this job exists to prevent.
           set -euo pipefail
 
           git log --format=%s "$BASE_SHA..$HEAD_SHA" \

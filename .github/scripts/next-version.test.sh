@@ -7,12 +7,12 @@ cd "$(dirname "$0")"
 pass=0
 fail=0
 
-# `input` usa \n e \0 literais, expandidos por printf %b. \0 separa um
-# commit do próximo — é o formato que o script espera (ver comentário em
-# next-version.sh sobre por que a entrada é por registro, não por linha).
-# `expected_exit` é conferido além do stdout: o contrato promete exit 0
-# tanto no caminho releasável quanto no "sem release", e exit 1 (com stdout
-# vazio) quando a versão de entrada é inválida.
+# `input` uses literal \n and \0, expanded by printf %b. \0 separates one
+# commit from the next — the format the script expects (see the comment in
+# next-version.sh on why input is per record, not per line).
+# `expected_exit` is checked alongside stdout: the contract promises exit 0 on
+# both the releasable path and the "no release" one, and exit 1 (with empty
+# stdout) when the input version is invalid.
 check() {
   desc=$1
   current=$2
@@ -44,8 +44,8 @@ check "escopo é reconhecido"               0.2.0 "0.3.0" 0 'feat(watch): pasta 
 check "feat! sobe major"                   0.2.0 "1.0.0" 0 'feat!: remove import legado\n\0'
 check "feat(escopo)! sobe major"           0.2.0 "1.0.0" 0 'feat(ofx)!: remove parser antigo\n\0'
 check "BREAKING CHANGE no corpo sobe major" 0.2.0 "1.0.0" 0 'feat: muda algo\n\nBREAKING CHANGE: o formato mudou\n\0'
-# O rodapé só vale dentro de um commit conventional: num commit fora do
-# padrão a marca pode ser texto citado (changelog colado, nota de release).
+# The footer only counts inside a conventional commit: in a non-conforming
+# commit the marker may be quoted text (pasted changelog, release note).
 check "BREAKING CHANGE em commit malformado é ignorado" 0.2.0 ""      0 'arrumei umas coisas\n\nBREAKING CHANGE: citado de um changelog\n\0'
 check "malformado com marca não contamina os outros"    0.2.0 "0.2.1" 0 'arrumei coisas\n\nBREAKING CHANGE: citado\n\0fix: real\n\0'
 # ...mas num commit conventional de qualquer tipo, a marca vale (spec).
@@ -61,11 +61,11 @@ check "versão com números altos"           1.9.9 "1.10.0" 0 'feat: a\n\0'
 check "i18n(escopo) sobe patch"            0.2.0 "0.2.1" 0 'i18n(watch): x\n\0'
 check "chore!: sobe major (breaking em tipo não-feat)" 0.2.0 "1.0.0" 0 'chore!: x\n\0'
 
-# --- Regressão: linha de corpo não pode ser confundida com cabeçalho ---
-# Este é o caso do defeito real: um commit `chore:` cujo corpo cita
-# "fix: corrigido..." (ex.: colado de um changelog) não pode virar release.
-# Se a separação por NUL/primeira-linha for revertida para leitura linha a
-# linha, este teste falha (resultado passa a ser "0.2.1").
+# --- Regression: a body line must not be mistaken for a header ---
+# This is the real defect's case: a `chore:` commit whose body quotes
+# "fix: fixed..." (e.g. pasted from a changelog) must not become a release.
+# If the NUL/first-line split is reverted to line-by-line reading, this test
+# fails (the result becomes "0.2.1").
 check "corpo com linha 'fix: algo' não é tratado como cabeçalho" \
   0.2.0 "" 0 'chore: bump deps\n\nNotas de release:\nfix: corrigido bug no changelog\n\0'
 
@@ -78,14 +78,14 @@ check "BREAKING CHANGE como última linha de corpo multi-linha sobe major" \
 check "corpo do segundo commit citando 'feat: x' não gera release (cabeçalho é docs:)" \
   0.2.0 "" 0 'docs: a\n\0docs: b\n\nfeat: x\n\0'
 
-# `git log --format='%B%x00'` é tformat: por não terminar em quebra de linha
-# "visível" (termina no NUL), o git insere um \n extra depois de cada
-# entrada. Isso faz o segundo registro em diante chegar com uma quebra de
-# linha a mais na frente — simulado aqui sem precisar de um repositório real.
+# `git log --format='%B%x00'` is tformat: since it does not end in a "visible"
+# newline (it ends at the NUL), git inserts an extra \n after each entry. That
+# makes every record from the second on arrive with one leading newline too
+# many — simulated here without needing a real repository.
 check "registro com \\n extra na frente (artefato do git tformat) ainda reconhece o cabeçalho" \
   0.2.0 "0.3.0" 0 'docs: a\n\0\nfeat: b\n\0'
 
-# --- Validação da versão de entrada ---
+# --- Input version validation ---
 check "versão com 'v' na frente é rejeitada (stdout vazio, exit != 0)" \
   v1.2.0 "" 1 'feat: x\n\0'
 check "versão incompleta (sem patch) é rejeitada" \

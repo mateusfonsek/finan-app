@@ -1,31 +1,31 @@
 #!/usr/bin/env bash
-# Escreve a versão nos TRÊS arquivos onde ela mora, mais o Cargo.lock.
+# Writes the version to the THREE files where it lives, plus Cargo.lock.
 #
-# Existe como ponto único porque eles já divergiram na mão: o Cargo.toml
-# ficou em 0.1.0 enquanto package.json e tauri.conf.json foram pra 0.2.0.
+# Exists as a single point because they already diverged by hand: Cargo.toml
+# stayed at 0.1.0 while package.json and tauri.conf.json moved to 0.2.0.
 set -euo pipefail
 
 v=${1:?uso: set-version.sh <versao>}
 
-# Valida a versão de entrada antes de qualquer substituição. Sem isso,
-# um `v` na frente (forma mais comum de passar uma tag de git por engano)
-# ou um "X.Y" incompleto passam pelo node e produzem JSON inválido em
-# silêncio. Rejeitar aqui, alto e claro, é a única defesa.
+# Validates the input version before any substitution. Without this, a leading
+# `v` (the most common way to pass a git tag by mistake) or an incomplete "X.Y"
+# slips through node and silently produces invalid JSON. Rejecting here, loud
+# and clear, is the only defence.
 if [[ ! $v =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
   printf 'erro: versão inválida: "%s" (esperado X.Y.Z, sem "v" na frente)\n' "$v" >&2
   exit 1
 fi
 
-# Troca só o valor do campo "version" via regex de texto, sem fazer
-# JSON.parse + stringify: re-serializar reformata o arquivo inteiro (o
-# tauri.conf.json tem arrays escritos em uma linha só, tipo
-# ["app", "dmg"], e o stringify do Node quebra cada item em uma linha —
-# dezenas de linhas de diff por causa de UMA versão).
+# Replaces only the "version" field value with a text regex, without
+# JSON.parse + stringify: re-serializing reformats the whole file (tauri.conf.json
+# has arrays written on a single line, such as ["app", "dmg"], and Node's
+# stringify breaks each item onto its own line — dozens of diff lines because of
+# ONE version).
 #
-# Guarda cada substituição para garantir que a chave foi encontrada: se
-# o `replace` não mudar nada, o arquivo sai intocado e a versão errada
-# fica silenciosamente no lugar. O mesmo risco que o perl previne com o
-# flag `$done` abaixo — deixar descoberto aqui seria repetir o mesmo bug.
+# Each substitution is guarded to make sure the key was found: if `replace`
+# changes nothing, the file comes out untouched and the wrong version silently
+# stays in place. The same risk perl prevents with the `$done` flag below —
+# leaving it uncovered here would repeat the very same bug.
 node -e '
   const fs = require("fs");
   const v = process.argv[1];
@@ -40,36 +40,36 @@ node -e '
   }
 ' "$v"
 
-# Só a PRIMEIRA ocorrência, que é a da seção [package] (a primeira do arquivo).
-# Nunca a `version` de uma dependência.
+# Only the FIRST occurrence, which is the one in the [package] section (the
+# file's first). Never a dependency's `version`.
 #
-# O flag só é marcado quando a substituição REALMENTE acontece — um
-# `unless $done++` marcaria já na linha 1 (`[package]`) e o arquivo sairia
-# intocado, em silêncio.
+# The flag is set only when the substitution REALLY happens — an
+# `unless $done++` would set it on line 1 (`[package]`) already and the file
+# would come out untouched, silently.
 perl -pi -e 'if (!$done && s/^version = "[^"]*"/version = "'"$v"'"/) { $done = 1 }' src-tauri/Cargo.toml
 
-# Mesma guarda do bloco node acima, pelo mesmo motivo: o `perl -pi` sai 0
-# mesmo quando não substitui NADA (basta a linha de version estar indentada
-# ou escrita de outro jeito). Sem esta conferência o script terminaria com
-# sucesso tendo bumpado só os dois JSON — recriando exatamente a divergência
-# entre os três arquivos que ele existe pra impedir.
+# Same guard as the node block above, for the same reason: `perl -pi` exits 0
+# even when it substitutes NOTHING (the version line only has to be indented or
+# written differently). Without this check the script would finish successfully
+# having bumped just the two JSON files — recreating exactly the divergence
+# between the three files it exists to prevent.
 #
-# Âncora no INÍCIO da linha (`^`) e não uma busca solta: `version = "1.0"`
-# também aparece dentro das linhas de dependência (`serde = { version =
-# "1.0", ... }`), que vêm indentadas ou depois de `{`. Ancorar em `^` já
-# basta pra descartar essas — uma busca solta daria falso-positivo
-# justamente quando `$v` coincidisse com a versão de alguma dep.
+# Anchored at the START of the line (`^`) rather than a loose search:
+# `version = "1.0"` also appears inside dependency lines (`serde = { version =
+# "1.0", ... }`), which come indented or after `{`. Anchoring at `^` is enough
+# to discard those — a loose search would false-positive precisely when `$v`
+# happened to match some dependency's version.
 #
-# Mas NÃO usamos `-x` (linha inteira exata): o perl real que roda acima só
-# troca o valor entre aspas, então um comentário ao final da linha
-# (`version = "0.2.0"  # bumped by CI`), espaço sobrando, ou CRLF sobrevivem
-# à substituição e fariam a guarda reportar falha numa troca que na
-# verdade funcionou. `[[:space:]]*(#.*)?$` tolera isso sem abrir mão da
-# âncora em `^version = "..."` que é o que de fato importa aqui.
+# But we do NOT use `-x` (whole line exact): the real perl above only swaps the
+# quoted value, so a trailing comment (`version = "0.2.0"  # bumped by CI`),
+# leftover whitespace or CRLF survive the substitution and would make the guard
+# report failure on a swap that actually worked. `[[:space:]]*(#.*)?$` tolerates
+# that without giving up the `^version = "..."` anchor, which is what actually
+# matters here.
 if ! grep -Eq '^version = "'"$v"'"[[:space:]]*(#.*)?$' src-tauri/Cargo.toml; then
   printf 'erro: a versão %s não foi escrita em src-tauri/Cargo.toml (linha `version = "..."` da seção [package] não encontrada)\n' "$v" >&2
   exit 1
 fi
 
-# Ler o manifesto já reescreve o lock com a versão nova.
+# Reading the manifest already rewrites the lock with the new version.
 cargo metadata --manifest-path src-tauri/Cargo.toml --format-version 1 >/dev/null

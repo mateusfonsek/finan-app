@@ -69,9 +69,10 @@
 {#if current && phase !== "hidden"}
   <!-- A parallel notification, not modal: no scrim, because it interrupts
        nothing — the user can carry on with what they were doing. -->
-  <!-- `grid` sem posicionamento: quem posiciona é o ActivityCenter. O grid fica
-       porque é ele que empilha os dois ramos (expandido e pílula) na mesma
-       célula, fazendo a troca entre eles ser um cross-fade no lugar. -->
+  <!-- `grid` with no positioning: the ActivityCenter is what positions this.
+       The grid stays because it is what stacks the two branches (expanded and
+       pill) in the same cell, making the swap between them a cross-fade in
+       place. -->
   <div
     class="grid"
     onmouseenter={() => (hovering = true)}

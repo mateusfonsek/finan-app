@@ -336,10 +336,10 @@ async setEnrichmentEnabled(enabled: boolean) : Promise<Result<null, string>> {
 }
 },
 /**
- * Dispara o enriquecimento numa thread e retorna imediatamente.
+ * Spawns the enrichment on a thread and returns immediately.
  * 
- * Continua sendo `fn` síncrono, e isso está correto: o corpo não bloqueia, só
- * faz `spawn`.
+ * It is still a synchronous `fn`, and that is correct: the body does not
+ * block, it only spawns.
  */
 async startCnpjEnrichment(accountId: number | null, onEvent: TAURI_CHANNEL<EnrichEvent>) : Promise<Result<null, string>> {
     try {
@@ -350,8 +350,8 @@ async startCnpjEnrichment(accountId: number | null, onEvent: TAURI_CHANNEL<Enric
 }
 },
 /**
- * Pede parada. O que já foi criado permanece — cancelar é parar de trabalhar,
- * não desfazer o trabalho feito.
+ * Requests a stop. What was already created stays — cancelling is stopping
+ * work, not undoing the work done.
  */
 async cancelCnpjEnrichment() : Promise<void> {
     await TAURI_INVOKE("cancel_cnpj_enrichment");
@@ -608,15 +608,15 @@ export type CategoryWithCount = { id: number; name: string; color_token: string 
 export type CnpjResolution = { cnpj: string; razao_social: string | null; nome_fantasia: string | null; cnae_fiscal: string | null; cnae_fiscal_descricao: string | null; suggested_category_id: number | null }
 export type DiscoveredFile = { id: number; content_hash: string; path: string; file_name: string; size: number; status: string; seen_at: string }
 /**
- * O que a thread de fundo conta para a interface, em ordem.
+ * What the background thread tells the interface, in order.
  * 
- * `Started` carrega o denominador — é ele que compra a barra determinada que a
- * HIG prefere, sem estimativa inventada, porque a lista de tax ids únicos é
- * conhecida antes da primeira consulta.
+ * `Started` carries the denominator — that is what buys the determinate bar
+ * the HIG prefers, with no invented estimate, because the list of unique tax
+ * ids is known before the first lookup.
  * 
- * `Failed` e `Aborted` são falhas de naturezas diferentes e a interface precisa
- * distingui-las: uma consulta que deu errado dentro de um loop que segue
- * adiante não é o trabalho ter morrido.
+ * `Failed` and `Aborted` are failures of different natures and the interface
+ * needs to tell them apart: a lookup that went wrong inside a loop that keeps
+ * going is not the work having died.
  */
 export type EnrichEvent = { kind: "Started"; total: number } | { kind: "Resolved"; done: number; label: string; rule: Rule } | { kind: "Unresolved"; done: number; resolution: CnpjResolution } | { kind: "Failed"; done: number; tax_id: string } | { kind: "Finished"; report: AutoClassifyReport } | { kind: "Cancelled"; report: AutoClassifyReport } | { kind: "Aborted"; message: string }
 export type EnrichmentStatus = { 
@@ -783,7 +783,7 @@ export type TransactionFilters = { account_id: number | null; month: string | nu
 export type TransferSummary = { total_out: string; total_in: string; count: number }
 /**
  * Triple used to dedupe against the composite UNIQUE
- * `(account_id, ofx_fitid, date, amount)` da tabela `transactions`.
+ * `(account_id, ofx_fitid, date, amount)` from the `transactions` table.
  */
 export type TxKey = { ofx_fitid: string; date: string; amount: string }
 export type UpdateCategory = { name: string; color_token: string | null; kind: string }

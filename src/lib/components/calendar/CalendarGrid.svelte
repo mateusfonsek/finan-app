@@ -91,7 +91,7 @@
     return out;
   }
 
-  /** Estado visual de uma conta: pago / vencido / pendente (futuro). */
+  /** Visual state of a bill: paid / overdue / pending (future). */
   type BillState = "paid" | "overdue" | "pending";
 
   function billState(e: CalendarEvent, todayDay: number): BillState {

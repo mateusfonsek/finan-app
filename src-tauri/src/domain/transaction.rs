@@ -33,7 +33,7 @@ pub struct InsertResult {
 }
 
 /// Triple used to dedupe against the composite UNIQUE
-/// `(account_id, ofx_fitid, date, amount)` da tabela `transactions`.
+/// `(account_id, ofx_fitid, date, amount)` from the `transactions` table.
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 pub struct TxKey {
     pub ofx_fitid: String,

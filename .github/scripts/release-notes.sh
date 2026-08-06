@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
-# Monta as notas da release a partir dos assuntos de commit (stdin).
+# Builds the release notes from commit subjects (stdin).
 #
-# Só entram os tipos que geram bump. Quem abre uma release quer saber o que
-# mudou pra ELE — não que uma dependência subiu ou que um teste foi coberto.
+# Only the types that generate a bump get in. Whoever opens a release wants to
+# know what changed for THEM — not that a dependency moved or a test got
+# covered.
 set -euo pipefail
 
-# A entrada é lida UMA vez pra dentro da variável. Rodar quatro `grep`
-# direto na stdin não funciona: o primeiro consome tudo e os outros três
-# recebem entrada vazia — o bug sai silencioso, com só a primeira seção
-# preenchida.
+# The input is read ONCE into the variable. Running four `grep`s straight off
+# stdin does not work: the first consumes everything and the other three get
+# empty input — the bug is silent, with only the first section filled in.
 all=$(cat)
 
 feats=$(printf '%s\n' "$all" | grep -E '^feat(\([^)]+\))?!?: ' || true)
@@ -21,11 +21,11 @@ section() {
   body=$2
   [ -z "$body" ] && return 0
   printf '### %s\n\n' "$title"
-  # O escopo (o que vem entre parênteses, tipo `feat(watch):`) é preservado
-  # na frente da linha — só o tipo do commit (feat/fix/perf/i18n) é ruído
-  # pra quem lê a release. Por isso a lista de tipos é explícita: um
-  # `^[a-z][a-z0-9]*` genérico bateria de novo no próprio escopo já
-  # reescrito (ex.: "watch: pasta observada") e apagaria o escopo.
+  # The scope (what sits between parentheses, as in `feat(watch):`) is kept at
+  # the front of the line — only the commit type (feat/fix/perf/i18n) is noise
+  # to whoever reads the release. Hence the explicit type list: a generic
+  # `^[a-z][a-z0-9]*` would match the already-rewritten scope again (e.g.
+  # "watch: watched folder") and erase the scope.
   printf '%s\n' "$body" | sed -E 's/^(feat|fix|perf|i18n)\(([^)]+)\)!?: /\2: /; s/^(feat|fix|perf|i18n)!?: //; s/^/- /'
   printf '\n'
 }

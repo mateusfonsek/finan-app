@@ -439,7 +439,7 @@ mod tests {
         transfer.date = "2026-04-22".into();
         raw_insert_batch(&mut conn, acc, &[e1, e2, e3, e4, inc, transfer]);
 
-        // Marca F6 como kind='transfer' (pagamento de fatura).
+        // Marks F6 as kind='transfer' (credit-card bill payment).
         conn.execute(
             "UPDATE transactions SET category_id = (
                 SELECT id FROM categories WHERE name = 'Transferências'

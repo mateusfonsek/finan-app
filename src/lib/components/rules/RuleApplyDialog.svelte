@@ -125,8 +125,9 @@
 
 <svelte:window {onkeydown} />
 
-<!-- Tarefa modal: o fundo escurece e recua. A janela materializa no centro
-     (escala + opacidade juntas) e desmaterializa pelo mesmo caminho. -->
+<!-- Modal task: the background dims and is pushed back. The window
+     materializes in place (scale and opacity together) and dematerializes by
+     the same path. -->
 <button
   type="button"
   aria-label={t("common.cancel")}
