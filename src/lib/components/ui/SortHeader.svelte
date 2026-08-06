@@ -45,12 +45,12 @@
 </script>
 
 <!--
-  Cabeçalho de coluna clicável.
+  Clickable column header.
 
-  O indicador some quando a coluna não está ativa, mas o espaço dele fica
-  reservado — assim nada empurra o texto ao aparecer. Numa coluna alinhada à
-  direita o ícone vem ANTES do rótulo (`flex-row-reverse`), pra que o rótulo
-  continue no prumo da borda direita dos números.
+  The indicator disappears when the column is not active, but its space stays
+  reserved — that way nothing pushes the text around when it appears. In a
+  right-aligned column the icon comes BEFORE the label (`flex-row-reverse`), so
+  the label stays flush with the right edge of the numbers.
 -->
 <button
   type="button"

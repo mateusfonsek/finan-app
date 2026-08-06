@@ -25,7 +25,7 @@
   let busy = $state(false);
   let fileInput: HTMLInputElement | undefined = $state();
 
-  let hintDismissed = $state(true); // pessimista até carregar, evita piscar
+  let hintDismissed = $state(true); // pessimistic until loaded, avoids a flash
 
   onMount(() => {
     void getAppSetting(WATCH_HINT_DISMISSED_KEY).then((v) => (hintDismissed = v === "1"));

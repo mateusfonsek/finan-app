@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 set -uo pipefail
 
-# Testes para set-version.sh
-# Cria um diretório temporário com fixture, executa o script, e verifica os resultados.
+# Tests for set-version.sh
+# Creates a temporary directory with a fixture, runs the script, and checks the
+# results.
 
 script_dir="$(cd "$(dirname "$0")" && pwd)"
 set_version_script="$script_dir/set-version.sh"
@@ -68,7 +69,7 @@ EOF
   echo "$tmpdir"
 }
 
-# Limpa o diretório temp.
+# Cleans up the temp directory.
 cleanup_fixture() {
   rm -rf "$1"
 }
@@ -136,7 +137,7 @@ cleanup_fixture() {
   cleanup_fixture "$fixture"
 }
 
-# Test 4: bad"version é rejeitado, JSON permanece válido
+# Test 4: bad"version is rejected, the JSON stays valid
 {
   desc='bad"version é rejeitado, JSON válido'
   fixture=$(setup_fixture)
@@ -169,7 +170,7 @@ cleanup_fixture() {
   cleanup_fixture "$fixture"
 }
 
-# Test 5: nenhum argumento é rejeitado
+# Test 5: no argument is rejected
 {
   desc="nenhum argumento é rejeitado"
   fixture=$(setup_fixture)

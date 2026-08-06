@@ -67,7 +67,7 @@
     label: string;
     color: string;
     txs: Transaction[];
-    total: number; // valor agregado para o header do grupo
+    total: number; // aggregate value for the group header
   };
 
   let groups = $derived.by<Group[]>(() => {

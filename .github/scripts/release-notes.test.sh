@@ -5,7 +5,7 @@ cd "$(dirname "$0")"
 pass=0
 fail=0
 
-# `contains <desc> <deve-conter|nao-deve-conter> <trecho> <assuntos>`
+# `contains <desc> <must-contain|must-not-contain> <snippet> <subjects>`
 contains() {
   desc=$1
   mode=$2
@@ -63,8 +63,8 @@ contains "escopo é preservado"        contem     "watch"           'feat(watch)
 contains "bloco do Gatekeeper sempre entra" contem "xattr -dr com.apple.quarantine" 'feat: a\n'
 contains "instalação sempre entra"    contem     "## Instalação (macOS)" 'fix: a\n'
 
-# Forma final da linha, caractere a caractere: o tipo sai, o escopo vira
-# prefixo `escopo: `, e o item ganha o hífen do markdown.
+# The line's final shape, character by character: the type goes away, the scope
+# becomes a `scope: ` prefix, and the item gains the markdown hyphen.
 linha_exata "escopo vira prefixo, tipo some" '- watch: pasta observada' 'feat(watch): pasta observada\n'
 linha_exata "sem escopo, só a descrição"     '- outra coisa'            'feat: outra coisa\n'
 linha_exata "fix com escopo idem"            '- ofx: corrige guard'     'fix(ofx): corrige guard\n'

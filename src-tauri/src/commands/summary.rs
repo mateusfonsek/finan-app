@@ -557,7 +557,7 @@ mod tests {
         insert_tx(&conn, acc, "2026-04-05", "-100.00", Some(mercado));
         insert_tx(&conn, acc, "2026-04-10", "5000.00", None);
         insert_tx(&conn, acc, "2026-04-15", "-732.52", Some(transferencias)); // pagamento de fatura
-        insert_tx(&conn, acc, "2026-04-20", "-1000.00", Some(transferencias)); // aplicação RDB
+        insert_tx(&conn, acc, "2026-04-20", "-1000.00", Some(transferencias)); // RDB deposit
 
         let mut stmt = conn
             .prepare(

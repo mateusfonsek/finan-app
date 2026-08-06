@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Testes do cálculo de bump. Shell puro de propósito: sem dependência nova,
-# roda igual na máquina e no CI.
+# Tests for the bump calculation. Pure shell on purpose: no new dependency, it
+# runs the same on a laptop and in CI.
 set -uo pipefail
 cd "$(dirname "$0")"
 
