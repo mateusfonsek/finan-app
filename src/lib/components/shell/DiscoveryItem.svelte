@@ -69,8 +69,11 @@
 {#if current && phase !== "hidden"}
   <!-- A parallel notification, not modal: no scrim, because it interrupts
        nothing — the user can carry on with what they were doing. -->
+  <!-- `grid` sem posicionamento: quem posiciona é o ActivityCenter. O grid fica
+       porque é ele que empilha os dois ramos (expandido e pílula) na mesma
+       célula, fazendo a troca entre eles ser um cross-fade no lugar. -->
   <div
-    class="fixed bottom-5 right-5 z-40 grid"
+    class="grid"
     onmouseenter={() => (hovering = true)}
     onmouseleave={() => (hovering = false)}
     role="presentation"

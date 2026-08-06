@@ -336,23 +336,25 @@ async setEnrichmentEnabled(enabled: boolean) : Promise<Result<null, string>> {
 }
 },
 /**
- * For every uncategorized OUTFLOW transaction with a CNPJ in its description:
- * 1. Skip if a rule already exists with that CNPJ as pattern.
- * 2. Else call BrasilAPI once.
- * 3. If CNAE maps to a category → create rule (priority 10) and apply.
- * 4. Else collect into `unresolved` for the UI to handle manually.
+ * Dispara o enriquecimento numa thread e retorna imediatamente.
  * 
- * Only considers `amount < 0` (outflows). Categorizing inflows (salary or
- * freelance paid by a company) makes no sense — those are tracked by
- * counterparty in the income sources panel, not by category.
+ * Continua sendo `fn` síncrono, e isso está correto: o corpo não bloqueia, só
+ * faz `spawn`.
  */
-async autoClassifyWithCnpj(accountId: number | null) : Promise<Result<AutoClassifyReport, string>> {
+async startCnpjEnrichment(accountId: number | null, onEvent: TAURI_CHANNEL<EnrichEvent>) : Promise<Result<null, string>> {
     try {
-    return { status: "ok", data: await TAURI_INVOKE("auto_classify_with_cnpj", { accountId }) };
+    return { status: "ok", data: await TAURI_INVOKE("start_cnpj_enrichment", { accountId, onEvent }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
 }
+},
+/**
+ * Pede parada. O que já foi criado permanece — cancelar é parar de trabalhar,
+ * não desfazer o trabalho feito.
+ */
+async cancelCnpjEnrichment() : Promise<void> {
+    await TAURI_INVOKE("cancel_cnpj_enrichment");
 },
 async summaryKpis(month: string | null) : Promise<Result<KpiSummary, string>> {
     try {
@@ -605,6 +607,18 @@ export type CategoryWithCount = { id: number; name: string; color_token: string 
  */
 export type CnpjResolution = { cnpj: string; razao_social: string | null; nome_fantasia: string | null; cnae_fiscal: string | null; cnae_fiscal_descricao: string | null; suggested_category_id: number | null }
 export type DiscoveredFile = { id: number; content_hash: string; path: string; file_name: string; size: number; status: string; seen_at: string }
+/**
+ * O que a thread de fundo conta para a interface, em ordem.
+ * 
+ * `Started` carrega o denominador — é ele que compra a barra determinada que a
+ * HIG prefere, sem estimativa inventada, porque a lista de tax ids únicos é
+ * conhecida antes da primeira consulta.
+ * 
+ * `Failed` e `Aborted` são falhas de naturezas diferentes e a interface precisa
+ * distingui-las: uma consulta que deu errado dentro de um loop que segue
+ * adiante não é o trabalho ter morrido.
+ */
+export type EnrichEvent = { kind: "Started"; total: number } | { kind: "Resolved"; done: number; label: string; rule: Rule } | { kind: "Unresolved"; done: number; resolution: CnpjResolution } | { kind: "Failed"; done: number; tax_id: string } | { kind: "Finished"; report: AutoClassifyReport } | { kind: "Cancelled"; report: AutoClassifyReport } | { kind: "Aborted"; message: string }
 export type EnrichmentStatus = { 
 /**
  * Active locale has a tax-id format and a known provider. When `false`
@@ -754,6 +768,7 @@ export type RuleWithCount = { id: number; patterns: string[]; category_id: numbe
  * higher-priority rule took.
  */
 transaction_count: number }
+export type TAURI_CHANNEL<TSend> = null
 export type Transaction = { id: number; account_id: number; date: string; 
 /**
  * Decimal serialized as string (e.g. "-123.45"). Never f64.

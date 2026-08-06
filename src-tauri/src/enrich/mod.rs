@@ -6,8 +6,12 @@
 //! (`rules.cnae_map`). A pack without a provider makes this whole module a
 //! no-op, with no country check anywhere.
 
+pub mod job;
 pub mod provider;
 pub mod providers;
+
+#[cfg(test)]
+pub mod test_support;
 
 use rusqlite::params;
 
@@ -94,22 +98,29 @@ pub fn lookup(
     let Some(p) = provider::for_name(&pack.manifest.tax_id.provider) else {
         return Ok(None);
     };
-    let company = p.lookup(&digits_of(tax_id))?;
+    Ok(Some(lookup_with(conn, tax_id, pack, p.as_ref())?))
+}
+
+/// Consulta com o provedor recebido — a forma testável, sem rede.
+///
+/// Separada de [`lookup`] porque resolver o provedor a partir do pack lá dentro
+/// tornava impossível exercitar o loop de enriquecimento sem chamar o serviço
+/// externo de verdade.
+pub fn lookup_with(
+    conn: &rusqlite::Connection,
+    tax_id: &str,
+    pack: &LocalePack,
+    provider: &dyn provider::TaxIdProvider,
+) -> AppResult<Enrichment> {
+    let company = provider.lookup(&digits_of(tax_id))?;
     let suggested = match company.activity_code.as_deref() {
         Some(code) => category_for_activity(conn, code, pack)?,
         None => None,
     };
-    Ok(Some(Enrichment {
+    Ok(Enrichment {
         company,
         suggested_category_id: suggested,
-    }))
-}
-
-/// Delay between calls to the active locale's provider.
-pub fn courtesy_delay_ms(pack: &LocalePack) -> u64 {
-    provider::for_name(&pack.manifest.tax_id.provider)
-        .map(|p| p.courtesy_delay_ms())
-        .unwrap_or(0)
+    })
 }
 
 #[cfg(test)]
@@ -126,6 +137,47 @@ mod tests {
 
     fn pack() -> LocalePack {
         LocalePack::embedded_pt_br()
+    }
+
+    use crate::enrich::test_support::FakeProvider;
+
+    #[test]
+    fn lookup_with_uses_the_injected_provider() {
+        let conn = fresh_conn();
+        let p = pack();
+        // 4711301 = mercado, mapeado no pacote pt-BR.
+        let fake = FakeProvider::new(&[("33967103000184", "4711301")]);
+
+        let e = lookup_with(&conn, "33.967.103/0001-84", &p, &fake).unwrap();
+
+        assert_eq!(fake.call_count(), 1, "deve consultar o provedor injetado");
+        assert!(
+            e.suggested_category_id.is_some(),
+            "CNAE mapeado sugere categoria"
+        );
+        assert_eq!(
+            e.company.legal_name.as_deref(),
+            Some("EMPRESA 33967103000184")
+        );
+    }
+
+    #[test]
+    fn lookup_with_maps_unknown_activity_to_no_category() {
+        let conn = fresh_conn();
+        let p = pack();
+        // 0111301 = cultivo de cereais, fora do cnae_map.
+        let fake = FakeProvider::new(&[("33967103000184", "0111301")]);
+
+        let e = lookup_with(&conn, "33.967.103/0001-84", &p, &fake).unwrap();
+
+        assert!(e.suggested_category_id.is_none());
+    }
+
+    #[test]
+    fn locale_pack_is_clonable() {
+        let p = pack();
+        let c = p.clone();
+        assert_eq!(c.manifest.tax_id.provider, p.manifest.tax_id.provider);
     }
 
     #[test]

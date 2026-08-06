@@ -128,6 +128,11 @@ pub struct RulesDef {
 // LocalePack — a fully-loaded, ready-to-use locale (with compiled regexes)
 // ---------------------------------------------------------------------------
 
+/// `Clone` existe para o trabalho de fundo: a thread de enriquecimento leva a
+/// sua própria cópia em vez de segurar o `Mutex` do locale pelos ~30s do job, o
+/// que bloquearia qualquer outro comando que leia o pacote. Todos os campos já
+/// eram clonáveis; o custo é uma cópia por job.
+#[derive(Clone)]
 pub struct LocalePack {
     pub manifest: Manifest,
     pub categories: Vec<CategoryDef>,
