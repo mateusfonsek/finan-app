@@ -264,8 +264,8 @@
     }
   }
 
-  // Varredura manual — o terceiro gatilho previsto na spec §5.1, ao lado da
-  // abertura do app e do foco da janela.
+  // Manual scan — the third trigger from spec §5.1, alongside app launch and
+  // window focus.
   async function scanNow() {
     error = null;
     try {

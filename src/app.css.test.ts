@@ -2,15 +2,15 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
-// Caminho a partir da raiz do projeto: sob jsdom, `import.meta.url` é uma URL
-// http do servidor do Vite, e `fileURLToPath` recusa qualquer esquema que não
-// seja `file:`.
+// Path from the project root: under jsdom, `import.meta.url` is an http URL
+// from the Vite server, and `fileURLToPath` rejects any scheme other than
+// `file:`.
 const css = readFileSync(resolve(process.cwd(), "src/app.css"), "utf8");
 
-/** Corpo da primeira regra `:focus-visible` que estiver FORA de `@layer`. */
+/** Body of the first `:focus-visible` rule that sits OUTSIDE any `@layer`. */
 function unlayeredFocusVisibleBlock(): string {
-  // Varre em profundidade de chaves para saber se a regra está dentro de um
-  // `@layer` — regex sozinho não distingue aninhamento.
+  // Walks brace depth to know whether the rule is inside a `@layer` — a regex
+  // alone cannot tell nesting apart.
   let depth = 0;
   let inLayer: number | null = null;
   for (let i = 0; i < css.length; i++) {
@@ -25,41 +25,40 @@ function unlayeredFocusVisibleBlock(): string {
       const open = css.indexOf("{", i);
       const close = css.indexOf("}", open);
       const selectorEnd = css.slice(i, open);
-      // Só a regra global, não variações como `.field:focus-visible`.
+      // The global rule only, not variants such as `.field:focus-visible`.
       if (selectorEnd.trim() === ":focus-visible") return css.slice(open + 1, close);
     }
   }
   return "";
 }
 
-describe("anel de foco", () => {
+describe("focus ring", () => {
   /**
-   * A regra global de `:focus-visible` vive fora de `@layer` para que a
-   * aparência do anel nunca perca para um utilitário `shadow-*`. O efeito
-   * colateral é que ela vence TUDO — inclusive a camada `utilities` do
-   * Tailwind.
+   * The global `:focus-visible` rule lives outside `@layer` so the ring's
+   * appearance never loses to a `shadow-*` utility. The side effect is that it
+   * beats EVERYTHING — Tailwind's `utilities` layer included.
    *
-   * Quando ela declarava `position: relative`, sobrescrevia o posicionamento de
-   * qualquer elemento focável já posicionado. O X do diálogo Sobre é
-   * `absolute right-3.5 top-3.5`: ao receber foco virava `relative`, caía no
-   * fluxo normal (canto superior esquerdo do card) e o `right: 14px` — que em
-   * elemento relativo empurra para a esquerda em vez de ancorar à direita — o
-   * jogava 12px para fora do card. Medido, não suposto.
+   * When it declared `position: relative`, it overrode the positioning of any
+   * already-positioned focusable. The About dialog's close button is
+   * `absolute right-3.5 top-3.5`: on focus it became `relative`, fell back into
+   * normal flow (the card's top-left) and `right: 14px` — which on a relative
+   * element pushes left instead of anchoring right — threw it 12px outside the
+   * card. Measured, not assumed.
    */
-  it("a regra global não sobrescreve position de quem já é posicionado", () => {
+  it("the global rule does not override position on already-positioned elements", () => {
     const block = unlayeredFocusVisibleBlock();
 
-    expect(block, "regra global :focus-visible não encontrada fora de @layer").not.toBe("");
+    expect(block, "global :focus-visible rule not found outside @layer").not.toBe("");
     expect(
       block,
-      "position em regra sem camada vence o utilities do Tailwind e quebra " +
-        "elementos com absolute/fixed/sticky — mova para @layer base",
+      "position in an unlayered rule beats Tailwind's utilities and breaks " +
+        "elements with absolute/fixed/sticky — move it to @layer base",
     ).not.toMatch(/(^|[;{\s])position\s*:/);
   });
 
-  it("a promoção para empilhamento continua existindo, em camada baixa", () => {
-    // Sem isso, o anel de elementos estáticos pode ficar por baixo de um irmão
-    // posterior — que é o motivo de a promoção existir.
+  it("the stacking promotion still exists, in a low layer", () => {
+    // Without it, the ring on static elements can end up under a later sibling
+    // — which is the reason the promotion exists.
     expect(css).toMatch(/@layer\s+base\s*\{[^}]*:focus-visible\s*\{[^}]*position\s*:\s*relative/s);
     expect(css).toMatch(/@layer\s+base\s*\{[^}]*:focus-visible\s*\{[^}]*z-index\s*:\s*1/s);
   });

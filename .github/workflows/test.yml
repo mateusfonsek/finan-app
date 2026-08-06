@@ -1,23 +1,22 @@
 name: test
 
-# Chamável por outros workflows. A suíte é definida UMA vez aqui e consumida
-# tanto pelo gate da PR quanto pelo release — se cada um tivesse a sua, os
-# dois disparariam em paralelo no merge e uma release poderia sair com a
-# suíte vermelha.
+# Callable by other workflows. The suite is defined ONCE here and consumed by
+# both the PR gate and the release — were each to have its own, the two would
+# fire in parallel on merge and a release could ship with a red suite.
 on:
   workflow_call:
 
-# Roda scripts de lifecycle do pnpm e build scripts do cargo — código de
-# terceiros. Só leitura, nada mais. (O job de release tem o seu próprio
-# `contents: write`, que continua necessário lá.)
+# Runs pnpm lifecycle scripts and cargo build scripts — third-party code. Read
+# only, nothing else. (The release job has its own `contents: write`, which is
+# still needed there.)
 permissions:
   contents: read
 
 jobs:
   test:
-    # macOS e não Linux: o crate `tauri` puxa dependências de sistema no Linux
-    # (webkit2gtk e cia) e o app é macOS-only — testar na plataforma-alvo é
-    # mais fiel. Repo público, então os minutos são gratuitos.
+    # macOS rather than Linux: the `tauri` crate pulls system dependencies on
+    # Linux (webkit2gtk and friends) and the app is macOS-only — testing on the
+    # target platform is truer. Public repo, so the minutes are free.
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4

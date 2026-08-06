@@ -43,8 +43,8 @@ check "Merge malformado reprova"        erro 'feat: x'          'Merge stuff wit
 check "linha vazia é ignorada"          ok   'feat: x'          'feat: a\n\n'
 check "sem commits, só título válido"   ok   'feat: x'          ''
 
-# Tipo desconhecido: casa na FORMA mas não é um tipo real. Sem essa checagem
-# o PR fica verde e o merge não gera release nenhuma.
+# Unknown type: matches the SHAPE but is not a real type. Without this check
+# the PR goes green and the merge generates no release at all.
 check "typo de tipo no título reprova"  erro 'feet: adiciona pasta observada' 'feat: x\n'
 check "typo de tipo no commit reprova"  erro 'feat: x'          'feet: adiciona pasta observada\n'
 check "tipo inventado reprova"          erro 'feat: x'          'wip: coisa\n'

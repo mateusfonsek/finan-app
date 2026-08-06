@@ -1,13 +1,13 @@
 name: release
 
-# Dispara no merge pra main. A tag NÃO é mais o gatilho — ela passa a ser
-# consequência: o workflow calcula a versão, builda e cria a tag.
+# Fires on merge to main. The tag is NO LONGER the trigger — it becomes a
+# consequence: the workflow computes the version, builds and creates the tag.
 on:
   push:
     branches: [main]
 
-# Dois merges seguidos não podem correr um sobre o outro: o segundo precisa
-# enxergar a tag criada pelo primeiro pra calcular o bump certo.
+# Two merges in a row must not run over each other: the second needs to see the
+# tag the first created in order to compute the right bump.
 concurrency:
   group: release-main
   cancel-in-progress: false
@@ -24,26 +24,26 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          # Histórico completo: `git describe` precisa das tags.
+          # Full history: `git describe` needs the tags.
           fetch-depth: 0
 
       - name: Calcular a próxima versão
         id: version
         run: |
-          # `pipefail`: o shell padrão do Actions é `bash -e {0}`, e sem
-          # pipefail o status de um pipeline é só o do último comando. Se o
-          # `git log` abaixo falhar (SHA inalcançável, clone raso), o
-          # next-version.sh recebe entrada VAZIA, conclui "nada releasável" e
-          # sai 0 — o merge passaria batido sem release e sem erro nenhum.
+          # `pipefail`: the Actions default shell is `bash -e {0}`, and without
+          # pipefail a pipeline's status is only the last command's. If the
+          # `git log` below fails (unreachable SHA, shallow clone),
+          # next-version.sh gets EMPTY input, concludes "nothing releasable" and
+          # exits 0 — the merge would slip by with no release and no error.
           set -euo pipefail
 
           current=$(node -p "require('./package.json').version")
           last_tag=$(git describe --tags --abbrev=0 --match 'v*' 2>/dev/null || true)
           if [ -n "$last_tag" ]; then range="$last_tag..HEAD"; else range=HEAD; fi
 
-          # %x00 separa os commits: o script trata só a PRIMEIRA linha de cada
-          # registro como cabeçalho. Com `--format=%B` puro, uma linha de corpo
-          # tipo "fix: ..." num commit `chore:` viraria release de patch.
+          # %x00 separates the commits: the script treats only the FIRST line
+          # of each record as the header. With plain `--format=%B`, a body line
+          # such as "fix: ..." in a `chore:` commit would become a patch release.
           next=$(git log --format='%B%x00' "$range" | .github/scripts/next-version.sh "$current")
 
           echo "next=$next" >> "$GITHUB_OUTPUT"
@@ -90,11 +90,11 @@ jobs:
         if: steps.version.outputs.next != ''
         run: pnpm install --frozen-lockfile
 
-      # A ORDEM daqui pra baixo não é intercambiável: o Tauri assa a versão do
-      # tauri.conf.json dentro do bundle, então buildar antes do bump geraria
-      # um .dmg carimbado com a versão velha. E commitar antes do build
-      # deixaria o main com uma versão que não virou release se o build
-      # quebrasse. Bump no working tree → build → só então commitar.
+      # The ORDER from here down is not interchangeable: Tauri bakes the
+      # tauri.conf.json version into the bundle, so building before the bump
+      # would produce a .dmg stamped with the old version. And committing before
+      # the build would leave main with a version that never became a release if
+      # the build broke. Bump the working tree → build → only then commit.
       - name: Escrever a versão nos arquivos
         if: steps.version.outputs.next != ''
         run: .github/scripts/set-version.sh "${{ steps.version.outputs.next }}"
@@ -112,29 +112,28 @@ jobs:
           git add package.json src-tauri/tauri.conf.json src-tauri/Cargo.toml src-tauri/Cargo.lock
           git commit -m "chore(release): v${{ steps.version.outputs.next }} [skip ci]"
 
-          # Duas invariantes protegem este bloco, e as duas têm que se manter
-          # se alguém for mexer aqui:
+          # Two invariants protect this block, and both must hold if anyone
+          # touches it:
           #
-          # 1. `git tag -a` (ANOTADA), não leve. Uma tag leve (`git tag
-          #    v1.2.3`) é simplesmente IGNORADA por `--follow-tags` — só
-          #    tags anotadas viajam com ele. Isso já foi bug aqui uma vez.
+          # 1. `git tag -a` (ANNOTATED), not lightweight. A lightweight tag
+          #    (`git tag v1.2.3`) is simply IGNORED by `--follow-tags` — only
+          #    annotated tags travel with it. This was a bug here once already.
           #
-          # 2. O push do commit e o push da tag têm que ser UM push atômico
-          #    (`--atomic`, dois refs), não dois `git push` separados. Com
-          #    dois pushes, dá pra o primeiro (o commit em HEAD:main) ir e o
-          #    segundo (a tag) falhar — rede, permissão, o que for. O `gh
-          #    release create` logo abaixo até esconde o estrago criando a
-          #    tag que faltou, mas na ponta do branch padrão, não neste
-          #    commit. E se o `gh` também falhar, o main fica com um
-          #    `chore(release):` sem tag nenhuma: a próxima execução
-          #    recalcula a MESMA versão, builda de novo (~10min de runner
-          #    macOS) e morre no `git commit` (nada staged pra commitar),
-          #    exigindo conserto manual. `--atomic` faz os dois refs se
-          #    moverem juntos ou nenhum se mover — sem o estado intermediário
-          #    "commit foi, tag não". Todo o resto do fluxo — o `git
-          #    describe` do cálculo de versão, o guard de "tag já existe", a
-          #    prevenção de loop — assume que a tag foi criada AQUI, junto
-          #    com o commit.
+          # 2. Pushing the commit and pushing the tag must be ONE atomic push
+          #    (`--atomic`, two refs), not two separate `git push` calls. With
+          #    two pushes, the first (the commit on HEAD:main) can land and the
+          #    second (the tag) fail — network, permissions, whatever. The `gh
+          #    release create` just below even hides the damage by creating the
+          #    missing tag, but at the default branch's tip, not on this commit.
+          #    And if `gh` fails too, main is left with a `chore(release):` and
+          #    no tag at all: the next run recomputes the SAME version, builds
+          #    again (~10min of macOS runner) and dies at `git commit` (nothing
+          #    staged to commit), requiring a manual fix. `--atomic` makes both
+          #    refs move together or neither move — with no intermediate
+          #    "commit landed, tag did not" state. Everything else in the flow —
+          #    the `git describe` in the version calculation, the "tag already
+          #    exists" guard, the loop prevention — assumes the tag was created
+          #    HERE, alongside the commit.
           git tag -a "v${{ steps.version.outputs.next }}" -m "v${{ steps.version.outputs.next }}"
           git push --atomic origin HEAD:main "refs/tags/v${{ steps.version.outputs.next }}"
 
@@ -143,24 +142,24 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # `pipefail` porque o shell padrão do Actions é `bash -e {0}`, SEM
-          # ele: num pipeline, o status que conta é o do ÚLTIMO comando. Sem
-          # pipefail, um `git log` que falha (ou um glob de .dmg que não casa)
-          # é engolido pelo `head`/pelo script seguinte, a variável sai vazia
-          # e o `set -e` nunca dispara — a falha só reaparece lá no `gh`, com
-          # uma mensagem que não aponta pra causa.
+          # `pipefail` because the Actions default shell is `bash -e {0}`,
+          # WITHOUT it: in a pipeline, the status that counts is the LAST
+          # command's. Without pipefail, a failing `git log` (or a .dmg glob
+          # that does not match) is swallowed by `head`/the next script, the
+          # variable comes out empty and `set -e` never fires — the failure only
+          # resurfaces at `gh`, with a message that does not point at the cause.
           set -euo pipefail
 
-          # `ls *.dmg | head -1` sob `pipefail` não protege nada: quando o
-          # glob não casa, é a ATRIBUIÇÃO que falha ("ls: ... No such file or
-          # directory"), o `set -e` mata o step ali mesmo e o `[ ! -f ]` nem
-          # chega a rodar — o `::error::` abaixo nunca aparece, só o erro cru
-          # do `ls`. Fora isso, `ls | head -1` pode sair 141 (SIGPIPE) se a
-          # listagem for grande o bastante pra estourar o buffer do pipe.
-          # Um array com glob resolve os dois: a expansão vazia vira um
-          # array vazio (com `nullglob`, sem isso o padrão literal `*.dmg`
-          # sobraria como "arquivo"), testável em shell puro, sem subshell
-          # nem pipe.
+          # `ls *.dmg | head -1` under `pipefail` protects nothing: when the
+          # glob does not match, it is the ASSIGNMENT that fails ("ls: ... No
+          # such file or directory"), `set -e` kills the step right there and
+          # `[ ! -f ]` never even runs — the `::error::` below never appears,
+          # only the raw `ls` error. On top of that, `ls | head -1` can exit 141
+          # (SIGPIPE) if the listing is large enough to overflow the pipe
+          # buffer. A glob array solves both: an empty expansion becomes an
+          # empty array (with `nullglob`; without it the literal `*.dmg` pattern
+          # would linger as a "file"), testable in pure shell, with no subshell
+          # and no pipe.
           shopt -s nullglob
           dmgs=(src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg)
           if [ ${#dmgs[@]} -eq 0 ]; then
@@ -168,15 +167,15 @@ jobs:
             exit 1
           fi
           if [ ${#dmgs[@]} -gt 1 ]; then
-            # Inesperado (o bundler do Tauri produz um único .dmg universal):
-            # avisa em vez de escolher em silêncio.
+            # Unexpected (Tauri's bundler produces a single universal .dmg):
+            # warn instead of choosing silently.
             echo "aviso: ${#dmgs[@]} arquivos .dmg encontrados, usando o primeiro: ${dmgs[0]}"
           fi
           dmg="${dmgs[0]}"
           echo "Anexando: $dmg"
 
-          # Só o .dmg. O .tar.gz que o tauri-action anexava (e que era apagado
-          # na mão) simplesmente nunca é enviado.
+          # The .dmg only. The .tar.gz the tauri-action used to attach (and
+          # which was deleted by hand) is simply never uploaded.
           git log --format=%s "${{ steps.version.outputs.range }}" \
             | .github/scripts/release-notes.sh > /tmp/notes.md
 

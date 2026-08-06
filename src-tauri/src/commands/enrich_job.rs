@@ -1,11 +1,11 @@
-//! Superfície Tauri do enriquecimento em segundo plano.
+//! Tauri surface for background enrichment.
 //!
-//! Este arquivo existe por um motivo específico: o comando anterior era `pub fn`
-//! síncrono, e o Tauri executa comandos síncronos NO MAIN THREAD. Como o corpo
-//! fazia HTTP bloqueante por tax id, com pausa de cortesia entre eles, o app
-//! ficava dezenas de segundos sem atender o event loop e o macOS desenhava o
-//! cursor de espera. Aqui o comando só dispara uma thread e volta na hora — o
-//! que não pode voltar a existir neste arquivo é I/O.
+//! This file exists for one specific reason: the previous command was a
+//! synchronous `pub fn`, and Tauri runs synchronous commands ON THE MAIN
+//! THREAD. Since the body did blocking HTTP per tax id, with a courtesy pause
+//! between them, the app went tens of seconds without servicing the event loop
+//! and macOS drew the spinning wait cursor. Here the command only spawns a
+//! thread and returns at once — what must never come back to this file is I/O.
 
 use std::sync::atomic::{AtomicBool, Ordering};
 
@@ -19,8 +19,8 @@ use crate::enrich::job::{run_enrichment, EnrichEvent};
 use crate::error::{AppError, AppResult};
 use crate::locale::LocaleState;
 
-/// Estado do job em andamento. Segue o precedente de `PendingOpen`
-/// (`commands/openfile.rs:8`): estado gerenciado, mutável, simples.
+/// State of the running job. Follows the precedent set by `PendingOpen`
+/// (`commands/openfile.rs:8`): managed, mutable, simple state.
 #[derive(Default)]
 pub struct EnrichJob {
     cancel: AtomicBool,
@@ -28,17 +28,18 @@ pub struct EnrichJob {
 }
 
 impl EnrichJob {
-    /// Toma o job para si. `false` quando já há um rodando — dois jobs
-    /// concorrentes disputariam o mesmo provedor e dobrariam o tráfego externo.
+    /// Claims the job. `false` when one is already running — two concurrent
+    /// jobs would contend for the same provider and double the external traffic.
     fn claim(&self) -> bool {
         let taken = self
             .running
             .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
             .is_ok();
         if taken {
-            // Limpar aqui, e não no release: um cancelamento que chega depois do
-            // job já ter acabado deixaria a flag ligada, e o PRÓXIMO job nasceria
-            // cancelado — parando sozinho, sem explicação nenhuma na tela.
+            // Cleared here rather than in release: a cancellation arriving after
+            // the job already finished would leave the flag set, and the NEXT job
+            // would be born cancelled — stopping on its own, with nothing on
+            // screen to explain it.
             self.cancel.store(false, Ordering::SeqCst);
         }
         taken
@@ -52,7 +53,7 @@ impl EnrichJob {
         self.cancel.store(true, Ordering::SeqCst);
     }
 
-    /// Só os testes perguntam isso: a thread lê a flag direto, via
+    /// Only tests ask this: the thread reads the flag directly, through
     /// [`Self::cancel_flag`].
     #[cfg(test)]
     fn is_cancelled(&self) -> bool {
@@ -64,10 +65,10 @@ impl EnrichJob {
     }
 }
 
-/// Dispara o enriquecimento numa thread e retorna imediatamente.
+/// Spawns the enrichment on a thread and returns immediately.
 ///
-/// Continua sendo `fn` síncrono, e isso está correto: o corpo não bloqueia, só
-/// faz `spawn`.
+/// It is still a synchronous `fn`, and that is correct: the body does not
+/// block, it only spawns.
 #[tauri::command]
 #[specta::specta]
 pub fn start_cnpj_enrichment(
@@ -75,8 +76,8 @@ pub fn start_cnpj_enrichment(
     account_id: Option<i64>,
     on_event: Channel<EnrichEvent>,
 ) -> AppResult<()> {
-    // Snapshot do locale: a thread leva a própria cópia em vez de segurar o
-    // mutex pelos ~30s do job.
+    // Locale snapshot: the thread takes its own copy instead of holding the
+    // mutex for the job's ~30s.
     let (pack, active) = {
         let locale = app.state::<LocaleState>();
         let db = app.state::<Db>();
@@ -86,9 +87,9 @@ pub fn start_cnpj_enrichment(
         (pack, active)
     };
 
-    // Desligado, ou locale sem provedor: relatório vazio, nenhuma thread,
-    // nenhuma rede. Emitir mesmo assim é o que permite a tela tratar um caminho
-    // só, em vez de perguntar antes se vale a pena chamar.
+    // Off, or a locale with no provider: empty report, no thread, no network.
+    // Emitting anyway is what lets the screen handle a single path instead of
+    // asking beforehand whether the call is worth making.
     if !active {
         let _ = on_event.send(EnrichEvent::Started { total: 0 });
         let _ = on_event.send(EnrichEvent::Finished {
@@ -103,12 +104,12 @@ pub fn start_cnpj_enrichment(
 
     let job = app.state::<EnrichJob>();
     if !job.claim() {
-        return Err(AppError::Invalid("enriquecimento já em andamento".into()));
+        return Err(AppError::Invalid("enrichment already running".into()));
     }
 
     let Some(provider) = enrich::provider::for_name(&pack.manifest.tax_id.provider) else {
         job.release();
-        return Err(AppError::Invalid("locale sem provedor".into()));
+        return Err(AppError::Invalid("locale has no provider".into()));
     };
 
     let handle = app.clone();
@@ -123,8 +124,8 @@ pub fn start_cnpj_enrichment(
             account_id,
             job.cancel_flag(),
             &mut |event| {
-                // Canal fechado (janela sumiu) não é motivo para derrubar nada:
-                // o trabalho já feito continua válido no banco.
+                // A closed channel (the window is gone) is no reason to bring
+                // anything down: the work already done stays valid in the database.
                 let _ = on_event.send(event);
             },
         );
@@ -141,8 +142,8 @@ pub fn start_cnpj_enrichment(
     Ok(())
 }
 
-/// Pede parada. O que já foi criado permanece — cancelar é parar de trabalhar,
-/// não desfazer o trabalho feito.
+/// Requests a stop. What was already created stays — cancelling is stopping
+/// work, not undoing the work done.
 #[tauri::command]
 #[specta::specta]
 pub fn cancel_cnpj_enrichment(job: State<'_, EnrichJob>) {
@@ -172,7 +173,7 @@ mod tests {
         assert!(job.is_cancelled());
         job.release();
 
-        // Sem a limpeza, o próximo job nasceria cancelado e pararia na hora.
+        // Without the cleanup, the next job would be born cancelled and stop at once.
         job.claim();
         assert!(!job.is_cancelled(), "um job novo começa não-cancelado");
     }

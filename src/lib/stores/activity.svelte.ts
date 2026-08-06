@@ -1,10 +1,10 @@
 /**
- * Centro de atividade: o que o app está fazendo em segundo plano.
+ * Activity centre: what the app is doing in the background.
  *
- * Existe porque o enriquecimento por CNPJ deixou de segurar o import. Com o
- * trabalho rodando depois que a tela de resultado já apareceu, alguém precisa
- * ser dono do progresso E do relatório final — e não pode ser o componente, que
- * desmonta assim que a pessoa navega para outra tela.
+ * It exists because tax-id enrichment stopped holding up the import. With the
+ * work running after the result screen has already appeared, something has to
+ * own the progress AND the final report — and it cannot be the component, which
+ * unmounts as soon as the user navigates to another screen.
  */
 import { cancelCnpjEnrichment, startCnpjEnrichment } from "$lib/api/enrichJob";
 import type { AutoClassifyReport } from "$lib/bindings";
@@ -22,7 +22,7 @@ export function createActivityStore() {
     get enrich() {
       return enrich;
     },
-    /** Há trabalho em andamento — o que decide se a superfície aparece. */
+    /** Work is in progress — what decides whether the surface shows. */
     get busy() {
       return enrich.phase === "running";
     },
@@ -30,23 +30,23 @@ export function createActivityStore() {
       return isTerminal(enrich.phase);
     },
 
-    /** Vale ocupar espaço na tela?
+    /** Is this worth screen space?
      *
-     *  Terminar não basta. Com o enriquecimento desligado o backend emite
-     *  `Started { total: 0 }` seguido de `Finished` com relatório vazio — para
-     *  a tela ter um caminho só — e sem esta distinção o app anunciaria
-     *  "nenhuma regra nova" depois de todo import, para quem nunca ligou a
-     *  funcionalidade. Erro sempre aparece: falha silenciosa é o que este
-     *  trabalho existe para acabar. */
+     *  Finishing is not enough. With enrichment off the backend emits
+     *  `Started { total: 0 }` followed by `Finished` with an empty report — so
+     *  the screen has a single path — and without this distinction the app
+     *  would announce "no new rules" after every import, to people who never
+     *  turned the feature on. An error always shows: silent failure is exactly
+     *  what this work exists to end. */
     get visible() {
       if (enrich.phase === "running" || enrich.phase === "failed") return true;
       return isTerminal(enrich.phase) && enrich.total > 0;
     },
 
     async start(accountId: number | null) {
-      // Sem otimismo aqui: a fase só vira "running" quando o backend emitir
-      // `Started`. Antecipar faria uma barra aparecer para um job que o backend
-      // pode recusar (já há um rodando) ou nem iniciar (enriquecimento off).
+      // No optimism here: the phase only turns "running" once the backend emits
+      // `Started`. Anticipating would show a bar for a job the backend may
+      // refuse (one already running) or never start (enrichment off).
       try {
         await startCnpjEnrichment(accountId, (event) => {
           enrich = reduceEnrich(enrich, event);
@@ -64,13 +64,13 @@ export function createActivityStore() {
       await cancelCnpjEnrichment();
     },
 
-    /** Chamado ao começar um import novo, para a tela não herdar o anterior. */
+    /** Called when a new import starts, so the screen does not inherit the previous one. */
     clear() {
       enrich = initialEnrichState;
     },
 
-    /** Substitui o relatório — a tela de Import edita as regras criadas
-     *  (renomear, trocar categoria, apagar) e o store é quem tem a verdade. */
+    /** Replaces the report — the Import screen edits the created rules (rename,
+     *  change category, delete) and the store is what holds the truth. */
     patchReport(next: AutoClassifyReport) {
       enrich = { ...enrich, report: next };
     },

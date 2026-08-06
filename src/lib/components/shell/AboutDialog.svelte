@@ -54,7 +54,7 @@
     void healthCheck()
       .then((h) => (version = h.version))
       .catch(() => (version = null));
-    // O foco entra na janela assim que ela materializa.
+    // Focus enters the window as soon as it materializes.
     queueMicrotask(() => closeEl?.focus());
   });
 </script>

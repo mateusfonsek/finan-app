@@ -41,7 +41,7 @@ pub fn normalize(description: &str, pack: &LocalePack) -> (String, String, Strin
         return (format!("{kp}:{cnpj}"), label, cnpj);
     }
 
-    // 2. Regras ordenadas do pack (strip / masked / system).
+    // 2. Ordered rules from the pack (strip / masked / system).
     for rule in &norm.rules {
         match rule.kind.as_str() {
             "strip" => {

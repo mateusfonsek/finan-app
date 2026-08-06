@@ -410,8 +410,7 @@ pub fn record_scan(conn: &Connection, outcome: &ScanOutcome) -> AppResult<Vec<Di
     pending_files(conn)
 }
 
-/// Varre todas as pastas observadas e registra os arquivos novos como
-/// `pending`.
+/// Scans every watched folder and records the new files as `pending`.
 ///
 /// `now` is injected (same reason as `scan_dir`): tests simulate elapsed time
 /// without sleeping. In production the caller always passes
@@ -505,7 +504,7 @@ mod tests {
         assert!(folder.exists);
         assert_eq!(folder.imported_count, 0);
         assert_eq!(folder.last_imported_at, None);
-        // canonicalize resolve /var → /private/var no macOS
+        // canonicalize resolves /var to /private/var on macOS
         assert_eq!(folder.path, std::fs::canonicalize(&dir).unwrap().to_string_lossy());
     }
 

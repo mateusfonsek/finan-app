@@ -128,10 +128,10 @@ pub struct RulesDef {
 // LocalePack — a fully-loaded, ready-to-use locale (with compiled regexes)
 // ---------------------------------------------------------------------------
 
-/// `Clone` existe para o trabalho de fundo: a thread de enriquecimento leva a
-/// sua própria cópia em vez de segurar o `Mutex` do locale pelos ~30s do job, o
-/// que bloquearia qualquer outro comando que leia o pacote. Todos os campos já
-/// eram clonáveis; o custo é uma cópia por job.
+/// `Clone` exists for the background work: the enrichment thread takes its own
+/// copy instead of holding the locale `Mutex` for the job's ~30s, which would
+/// block any other command that reads the pack. Every field was already
+/// clonable; the cost is one copy per job.
 #[derive(Clone)]
 pub struct LocalePack {
     pub manifest: Manifest,
@@ -243,10 +243,10 @@ fn load_pack(root: Option<&Path>, code: &str) -> LocalePack {
         let dir = root.join(code);
         match LocalePack::load_from_dir(&dir) {
             Ok(p) => return p,
-            // O caminho no texto não é ornamento: sem ele, este aviso dizia só
-            // "No such file or directory" e passou por peculiaridade de dev por
-            // muito tempo, enquanto na verdade o pack de disco nunca carregava
-            // porque os arquivos estavam sendo empacotados um nível ao lado.
+            // The path in the text is not ornament: without it this warning said
+            // only "No such file or directory" and passed for a dev quirk for a
+            // long time, while in truth the on-disk pack never loaded because the
+            // files were being bundled one level to the side.
             Err(e) => eprintln!(
                 "[finan] locale '{code}' failed to load from {}: {e}; using embedded pt-BR",
                 dir.display()
@@ -361,22 +361,23 @@ pub fn set_active_locale(state: State<'_, LocaleState>, code: String) -> AppResu
 mod tests {
     use super::*;
 
-    /// Os locales precisam ser empacotados EXATAMENTE onde
-    /// [`resource_locales_root`] procura: `<resources>/locales`.
+    /// Locales must be bundled EXACTLY where [`resource_locales_root`] looks:
+    /// `<resources>/locales`.
     ///
-    /// Este teste existe por causa de um bug que passou despercebido porque o
-    /// fallback o escondia perfeitamente. A config era uma LISTA com caminho
-    /// relativo pra fora (`["../locales/**/*"]`), e o Tauri traduz cada `..` do
-    /// caminho de origem para um diretório literal chamado `_up_` ao calcular o
-    /// destino (`tauri_utils::resources::resource_relpath`). Os arquivos iam
-    /// para `<resources>/_up_/locales/`, que ninguém lê — então o pack de disco
-    /// NUNCA carregou, em build nenhum, e o app sempre caiu no embedded.
+    /// This test exists because of a bug that went unnoticed for so long that the
+    /// fallback hid it perfectly. The config was a LIST with a path escaping the
+    /// crate (`["../locales/**/*"]`), and Tauri maps every `..` of the source
+    /// path to a literal directory named `_up_` when computing the destination
+    /// (`tauri_utils::resources::resource_relpath`). The files landed in
+    /// `<resources>/_up_/locales/`, which nobody reads — so the on-disk pack
+    /// NEVER loaded, in any build, and the app always fell back to the embedded
+    /// one.
     ///
-    /// A forma de MAPA define o destino explicitamente, sem derivá-lo da
-    /// origem. E precisa ser o DIRETÓRIO, não um glob: com `*` no padrão o
-    /// Tauri usa `dest.join(file_name)` e achata tudo — os quatro `.json` de
-    /// `pt-BR/` colidiriam na raiz e um segundo idioma sobrescreveria o
-    /// primeiro.
+    /// The MAP form sets the destination explicitly, without deriving it from
+    /// the source. And it must name the DIRECTORY, not a glob: with `*` in the
+    /// pattern Tauri uses `dest.join(file_name)` and flattens everything — the
+    /// four `.json` files of `pt-BR/` would collide at the root and a second
+    /// locale would overwrite the first.
     #[test]
     fn locales_are_bundled_where_the_app_looks_for_them() {
         let cfg: serde_json::Value =
@@ -385,17 +386,18 @@ mod tests {
 
         assert!(
             resources.is_object(),
-            "resources tem que ser mapa origem→destino, não lista: a lista deriva \
-             o destino da origem e o `..` vira `_up_`. Veio: {resources}"
+            "resources must be a source→destination map, not a list: the list \
+             derives the destination from the source and `..` becomes `_up_`. \
+             Got: {resources}"
         );
         assert_eq!(
             resources["../locales"], "locales",
-            "o diretório locales tem que cair em <resources>/locales"
+            "the locales directory must land in <resources>/locales"
         );
         for (src, _) in resources.as_object().unwrap() {
             assert!(
                 !src.contains('*'),
-                "glob em resources achata a estrutura de diretórios: {src}"
+                "a glob in resources flattens the directory structure: {src}"
             );
         }
     }

@@ -304,19 +304,19 @@ button,
   border-color: var(--color-accent);
 }
 
-/* O anel é um `box-shadow`, então ele pinta junto com o elemento e pode ficar
-   por baixo de um irmão posterior. `z-index` resolve — mas só age em elemento
-   posicionado, daí o `position: relative`.
+/* The ring is a `box-shadow`, so it paints with the element and can end up
+   underneath a later sibling. `z-index` fixes that — but it only acts on a
+   positioned element, hence the `position: relative`.
 
-   Essa promoção mora em `base` DE PROPÓSITO. Fora de camada, ela vencia o
-   `utilities` do Tailwind e sobrescrevia o `position` de quem já era
-   posicionado: o X do diálogo Sobre é `absolute right-3.5 top-3.5`, virava
-   `relative` ao receber foco, caía no fluxo normal (canto superior esquerdo do
-   card) e o `right: 14px` — que em elemento relativo empurra para a ESQUERDA em
-   vez de ancorar à direita — o jogava para fora do card.
-   Em `base`, qualquer utilitário de posicionamento vence, e quem é estático
-   continua ganhando o empilhamento. A aparência do anel segue fora de camada,
-   para nunca perder para um `shadow-*`. */
+   That promotion lives in `base` ON PURPOSE. Unlayered, it beat Tailwind's
+   `utilities` layer and overrode the `position` of anything already
+   positioned: the About dialog's close button is `absolute right-3.5 top-3.5`,
+   became `relative` on focus, fell back into normal flow (the card's top-left)
+   and `right: 14px` — which on a relative element pushes LEFT instead of
+   anchoring right — threw it outside the card.
+   In `base`, any positioning utility outweighs it while static elements still
+   get the stacking. The ring's appearance stays unlayered, so it never loses
+   to a `shadow-*`. */
 @layer base {
   :focus-visible {
     position: relative;

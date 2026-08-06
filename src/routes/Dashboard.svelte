@@ -95,7 +95,7 @@
     return Number(kpis.expense) + Number(investments.aplicado_no_mes) + Number(transfers.total_out);
   });
 
-  /** Saldo investido NO MÊS: aplicado − resgatado (positivo = entrou mais que saiu de investimento). */
+  /** Amount invested IN THE MONTH: deposited − withdrawn (positive = more went into investments than came out). */
   let investmentNetMonth = $derived.by(() => {
     if (!investments) return 0;
     return Number(investments.aplicado_no_mes) - Number(investments.resgatado_no_mes);

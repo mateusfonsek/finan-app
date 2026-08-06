@@ -68,8 +68,9 @@
         {@const isDup = !!(t.fitid && duplicateKeys.has(txKeyString({ ofx_fitid: t.fitid, date: t.date, amount: t.amount })))}
         {@const isSel = !!(t.fitid && selected.has(t.fitid))}
         {@const rev = t.fitid ? reversalMap.get(t.fitid) : undefined}
-        <!-- Estorno recebe uma barra amarela na borda inicial; duplicada
-             desbota. Dois estados distintos, distinguíveis sem cor isolada. -->
+        <!-- A reversal gets a yellow bar on the leading edge; a duplicate fades.
+             Two distinct states, tellable apart without relying on colour
+             alone. -->
         <tr
           class="row border-t border-border-subtle first:border-t-0 {isDup ? 'opacity-50' : ''}"
           style={rev

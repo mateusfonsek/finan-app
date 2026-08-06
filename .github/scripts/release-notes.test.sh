@@ -29,20 +29,20 @@ contains() {
 
 # `linha_exata <desc> <linha-inteira> <assuntos>`
 #
-# Existe porque `contains` é frouxo demais pra cobrir a ÚNICA transformação
-# que o release-notes.sh faz. Procurar por "pasta observada" casa igualmente
-# em `- feat(watch): pasta observada` (linha crua, sem normalização nenhuma),
-# e procurar por "watch" casa até no `feat(watch):` intacto. Ou seja: dá pra
-# arrancar o sed inteiro e a suíte continua verde. Comparar a LINHA INTEIRA
-# (`grep -x`) é o que trava a forma final.
+# Exists because `contains` is far too loose to cover the ONLY transformation
+# release-notes.sh performs. Searching for "pasta observada" matches equally in
+# `- feat(watch): pasta observada` (the raw line, with no normalisation at all),
+# and searching for "watch" even matches an intact `feat(watch):`. In other
+# words: the whole sed could be ripped out and the suite would stay green.
+# Comparing the WHOLE LINE (`grep -x`) is what pins the final shape.
 linha_exata() {
   desc=$1
   linha=$2
   subjects=$3
 
   out=$(printf '%b' "$subjects" | ./release-notes.sh)
-  # `--` obrigatório: toda linha esperada começa com o hífen do markdown, e
-  # sem ele o grep leria "- watch: ..." como opção.
+  # `--` is mandatory: every expected line starts with the markdown hyphen, and
+  # without it grep would read "- watch: ..." as an option.
   if printf '%s\n' "$out" | grep -qxF -- "$linha"; then
     pass=$((pass + 1))
   else
