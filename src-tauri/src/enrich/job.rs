@@ -441,7 +441,7 @@ mod tests {
         let acc = seed_account(&conn);
         seed_tx(&conn, acc, "Pix - ENERGISA - 09.095.183/0001-40 - ITAU");
         seed_tx(&conn, acc, "Pix - DEMERGE - 33.967.103/0001-84 - BB");
-        // Só o segundo tem resposta; o primeiro (ordem alfabética) falha.
+        // Only the second has an answer; the first (alphabetical order) fails.
         let fake = FakeProvider::new(&[("33967103000184", "5611201")]);
 
         let (events, _db) = collect_events(conn, &fake, Some(acc), &AtomicBool::new(false));

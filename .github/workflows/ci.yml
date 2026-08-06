@@ -14,8 +14,8 @@ concurrency:
   group: "ci-${{ github.ref }}"
   cancel-in-progress: true
 
-# Estes jobs rodam scripts de lifecycle do pnpm e build scripts do cargo —
-# código de terceiros. Só leitura, nada mais.
+# These jobs run pnpm lifecycle scripts and cargo build scripts — third-party
+# code. Read only, nothing else.
 permissions:
   contents: read
 
