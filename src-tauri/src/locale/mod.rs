@@ -235,9 +235,17 @@ fn write_active_locale(data_dir: &Path, code: &str) -> AppResult<()> {
 /// pt-BR pack when the folder is missing or unreadable.
 fn load_pack(root: Option<&Path>, code: &str) -> LocalePack {
     if let Some(root) = root {
-        match LocalePack::load_from_dir(&root.join(code)) {
+        let dir = root.join(code);
+        match LocalePack::load_from_dir(&dir) {
             Ok(p) => return p,
-            Err(e) => eprintln!("[finan] locale '{code}' failed to load ({e}); using embedded pt-BR"),
+            // O caminho no texto não é ornamento: sem ele, este aviso dizia só
+            // "No such file or directory" e passou por peculiaridade de dev por
+            // muito tempo, enquanto na verdade o pack de disco nunca carregava
+            // porque os arquivos estavam sendo empacotados um nível ao lado.
+            Err(e) => eprintln!(
+                "[finan] locale '{code}' failed to load from {}: {e}; using embedded pt-BR",
+                dir.display()
+            ),
         }
     }
     LocalePack::embedded_pt_br()
@@ -347,6 +355,45 @@ pub fn set_active_locale(state: State<'_, LocaleState>, code: String) -> AppResu
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Os locales precisam ser empacotados EXATAMENTE onde
+    /// [`resource_locales_root`] procura: `<resources>/locales`.
+    ///
+    /// Este teste existe por causa de um bug que passou despercebido porque o
+    /// fallback o escondia perfeitamente. A config era uma LISTA com caminho
+    /// relativo pra fora (`["../locales/**/*"]`), e o Tauri traduz cada `..` do
+    /// caminho de origem para um diretório literal chamado `_up_` ao calcular o
+    /// destino (`tauri_utils::resources::resource_relpath`). Os arquivos iam
+    /// para `<resources>/_up_/locales/`, que ninguém lê — então o pack de disco
+    /// NUNCA carregou, em build nenhum, e o app sempre caiu no embedded.
+    ///
+    /// A forma de MAPA define o destino explicitamente, sem derivá-lo da
+    /// origem. E precisa ser o DIRETÓRIO, não um glob: com `*` no padrão o
+    /// Tauri usa `dest.join(file_name)` e achata tudo — os quatro `.json` de
+    /// `pt-BR/` colidiriam na raiz e um segundo idioma sobrescreveria o
+    /// primeiro.
+    #[test]
+    fn locales_are_bundled_where_the_app_looks_for_them() {
+        let cfg: serde_json::Value =
+            serde_json::from_str(include_str!("../../tauri.conf.json")).unwrap();
+        let resources = &cfg["bundle"]["resources"];
+
+        assert!(
+            resources.is_object(),
+            "resources tem que ser mapa origem→destino, não lista: a lista deriva \
+             o destino da origem e o `..` vira `_up_`. Veio: {resources}"
+        );
+        assert_eq!(
+            resources["../locales"], "locales",
+            "o diretório locales tem que cair em <resources>/locales"
+        );
+        for (src, _) in resources.as_object().unwrap() {
+            assert!(
+                !src.contains('*'),
+                "glob em resources achata a estrutura de diretórios: {src}"
+            );
+        }
+    }
 
     #[test]
     fn embedded_pt_br_parses() {
