@@ -158,11 +158,11 @@ mod tests {
     fn claim_succeeds_once_then_refuses_until_released() {
         let job = EnrichJob::default();
 
-        assert!(job.claim(), "primeiro início toma o job");
-        assert!(!job.claim(), "segundo início é recusado enquanto roda");
+        assert!(job.claim(), "the first start claims the job");
+        assert!(!job.claim(), "a second start is refused while it runs");
 
         job.release();
-        assert!(job.claim(), "depois de liberar, um novo job pode começar");
+        assert!(job.claim(), "after releasing, a new job can start");
     }
 
     #[test]
@@ -175,6 +175,6 @@ mod tests {
 
         // Without the cleanup, the next job would be born cancelled and stop at once.
         job.claim();
-        assert!(!job.is_cancelled(), "um job novo começa não-cancelado");
+        assert!(!job.is_cancelled(), "a new job starts uncancelled");
     }
 }

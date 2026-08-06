@@ -183,7 +183,7 @@
               </div>
             </div>
 
-            <!-- Coluna SAÍDAS -->
+            <!-- OUTFLOWS column -->
             <div class="flex flex-col gap-1">
               <div class="text-cap font-semibold text-fg-subtle pb-0.5">
                 {t("dashboard.outflows")}

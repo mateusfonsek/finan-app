@@ -362,7 +362,7 @@ mod tests {
         );
         match &events[0] {
             EnrichEvent::Started { total } => assert_eq!(*total, 2),
-            other => panic!("primeiro evento deveria ser Started, veio {other:?}"),
+            other => panic!("the first event should be Started, got {other:?}"),
         }
     }
 
@@ -386,7 +386,7 @@ mod tests {
                 _ => None,
             })
             .collect();
-        assert_eq!(dones, vec![1, 2], "o contador nunca anda para trás nem pula");
+        assert_eq!(dones, vec![1, 2], "the counter never goes backwards nor skips");
     }
 
     #[test]
@@ -402,7 +402,7 @@ mod tests {
         assert_eq!(
             rules_for(&db, "09.095.183/0001-40"),
             0,
-            "sem categoria sugerida, nenhuma regra é criada"
+            "with no suggested category, no rule is created"
         );
     }
 
@@ -430,7 +430,7 @@ mod tests {
         assert_eq!(
             fake.call_count(),
             0,
-            "a regra existente é o cache — não consulta"
+            "the existing rule is the cache — no lookup"
         );
         assert_eq!(kinds(&events), vec!["started", "finished"]);
     }
@@ -449,14 +449,14 @@ mod tests {
         assert_eq!(
             kinds(&events),
             vec!["started", "failed", "resolved", "finished"],
-            "a falha não interrompe o que vem depois"
+            "the failure does not interrupt what comes next"
         );
         match &events[1] {
             EnrichEvent::Failed { done, tax_id } => {
                 assert_eq!(*done, 1);
                 assert_eq!(tax_id, "09.095.183/0001-40");
             }
-            other => panic!("esperava Failed, veio {other:?}"),
+            other => panic!("expected Failed, got {other:?}"),
         }
     }
 
@@ -476,7 +476,7 @@ mod tests {
         let (events, db) = collect_events(conn, &fake, Some(acc), &cancel);
 
         assert_eq!(kinds(&events), vec!["started", "cancelled"]);
-        assert_eq!(fake.call_count(), 0, "cancelado antes de consultar");
+        assert_eq!(fake.call_count(), 0, "cancelled before looking anything up");
         assert_eq!(rules_for(&db, "09.095.183/0001-40"), 0);
         assert_eq!(rules_for(&db, "33.967.103/0001-84"), 0);
     }
@@ -510,20 +510,20 @@ mod tests {
                 assert_eq!(
                     report.created_rules.len(),
                     1,
-                    "a regra criada antes da parada permanece no relatório"
+                    "the rule created before the stop stays in the report"
                 );
             }
-            other => panic!("esperava Cancelled, veio {other:?}"),
+            other => panic!("expected Cancelled, got {other:?}"),
         }
         assert_eq!(
             rules_for(&guarded, "09.095.183/0001-40"),
             1,
-            "a regra continua no banco depois do cancelamento"
+            "the rule stays in the database after cancellation"
         );
         assert_eq!(
             rules_for(&guarded, "33.967.103/0001-84"),
             0,
-            "a que nunca foi consultada não existe"
+            "the one never looked up does not exist"
         );
     }
 

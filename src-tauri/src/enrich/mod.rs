@@ -150,10 +150,10 @@ mod tests {
 
         let e = lookup_with(&conn, "33.967.103/0001-84", &p, &fake).unwrap();
 
-        assert_eq!(fake.call_count(), 1, "deve consultar o provedor injetado");
+        assert_eq!(fake.call_count(), 1, "must query the injected provider");
         assert!(
             e.suggested_category_id.is_some(),
-            "CNAE mapeado sugere categoria"
+            "a mapped activity code suggests a category"
         );
         assert_eq!(
             e.company.legal_name.as_deref(),

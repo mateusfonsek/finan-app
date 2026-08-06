@@ -211,7 +211,7 @@
   async function enableWatch() {
     error = null;
     const picked = await pickFolder();
-    if (!picked) return; // cancelar não ativa nada — sem estado zumbi
+    if (!picked) return; // cancelling activates nothing — no zombie state
     try {
       await addWatchedFolder(picked);
       await watch.setEnabled(true);
@@ -224,7 +224,7 @@
   async function disableWatch() {
     error = null;
     try {
-      await watch.setEnabled(false); // mantém a lista de pastas
+      await watch.setEnabled(false); // keeps the folder list
     } catch (e) {
       error = folderError(e, "watch.error_toggle");
     }
