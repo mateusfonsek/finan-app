@@ -26,16 +26,16 @@ pub struct MonthSummary {
 }
 
 /// Everything about categories with kind='transfer' AND is_investment=1.
-/// `saldo_acumulado` sums (deposited - withdrawn) over the WHOLE history in the
-/// DB, not just the month. It is net capital put in, excluding returns, which
-/// OFX does not carry.
+/// `accumulated_balance` sums (deposited - withdrawn) over the WHOLE history in
+/// the DB, not just the month. It is net capital put in, excluding returns,
+/// which OFX does not carry.
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 pub struct InvestmentSummary {
-    pub aplicado_no_mes: String,
-    pub resgatado_no_mes: String,
-    pub aplicacoes_count: u32,
-    pub resgates_count: u32,
-    pub saldo_acumulado: String,
+    pub applied_in_month: String,
+    pub redeemed_in_month: String,
+    pub applications_count: u32,
+    pub redemptions_count: u32,
+    pub accumulated_balance: String,
 }
 
 /// Breakdown of internal transfers (kind='transfer' AND is_investment=0)

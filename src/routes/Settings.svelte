@@ -551,7 +551,7 @@
     {/if}
   </Card>
 
-  <!-- ── Banco de dados ─────────────────────────────────────────────────── -->
+  <!-- ── Database ───────────────────────────────────────────────────────── -->
   <Card title={t("settings.database")}>
     <p class="text-sub text-fg-muted leading-relaxed">{t("settings.database_desc")}</p>
     <div class="card-inset font-mono text-foot text-fg break-all p-2.5 selectable">

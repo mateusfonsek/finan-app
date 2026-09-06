@@ -676,11 +676,11 @@ recurring_months: number }
 export type InsertResult = { inserted: number; skipped_duplicates: number; auto_categorized: number }
 /**
  * Everything about categories with kind='transfer' AND is_investment=1.
- * `saldo_acumulado` sums (deposited - withdrawn) over the WHOLE history in the
- * DB, not just the month. It is net capital put in, excluding returns, which
- * OFX does not carry.
+ * `accumulated_balance` sums (deposited - withdrawn) over the WHOLE history in
+ * the DB, not just the month. It is net capital put in, excluding returns,
+ * which OFX does not carry.
  */
-export type InvestmentSummary = { aplicado_no_mes: string; resgatado_no_mes: string; aplicacoes_count: number; resgates_count: number; saldo_acumulado: string }
+export type InvestmentSummary = { applied_in_month: string; redeemed_in_month: string; applications_count: number; redemptions_count: number; accumulated_balance: string }
 export type KpiSummary = { income: string; expense: string; net: string; transaction_count: number }
 export type LocaleInfo = { code: string; name: string; flag: string }
 export type MonthSummary = { month: string; income: string; expense: string }
