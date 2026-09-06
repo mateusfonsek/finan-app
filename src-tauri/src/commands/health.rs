@@ -48,6 +48,7 @@ mod tests {
     fn category_count_matches_seed() {
         let conn = Connection::open_in_memory().unwrap();
         migrations::apply(&conn).unwrap();
+        crate::db::seed_from_pack(&conn, &crate::locale::LocalePack::embedded_pt_br()).unwrap();
         let count: u32 = conn
             .query_row("SELECT COUNT(*) FROM categories", [], |row| row.get(0))
             .unwrap();

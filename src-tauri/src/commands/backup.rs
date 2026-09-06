@@ -100,6 +100,7 @@ mod tests {
         let _ = fs::remove_file(&path);
         let conn = Connection::open(&path).unwrap();
         migrations::apply(&conn).unwrap();
+        crate::db::seed_from_pack(&conn, &crate::locale::LocalePack::embedded_pt_br()).unwrap();
         drop(conn);
 
         validate_sqlite_file(&path).expect("valid sqlite should pass");
@@ -128,6 +129,7 @@ mod tests {
 
         let conn = Connection::open(&src).unwrap();
         migrations::apply(&conn).unwrap();
+        crate::db::seed_from_pack(&conn, &crate::locale::LocalePack::embedded_pt_br()).unwrap();
         drop(conn);
 
         validate_sqlite_file(&src).unwrap();

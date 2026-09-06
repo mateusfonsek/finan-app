@@ -30,14 +30,3 @@ CREATE TABLE transactions (
 CREATE INDEX idx_tx_date ON transactions(date);
 CREATE INDEX idx_tx_category ON transactions(category_id);
 CREATE INDEX idx_tx_account ON transactions(account_id);
-
-INSERT INTO categories (name, color_token, kind) VALUES
-  ('Mercado',     '--color-cat-mercado',     'expense'),
-  ('Restaurante', '--color-cat-restaurante', 'expense'),
-  ('Transporte',  '--color-cat-transporte',  'expense'),
-  ('Casa',        '--color-cat-casa',        'expense'),
-  ('Saúde',       '--color-cat-saude',       'expense'),
-  ('Lazer',       '--color-cat-lazer',       'expense'),
-  ('Assinatura',  '--color-cat-assinatura',  'expense'),
-  ('Renda',       '--color-cat-renda',       'income'),
-  ('Outros',      '--color-cat-outros',      'expense');

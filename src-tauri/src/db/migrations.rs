@@ -150,10 +150,14 @@ mod tests {
         let conn = Connection::open_in_memory().unwrap();
         apply_through(&conn, "0016_watched_folders");
 
+        conn.execute(
+            "INSERT INTO categories (name, color_token, kind) VALUES ('X', NULL, 'expense')",
+            [],
+        )
+        .unwrap();
+        let cat = conn.last_insert_rowid();
+
         // Old format: pattern was a column on the rule itself.
-        let cat: i64 = conn
-            .query_row("SELECT id FROM categories LIMIT 1", [], |r| r.get(0))
-            .unwrap();
         conn.execute(
             "INSERT INTO rules (pattern, category_id, priority, due_day) VALUES ('legado', ?1, 7, 5)",
             [cat],
@@ -190,6 +194,22 @@ mod tests {
             .is_err());
     }
 
+    /// Migrations create schema; the active locale pack creates data. Without this
+    /// separation a fresh database in any language is born with Brazilian rows,
+    /// because migrations run before the pack is even read.
+    #[test]
+    fn fresh_db_has_no_seed_data() {
+        let conn = Connection::open_in_memory().unwrap();
+        apply(&conn).unwrap();
+
+        for table in ["categories", "rules", "rule_patterns"] {
+            let count: i64 = conn
+                .query_row(&format!("SELECT COUNT(*) FROM {table}"), [], |r| r.get(0))
+                .unwrap();
+            assert_eq!(count, 0, "{table} must be empty: seeding belongs to the pack");
+        }
+    }
+
     #[test]
     fn applies_init_migration() {
         let conn = Connection::open_in_memory().unwrap();
@@ -202,46 +222,15 @@ mod tests {
     }
 
     #[test]
-    fn seeds_default_categories() {
-        let conn = Connection::open_in_memory().unwrap();
-        apply(&conn).unwrap();
-
-        let count: i64 = conn
-            .query_row("SELECT COUNT(*) FROM categories", [], |row| row.get(0))
-            .unwrap();
-        assert_eq!(count, 13);
-
-        // 'Renda' was removed in 0008. Make sure nothing is left.
-        let renda_exists: i64 = conn
-            .query_row(
-                "SELECT COUNT(*) FROM categories WHERE name = 'Renda'",
-                [],
-                |row| row.get(0),
-            )
-            .unwrap();
-        assert_eq!(renda_exists, 0, "Renda was removed by migration 0008");
-    }
-
-    #[test]
     fn migration_is_idempotent() {
         let conn = Connection::open_in_memory().unwrap();
         apply(&conn).unwrap();
         apply(&conn).unwrap();
 
-        let count: i64 = conn
-            .query_row("SELECT COUNT(*) FROM categories", [], |row| row.get(0))
+        let applied: i64 = conn
+            .query_row("SELECT COUNT(*) FROM _migrations", [], |r| r.get(0))
             .unwrap();
-        assert_eq!(count, 13, "re-running migrations should not duplicate seeds");
-
-        let rule_count: i64 = conn
-            .query_row(
-                "SELECT COUNT(*) FROM rule_patterns
-                 WHERE pattern IN ('Pagamento de fatura','Aplicação RDB','Resgate RDB')",
-                [],
-                |row| row.get(0),
-            )
-            .unwrap();
-        assert_eq!(rule_count, 3, "seed rules must not duplicate on re-run");
+        assert_eq!(applied as usize, MIGRATIONS.len(), "each migration runs once");
     }
 
     #[test]
@@ -283,29 +272,25 @@ mod tests {
         );
     }
 
+    /// 0014 backfills `key` by the Portuguese name the earlier migrations seeded.
+    /// A fresh database has no such rows any more, so the state has to be built.
     #[test]
     fn backfills_category_keys() {
         let conn = Connection::open_in_memory().unwrap();
+        apply_through(&conn, "0013_composite_fitid_unique");
+
+        conn.execute(
+            "INSERT INTO categories (name, color_token, kind) VALUES ('Mercado', '--color-cat-mercado', 'expense')",
+            [],
+        )
+        .unwrap();
+
         apply(&conn).unwrap();
 
-        // Every seeded category must have a stable key after 0014.
-        let missing: i64 = conn
-            .query_row(
-                "SELECT COUNT(*) FROM categories WHERE key IS NULL",
-                [],
-                |row| row.get(0),
-            )
+        let key: String = conn
+            .query_row("SELECT key FROM categories WHERE name = 'Mercado'", [], |r| r.get(0))
             .unwrap();
-        assert_eq!(missing, 0, "every seeded category has a key");
-
-        let market: String = conn
-            .query_row(
-                "SELECT key FROM categories WHERE name = 'Mercado'",
-                [],
-                |row| row.get(0),
-            )
-            .unwrap();
-        assert_eq!(market, "market");
+        assert_eq!(key, "market");
     }
 
     #[test]

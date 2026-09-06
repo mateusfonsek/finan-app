@@ -1,2 +1,8 @@
-INSERT OR IGNORE INTO categories (name, color_token, kind)
-VALUES ('Compras', '--color-cat-amarelo', 'expense');
+-- The 'shopping' category now comes from the active locale pack
+-- (locales/<code>/categories.json), applied by db::seed_from_pack on a fresh
+-- database. Seeding here ran before the pack was read, so it wrote Portuguese
+-- rows into every database regardless of language.
+--
+-- Emptied rather than deleted: the name is recorded in _migrations on every
+-- existing install, and removing the entry would make apply() try to run a
+-- migration that no longer exists.
