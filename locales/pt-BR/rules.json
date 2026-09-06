@@ -224,5 +224,31 @@
       { "type": "system", "prefix": "Estorno -",                       "key": "system:estorno", "label": "Estorno" },
       { "type": "system", "prefix": "Recarga de celular",              "key": "system:recarga", "label": "Recarga de celular" }
     ]
+  },
+  "reversals": {
+    "phases": [
+      {
+        "strategy": "exact_remainder",
+        "prefix": "Estorno - ",
+        "window_days": 7,
+        "role": "reversal",
+        "counterpart_role": "reversed"
+      },
+      {
+        "strategy": "counterparty_signature",
+        "prefix": "Reembolso recebido pelo Pix - ",
+        "counterpart_prefix": "Transferência enviada pelo Pix - ",
+        "window_days": 30,
+        "role": "refund",
+        "counterpart_role": "refunded"
+      },
+      {
+        "strategy": "quoted_merchant",
+        "prefix": "Estorno de ",
+        "window_days": 30,
+        "role": "reversal",
+        "counterpart_role": "reversed"
+      }
+    ]
   }
 }

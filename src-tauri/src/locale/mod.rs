@@ -115,6 +115,32 @@ pub struct Normalization {
     pub rules: Vec<NormRule>,
 }
 
+/// One reversal-detection phase. `strategy` picks the pairing algorithm (which
+/// stays in the frontend); every other field is how this country's banks phrase
+/// the pair.
+///
+/// `counterpart_prefix` is only read by `counterparty_signature`.
+#[allow(dead_code)]
+#[derive(Debug, Clone, Deserialize)]
+pub struct ReversalPhase {
+    pub strategy: String,
+    pub prefix: String,
+    #[serde(default)]
+    pub counterpart_prefix: String,
+    pub window_days: u32,
+    pub role: String,
+    pub counterpart_role: String,
+}
+
+/// Empty `phases` disables reversal detection for the locale, the same way an
+/// empty `taxId.regex` disables company lookup.
+#[allow(dead_code)]
+#[derive(Debug, Clone, Default, Deserialize)]
+pub struct Reversals {
+    #[serde(default)]
+    pub phases: Vec<ReversalPhase>,
+}
+
 #[derive(Debug, Clone, Deserialize)]
 pub struct RulesDef {
     #[serde(default)]
@@ -122,6 +148,8 @@ pub struct RulesDef {
     #[serde(default)]
     pub seed_rules: Vec<SeedRule>,
     pub normalization: Normalization,
+    #[serde(default)]
+    pub reversals: Reversals,
 }
 
 // ---------------------------------------------------------------------------
@@ -428,5 +456,27 @@ mod tests {
         for expected in ["market", "restaurant", "transport", "transfer", "investment"] {
             assert!(keys.contains(&expected), "missing key {expected}");
         }
+    }
+
+    #[test]
+    fn embedded_pt_br_declares_reversal_phases() {
+        let pack = LocalePack::embedded_pt_br();
+        let strategies: Vec<&str> = pack
+            .rules
+            .reversals
+            .phases
+            .iter()
+            .map(|p| p.strategy.as_str())
+            .collect();
+        assert_eq!(
+            strategies,
+            vec!["exact_remainder", "counterparty_signature", "quoted_merchant"]
+        );
+
+        let pix = &pack.rules.reversals.phases[1];
+        assert_eq!(pix.counterpart_prefix, "Transferência enviada pelo Pix - ");
+        assert_eq!(pix.role, "refund");
+        assert_eq!(pix.counterpart_role, "refunded");
+        assert_eq!(pix.window_days, 30);
     }
 }
