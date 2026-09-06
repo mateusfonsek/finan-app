@@ -5,24 +5,54 @@ import type { ParsedTransaction } from "./types";
  * chargebacks and refunds differently, but all mean "part of a pair summing to
  * zero".
  */
-export type ReversalRole = "estorno" | "estornada" | "reembolso" | "reembolsada";
+export type ReversalRole = "reversal" | "reversed" | "refund" | "refunded";
 
 export interface ReversalInfo {
   role: ReversalRole;
-  /** fitid da outra ponta do par. */
+  /** fitid of the other end of the pair. */
   pairFitid: string;
 }
 
-const ESTORNO_PREFIX_RE = /^Estorno\s*-\s*/i;
-const REEMBOLSO_PREFIX_RE = /^Reembolso recebido pelo Pix\s*-\s*/i;
-const PIX_ENVIADO_PREFIX_RE = /^Transferência enviada pelo Pix\s*-\s*/i;
-/** Nubank credit-card chargeback: `Estorno de "Merchant" (Merchant)`. */
-const ESTORNO_CC_RE = /^Estorno\s+de\s+"([^"]+)"\s*(?:\([^)]+\))?\s*$/i;
+/**
+ * One detection phase, declared by the locale pack. `strategy` picks the
+ * pairing algorithm below; the rest is how this country's banks phrase the
+ * pair. An empty phase list disables detection.
+ */
+export interface ReversalPhase {
+  strategy: "exact_remainder" | "counterparty_signature" | "quoted_merchant";
+  prefix: string;
+  /** Only read by `counterparty_signature`: the outgoing leg's prefix. */
+  counterpart_prefix?: string;
+  window_days: number;
+  role: ReversalRole;
+  counterpart_role: ReversalRole;
+}
 
-/** Takes the quoted merchant out of `Estorno de "Merchant" (Merchant)`. */
-function extractEstornoCcMerchant(description: string): string | null {
-  const m = description.match(ESTORNO_CC_RE);
-  return m ? m[1].trim() : null;
+/** Amounts equal in magnitude within a cent. */
+const CENT = 0.01;
+
+/**
+ * Compiles a pack-declared prefix into a regex. The prefix is escaped as a
+ * literal, and each of its spaces becomes `\s+` — banks vary the spacing, and
+ * demanding a regex from whoever writes a locale pack would defeat the point.
+ */
+function escapePrefix(prefix: string): string {
+  return prefix
+    .trim()
+    .replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+    .replace(/\s+/g, "\\s+");
+}
+
+function prefixRe(prefix: string): RegExp {
+  return new RegExp("^" + escapePrefix(prefix) + "\\s*", "i");
+}
+
+/** `<prefix> "Merchant" (Merchant)` — the quoted merchant is what pairs. */
+function quotedMerchantRe(prefix: string): RegExp {
+  return new RegExp(
+    "^" + escapePrefix(prefix) + '\\s+"([^"]+)"\\s*(?:\\([^)]+\\))?\\s*$',
+    "i",
+  );
 }
 
 /** Distance in days between two ISO YYYY-MM-DD dates. */
@@ -34,136 +64,127 @@ function daysBetween(a: string, b: string): number {
 }
 
 /**
- * From a Pix description `<Prefix> - NAME - ID - BANK/BRANCH/ACCOUNT`, takes
- * everything after the name. That identifies the counterparty uniquely even
- * when the NAME varies (legal vs trade name, as Amazon refunds do).
- *
- * `null` when the description does not start with a known Pix prefix.
+ * From `<prefix> - NAME - ID - BANK/BRANCH/ACCOUNT`, takes everything after the
+ * name. That identifies the counterparty even when the NAME varies (legal vs
+ * trade name, as Amazon refunds do).
  */
-function pixCounterpartySignature(description: string): string | null {
-  let body: string | null = null;
-  for (const re of [PIX_ENVIADO_PREFIX_RE, REEMBOLSO_PREFIX_RE]) {
+function counterpartySig(description: string, res: RegExp[]): string | null {
+  for (const re of res) {
     const m = description.match(re);
-    if (m) {
-      body = description.substring(m[0].length);
-      break;
-    }
+    if (!m) continue;
+    const body = description.slice(m[0].length);
+    const firstDash = body.indexOf(" - ");
+    if (firstDash === -1) return null;
+    return body.slice(firstDash + 3).trim();
   }
-  if (body === null) return null;
-  const firstDash = body.indexOf(" - ");
-  if (firstDash === -1) return null;
-  return body.substring(firstDash + 3).trim();
+  return null;
 }
 
+type PhaseRun = (
+  txs: ParsedTransaction[],
+  phase: ReversalPhase,
+  used: Set<string>,
+  result: Map<string, ReversalInfo>,
+) => void;
+
 /**
- * Finds reversal pairs in a list of OFX transactions. Three phases:
- *
- * **Phase 1 — checking-account chargebacks**: description "Estorno - X", paired
- * with the tx whose description is exactly X. Window: +/-7 days.
- *
- * **Phase 2 — Pix refunds**: description "Reembolso recebido pelo Pix - ".
- * Paired by counterparty signature (tax id plus bank details) rather than name
- * — Amazon sends one trade name on the outgoing Pix and the legal name on the
- * refund. Window: +/-30 days.
- *
- * **Phase 3 — Nubank card chargebacks**: description `Estorno de "Merchant"`,
- * paired with the original purchase whose MEMO equals the quoted merchant
- * (case-insensitive). Window: +/-30 days.
- *
- * In every phase amounts must be opposite in sign and equal in magnitude.
- * FIFO pairing when several candidates exist.
+ * Records the pair when a candidate matches: opposite sign, same magnitude,
+ * inside the phase's window, and not already spoken for. FIFO — `find` takes
+ * the first free candidate.
+ */
+function pair(
+  txs: ParsedTransaction[],
+  trigger: ParsedTransaction,
+  phase: ReversalPhase,
+  used: Set<string>,
+  result: Map<string, ReversalInfo>,
+  matches: (candidate: ParsedTransaction) => boolean,
+): void {
+  const triggerFitid = trigger.fitid;
+  if (!triggerFitid) return;
+  const amount = Number(trigger.amount);
+  if (!Number.isFinite(amount)) return;
+
+  const candidate = txs.find((t) => {
+    if (!t.fitid || used.has(t.fitid) || t.fitid === triggerFitid) return false;
+    if (!matches(t)) return false;
+    const other = Number(t.amount);
+    if (!Number.isFinite(other)) return false;
+    if (Math.abs(other + amount) > CENT) return false;
+    return daysBetween(t.date, trigger.date) <= phase.window_days;
+  });
+
+  if (!candidate?.fitid) return;
+  result.set(triggerFitid, { role: phase.role, pairFitid: candidate.fitid });
+  result.set(candidate.fitid, { role: phase.counterpart_role, pairFitid: triggerFitid });
+  used.add(triggerFitid);
+  used.add(candidate.fitid);
+}
+
+/** Checking-account chargeback: the original's description is what is left of
+ *  the trigger after the prefix. */
+const exactRemainder: PhaseRun = (txs, phase, used, result) => {
+  const re = prefixRe(phase.prefix);
+  for (const trigger of txs) {
+    if (!trigger.fitid || used.has(trigger.fitid)) continue;
+    const m = trigger.description.match(re);
+    if (!m) continue;
+    const core = trigger.description.slice(m[0].length).trim();
+    pair(txs, trigger, phase, used, result, (t) => t.description.trim() === core);
+  }
+};
+
+/** Refund of an outgoing transfer, paired by counterparty rather than by name. */
+const counterpartySignature: PhaseRun = (txs, phase, used, result) => {
+  const re = prefixRe(phase.prefix);
+  const counterRe = prefixRe(phase.counterpart_prefix ?? "");
+  const both = [re, counterRe];
+  for (const trigger of txs) {
+    if (!trigger.fitid || used.has(trigger.fitid)) continue;
+    if (!re.test(trigger.description)) continue;
+    const sig = counterpartySig(trigger.description, both);
+    if (!sig) continue;
+    pair(txs, trigger, phase, used, result, (t) => {
+      if (!counterRe.test(t.description)) return false;
+      return counterpartySig(t.description, both) === sig;
+    });
+  }
+};
+
+/** Card chargeback: the original purchase's whole description is the merchant
+ *  quoted in the trigger. */
+const quotedMerchant: PhaseRun = (txs, phase, used, result) => {
+  const re = quotedMerchantRe(phase.prefix);
+  for (const trigger of txs) {
+    if (!trigger.fitid || used.has(trigger.fitid)) continue;
+    const m = trigger.description.match(re);
+    if (!m) continue;
+    const merchant = m[1].trim().toLowerCase();
+    pair(txs, trigger, phase, used, result, (t) =>
+      t.description.trim().toLowerCase() === merchant,
+    );
+  }
+};
+
+const STRATEGIES: Record<ReversalPhase["strategy"], PhaseRun> = {
+  exact_remainder: exactRemainder,
+  counterparty_signature: counterpartySignature,
+  quoted_merchant: quotedMerchant,
+};
+
+/**
+ * Finds reversal pairs, running each phase the locale pack declares in order.
+ * Phases share the set of already-paired transactions, so an earlier phase wins
+ * a contested fitid — which is why the pack's array order is meaningful.
  */
 export function detectReversalPairs(
   txs: ParsedTransaction[],
+  phases: ReversalPhase[],
 ): Map<string, ReversalInfo> {
   const result = new Map<string, ReversalInfo>();
   const used = new Set<string>();
-
-  // Phase 1: chargebacks (exact description match).
-  for (const e of txs) {
-    if (!e.fitid || used.has(e.fitid)) continue;
-    if (!ESTORNO_PREFIX_RE.test(e.description)) continue;
-
-    const core = e.description.replace(ESTORNO_PREFIX_RE, "").trim();
-    const estornoAmt = Number(e.amount);
-    if (!Number.isFinite(estornoAmt)) continue;
-
-    const candidate = txs.find((t) => {
-      if (!t.fitid || used.has(t.fitid) || t.fitid === e.fitid) return false;
-      if (t.description.trim() !== core) return false;
-      const amt = Number(t.amount);
-      if (!Number.isFinite(amt)) return false;
-      if (Math.abs(amt + estornoAmt) > 0.01) return false;
-      return daysBetween(t.date, e.date) <= 7;
-    });
-
-    if (candidate?.fitid) {
-      result.set(e.fitid, { role: "estorno", pairFitid: candidate.fitid });
-      result.set(candidate.fitid, { role: "estornada", pairFitid: e.fitid });
-      used.add(e.fitid);
-      used.add(candidate.fitid);
-    }
+  for (const phase of phases) {
+    STRATEGIES[phase.strategy]?.(txs, phase, used, result);
   }
-
-  // Fase 2: reembolsos (match por assinatura CNPJ+conta).
-  for (const r of txs) {
-    if (!r.fitid || used.has(r.fitid)) continue;
-    if (!REEMBOLSO_PREFIX_RE.test(r.description)) continue;
-
-    const sig = pixCounterpartySignature(r.description);
-    if (!sig) continue;
-    const reembolsoAmt = Number(r.amount);
-    if (!Number.isFinite(reembolsoAmt)) continue;
-
-    const candidate = txs.find((t) => {
-      if (!t.fitid || used.has(t.fitid) || t.fitid === r.fitid) return false;
-      // The original is an outgoing Pix with the same signature.
-      if (!PIX_ENVIADO_PREFIX_RE.test(t.description)) return false;
-      const otherSig = pixCounterpartySignature(t.description);
-      if (otherSig !== sig) return false;
-      const amt = Number(t.amount);
-      if (!Number.isFinite(amt)) return false;
-      if (Math.abs(amt + reembolsoAmt) > 0.01) return false;
-      return daysBetween(t.date, r.date) <= 30;
-    });
-
-    if (candidate?.fitid) {
-      result.set(r.fitid, { role: "reembolso", pairFitid: candidate.fitid });
-      result.set(candidate.fitid, { role: "reembolsada", pairFitid: r.fitid });
-      used.add(r.fitid);
-      used.add(candidate.fitid);
-    }
-  }
-
-  // Phase 3: credit-card chargebacks (Nubank).
-  // Formato: `Estorno de "Merchant" (Merchant)` (CREDIT, positivo).
-  // Pairing: an earlier tx whose normalized description (lowercase, trimmed) is
-  // equal to the quoted merchant, opposite sign, same magnitude, +/-30 days.
-  for (const e of txs) {
-    if (!e.fitid || used.has(e.fitid)) continue;
-    const merchant = extractEstornoCcMerchant(e.description);
-    if (!merchant) continue;
-    const merchantLower = merchant.toLowerCase();
-    const estornoAmt = Number(e.amount);
-    if (!Number.isFinite(estornoAmt)) continue;
-
-    const candidate = txs.find((t) => {
-      if (!t.fitid || used.has(t.fitid) || t.fitid === e.fitid) return false;
-      // Original card purchase: description == merchant (case-insensitive trim).
-      if (t.description.trim().toLowerCase() !== merchantLower) return false;
-      const amt = Number(t.amount);
-      if (!Number.isFinite(amt)) return false;
-      if (Math.abs(amt + estornoAmt) > 0.01) return false;
-      return daysBetween(t.date, e.date) <= 30;
-    });
-
-    if (candidate?.fitid) {
-      result.set(e.fitid, { role: "estorno", pairFitid: candidate.fitid });
-      result.set(candidate.fitid, { role: "estornada", pairFitid: e.fitid });
-      used.add(e.fitid);
-      used.add(candidate.fitid);
-    }
-  }
-
   return result;
 }

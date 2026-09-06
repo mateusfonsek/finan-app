@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import type { ReversalPhase } from "$lib/ofx/reversals";
 
 // -------------------------------------------------------------------------
 // Auto-discovery of locale packs.
@@ -17,10 +18,11 @@ export type Manifest = {
 };
 
 type Strings = Record<string, unknown>;
-type Pack = { code: string; manifest: Manifest; strings: Strings };
+type Pack = { code: string; manifest: Manifest; strings: Strings; reversals: ReversalPhase[] };
 
 const manifestMods = import.meta.glob("/locales/*/manifest.json", { eager: true });
 const stringsMods = import.meta.glob("/locales/*/strings.json", { eager: true });
+const rulesMods = import.meta.glob("/locales/*/rules.json", { eager: true });
 
 function codeFromPath(path: string): string {
   // "/locales/pt-BR/manifest.json" -> "pt-BR"
@@ -34,11 +36,22 @@ function pick<T>(mod: unknown): T {
 const packs: Record<string, Pack> = {};
 for (const [path, mod] of Object.entries(manifestMods)) {
   const code = codeFromPath(path);
-  packs[code] = { code, manifest: pick<Manifest>(mod), strings: packs[code]?.strings ?? {} };
+  packs[code] = {
+    code,
+    manifest: pick<Manifest>(mod),
+    strings: packs[code]?.strings ?? {},
+    reversals: packs[code]?.reversals ?? [],
+  };
 }
 for (const [path, mod] of Object.entries(stringsMods)) {
   const code = codeFromPath(path);
   if (packs[code]) packs[code].strings = pick<Strings>(mod);
+}
+for (const [path, mod] of Object.entries(rulesMods)) {
+  const code = codeFromPath(path);
+  if (!packs[code]) continue;
+  const rules = pick<{ reversals?: { phases?: ReversalPhase[] } }>(mod);
+  packs[code].reversals = rules.reversals?.phases ?? [];
 }
 
 const DEFAULT_LOCALE = "pt-BR";
@@ -115,6 +128,10 @@ function createLocale() {
     },
     get dateLocale(): string {
       return packs[code]?.manifest.dateLocale ?? DEFAULT_LOCALE;
+    },
+    /** Reversal-detection phases for the active locale; empty disables it. */
+    get reversals(): ReversalPhase[] {
+      return packs[code]?.reversals ?? [];
     },
     get months(): string[] {
       return (lookup(stringsOf(code), "months") as string[]) ?? [];
