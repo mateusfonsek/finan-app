@@ -104,6 +104,14 @@ pub struct NormRule {
     #[serde(default)]
     pub key: String,
     pub label: String,
+    /// Read only by the frontend, which loads its own copy of `rules.json` via
+    /// `import.meta.glob` — Rust deserializes these for the contract test.
+    #[allow(dead_code)]
+    #[serde(default)]
+    pub badge: String,
+    #[allow(dead_code)]
+    #[serde(default)]
+    pub tone: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]

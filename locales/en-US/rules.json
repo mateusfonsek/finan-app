@@ -50,15 +50,15 @@
     "cpf_mask_regex": "",
     "cnpj_key_prefix": "taxid",
     "rules": [
-      { "type": "strip",  "prefix": "POS PURCHASE ",    "key_prefix": "pos",      "label": "Card · {v}" },
-      { "type": "strip",  "prefix": "CHECK CARD ",      "key_prefix": "card",     "label": "Card · {v}" },
-      { "type": "strip",  "prefix": "ACH DEBIT ",       "key_prefix": "ach_out",  "label": "ACH → {v}" },
-      { "type": "strip",  "prefix": "ACH CREDIT ",      "key_prefix": "ach_in",   "label": "ACH ← {v}" },
-      { "type": "strip",  "prefix": "DIRECT DEP ",      "key_prefix": "payroll",  "label": "Direct deposit · {v}" },
-      { "type": "strip",  "prefix": "ZELLE TO ",        "key_prefix": "zelle_out","label": "Zelle → {v}" },
-      { "type": "strip",  "prefix": "ZELLE FROM ",      "key_prefix": "zelle_in", "label": "Zelle ← {v}" },
-      { "type": "system", "prefix": "ATM WITHDRAWAL",   "key": "system:atm",      "label": "ATM withdrawal" },
-      { "type": "system", "prefix": "PAYMENT THANK YOU","key": "system:cc_paid",  "label": "Card payment received" }
+      { "type": "strip",  "prefix": "POS PURCHASE ",    "key_prefix": "pos",      "label": "Card · {v}",     "badge": "CARD",     "tone": "neutral" },
+      { "type": "strip",  "prefix": "CHECK CARD ",      "key_prefix": "card",     "label": "Card · {v}",     "badge": "CARD",     "tone": "neutral" },
+      { "type": "strip",  "prefix": "ACH DEBIT ",       "key_prefix": "ach_out",  "label": "ACH → {v}",      "badge": "ACH →",    "tone": "amarelo" },
+      { "type": "strip",  "prefix": "ACH CREDIT ",      "key_prefix": "ach_in",   "label": "ACH ← {v}",      "badge": "ACH ←",    "tone": "mercado" },
+      { "type": "strip",  "prefix": "DIRECT DEP ",      "key_prefix": "payroll",  "label": "Direct deposit · {v}", "badge": "PAYROLL", "tone": "mercado" },
+      { "type": "strip",  "prefix": "ZELLE TO ",        "key_prefix": "zelle_out","label": "Zelle → {v}",    "badge": "ZELLE →",  "tone": "marrom" },
+      { "type": "strip",  "prefix": "ZELLE FROM ",      "key_prefix": "zelle_in", "label": "Zelle ← {v}",    "badge": "ZELLE ←",  "tone": "marrom" },
+      { "type": "system", "prefix": "ATM WITHDRAWAL",   "key": "system:atm",      "label": "ATM withdrawal", "badge": "SYSTEM",   "tone": "neutral" },
+      { "type": "system", "prefix": "PAYMENT THANK YOU","key": "system:cc_paid",  "label": "Card payment received", "badge": "SYSTEM", "tone": "neutral" }
     ]
   },
   "reversals": { "phases": [] }

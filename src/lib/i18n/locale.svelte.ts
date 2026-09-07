@@ -17,8 +17,17 @@ export type Manifest = {
   taxId: { name: string; regex: string; provider: string };
 };
 
+export type NormRule = { key_prefix: string; badge: string; tone: string };
+
 type Strings = Record<string, unknown>;
-type Pack = { code: string; manifest: Manifest; strings: Strings; reversals: ReversalPhase[] };
+type Pack = {
+  code: string;
+  manifest: Manifest;
+  strings: Strings;
+  reversals: ReversalPhase[];
+  normRules: NormRule[];
+  cnpjKeyPrefix: string;
+};
 
 const manifestMods = import.meta.glob("/locales/*/manifest.json", { eager: true });
 const stringsMods = import.meta.glob("/locales/*/strings.json", { eager: true });
@@ -41,6 +50,8 @@ for (const [path, mod] of Object.entries(manifestMods)) {
     manifest: pick<Manifest>(mod),
     strings: packs[code]?.strings ?? {},
     reversals: packs[code]?.reversals ?? [],
+    normRules: packs[code]?.normRules ?? [],
+    cnpjKeyPrefix: packs[code]?.cnpjKeyPrefix ?? "",
   };
 }
 for (const [path, mod] of Object.entries(stringsMods)) {
@@ -50,8 +61,13 @@ for (const [path, mod] of Object.entries(stringsMods)) {
 for (const [path, mod] of Object.entries(rulesMods)) {
   const code = codeFromPath(path);
   if (!packs[code]) continue;
-  const rules = pick<{ reversals?: { phases?: ReversalPhase[] } }>(mod);
+  const rules = pick<{
+    reversals?: { phases?: ReversalPhase[] };
+    normalization?: { rules?: NormRule[]; cnpj_key_prefix?: string };
+  }>(mod);
   packs[code].reversals = rules.reversals?.phases ?? [];
+  packs[code].normRules = rules.normalization?.rules ?? [];
+  packs[code].cnpjKeyPrefix = rules.normalization?.cnpj_key_prefix ?? "";
 }
 
 const DEFAULT_LOCALE = "pt-BR";
@@ -132,6 +148,14 @@ function createLocale() {
     /** Reversal-detection phases for the active locale; empty disables it. */
     get reversals(): ReversalPhase[] {
       return packs[code]?.reversals ?? [];
+    },
+    /** Normalization rules (badge/tone per key_prefix) for the active locale. */
+    get normRules(): NormRule[] {
+      return packs[code]?.normRules ?? [];
+    },
+    /** The pack's tax-id key prefix (e.g. `cnpj`, `taxid`) — structural, not a rule. */
+    get cnpjKeyPrefix(): string {
+      return packs[code]?.cnpjKeyPrefix ?? "";
     },
     get months(): string[] {
       return (lookup(stringsOf(code), "months") as string[]) ?? [];

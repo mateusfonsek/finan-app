@@ -201,6 +201,8 @@ fn rule_categories_resolve_to_declared_keys() {
     }
 }
 
+const BADGE_TONES: [&str; 5] = ["indigo", "amarelo", "mercado", "marrom", "neutral"];
+
 #[test]
 fn normalization_is_wellformed() {
     for (code, dir) in packs() {
@@ -222,10 +224,17 @@ fn normalization_is_wellformed() {
             );
 
             match kind {
-                "strip" | "masked" => assert!(
-                    rule["key_prefix"].as_str().is_some_and(|s| !s.is_empty()),
-                    "{code}/{prefix}: a {kind} rule needs key_prefix"
-                ),
+                "strip" | "masked" => {
+                    assert!(
+                        rule["key_prefix"].as_str().is_some_and(|s| !s.is_empty()),
+                        "{code}/{prefix}: a {kind} rule needs key_prefix"
+                    );
+                    assert!(
+                        rule["badge"].as_str().is_some_and(|s| !s.is_empty()),
+                        "{code}/{prefix}: a {kind} rule needs a non-empty badge — \
+                         without it the suggestion chip falls through to badge_other"
+                    );
+                }
                 "system" => assert!(
                     rule["key"].as_str().is_some_and(|s| !s.is_empty()),
                     "{code}/{prefix}: a system rule needs key"
@@ -234,6 +243,14 @@ fn normalization_is_wellformed() {
                     "{code}/{prefix}: normalization type must be strip|masked|system, \
                      got {other:?} — an unknown type is skipped in silence"
                 ),
+            }
+
+            let tone = rule["tone"].as_str().unwrap_or_default();
+            if !tone.is_empty() {
+                assert!(
+                    BADGE_TONES.contains(&tone),
+                    "{code}/{prefix}: tone must be one of {BADGE_TONES:?}, got {tone:?}"
+                );
             }
         }
     }
