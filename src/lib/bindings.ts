@@ -562,6 +562,14 @@ async listLocales() : Promise<LocaleInfo[]> {
 async getActiveLocale() : Promise<string> {
     return await TAURI_INVOKE("get_active_locale");
 },
+/**
+ * Swaps the active pack and, when the database is still pristine (nothing
+ * imported yet), reseeds it from the new pack — otherwise a language switch
+ * after `pt-BR` seeded the DB would leave the old categories and rules in
+ * place forever. Locks are taken `db` then `locale`, same order as every
+ * other command that holds both (see `commands::enrichment::enrichment_status`),
+ * to avoid a deadlock.
+ */
 async setActiveLocale(code: string) : Promise<Result<null, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("set_active_locale", { code }) };

@@ -389,10 +389,28 @@ pub fn get_active_locale(state: State<'_, LocaleState>) -> String {
     state.active.lock().expect("locale mutex poisoned").clone()
 }
 
+/// Swaps the active pack and, when the database is still pristine (nothing
+/// imported yet), reseeds it from the new pack — otherwise a language switch
+/// after `pt-BR` seeded the DB would leave the old categories and rules in
+/// place forever. Locks are taken `db` then `locale`, same order as every
+/// other command that holds both (see `commands::enrichment::enrichment_status`),
+/// to avoid a deadlock.
 #[tauri::command]
 #[specta::specta]
-pub fn set_active_locale(state: State<'_, LocaleState>, code: String) -> AppResult<()> {
+pub fn set_active_locale(
+    db: State<'_, crate::db::Db>,
+    state: State<'_, LocaleState>,
+    code: String,
+) -> AppResult<()> {
     let pack = load_pack(state.locales_root.as_deref(), &code);
+
+    {
+        let conn = db.conn.lock().expect("db mutex poisoned");
+        if crate::db::is_pristine(&conn)? {
+            crate::db::reseed_from_pack(&conn, &pack)?;
+        }
+    }
+
     write_active_locale(&state.data_dir, &code)?;
     *state.active.lock().expect("locale mutex poisoned") = code;
     *state.pack.lock().expect("locale mutex poisoned") = pack;
