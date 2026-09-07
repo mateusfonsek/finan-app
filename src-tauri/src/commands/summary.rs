@@ -630,6 +630,9 @@ mod tests {
         assert_eq!(&s[7..10], "-01");
     }
 
+    // Compared as an exact key set, not by substring: a substring check still
+    // passes if a Portuguese name coexists (e.g. via `#[serde(alias)]` or an
+    // extra field), so it can't catch a name that was never actually removed.
     #[test]
     fn investment_summary_fields_serialize_in_english() {
         let s = InvestmentSummary {
@@ -640,14 +643,23 @@ mod tests {
             accumulated_balance: "10.00".into(),
         };
         let json = serde_json::to_string(&s).unwrap();
-        for field in [
-            "applied_in_month",
-            "redeemed_in_month",
-            "applications_count",
-            "redemptions_count",
-            "accumulated_balance",
-        ] {
-            assert!(json.contains(field), "missing {field} in {json}");
-        }
+        let value: serde_json::Value = serde_json::from_str(&json).unwrap();
+        let mut keys: Vec<&str> = value
+            .as_object()
+            .unwrap()
+            .keys()
+            .map(String::as_str)
+            .collect();
+        keys.sort_unstable();
+        assert_eq!(
+            keys,
+            vec![
+                "accumulated_balance",
+                "applications_count",
+                "applied_in_month",
+                "redeemed_in_month",
+                "redemptions_count",
+            ]
+        );
     }
 }
