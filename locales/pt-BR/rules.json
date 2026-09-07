@@ -213,16 +213,42 @@
     "cpf_mask_regex": "•••\\.\\d{3}\\.\\d{3}-••",
     "cnpj_key_prefix": "cnpj",
     "rules": [
-      { "type": "strip",  "prefix": "Compra no débito - ",             "key_prefix": "debito",  "label": "Débito · {v}" },
-      { "type": "masked", "prefix": "Transferência enviada pelo Pix",  "key_prefix": "pix_out", "label": "Pix → {name}" },
-      { "type": "masked", "prefix": "Transferência recebida pelo Pix", "key_prefix": "pix_in",  "label": "Pix ← {name}" },
-      { "type": "masked", "prefix": "Transferência Recebida - ",       "key_prefix": "ted_in",  "label": "Transf. ← {name}" },
-      { "type": "strip",  "prefix": "Pagamento de boleto efetuado - ", "key_prefix": "boleto",  "label": "Boleto · {v}" },
-      { "type": "system", "prefix": "Aplicação RDB",                   "key": "system:rdb_apl", "label": "Aplicação RDB" },
-      { "type": "system", "prefix": "Resgate RDB",                     "key": "system:rdb_res", "label": "Resgate RDB" },
-      { "type": "system", "prefix": "Pagamento de fatura",             "key": "system:fatura",  "label": "Pagamento de fatura" },
-      { "type": "system", "prefix": "Estorno -",                       "key": "system:estorno", "label": "Estorno" },
-      { "type": "system", "prefix": "Recarga de celular",              "key": "system:recarga", "label": "Recarga de celular" }
+      { "type": "strip",  "prefix": "Compra no débito - ",             "key_prefix": "debito",  "label": "Débito · {v}",  "badge": "DÉBITO",   "tone": "neutral" },
+      { "type": "masked", "prefix": "Transferência enviada pelo Pix",  "key_prefix": "pix_out", "label": "Pix → {name}", "badge": "PIX →",    "tone": "amarelo" },
+      { "type": "masked", "prefix": "Transferência recebida pelo Pix", "key_prefix": "pix_in",  "label": "Pix ← {name}", "badge": "PIX ←",    "tone": "mercado" },
+      { "type": "masked", "prefix": "Transferência Recebida - ",       "key_prefix": "ted_in",  "label": "Transf. ← {name}", "badge": "TRANSF. ←", "tone": "mercado" },
+      { "type": "strip",  "prefix": "Pagamento de boleto efetuado - ", "key_prefix": "boleto",  "label": "Boleto · {v}", "badge": "BOLETO",   "tone": "marrom" },
+      { "type": "system", "prefix": "Aplicação RDB",                   "key": "system:rdb_apl", "label": "Aplicação RDB", "badge": "SISTEMA", "tone": "neutral" },
+      { "type": "system", "prefix": "Resgate RDB",                     "key": "system:rdb_res", "label": "Resgate RDB", "badge": "SISTEMA",   "tone": "neutral" },
+      { "type": "system", "prefix": "Pagamento de fatura",             "key": "system:fatura",  "label": "Pagamento de fatura", "badge": "SISTEMA", "tone": "neutral" },
+      { "type": "system", "prefix": "Estorno -",                       "key": "system:estorno", "label": "Estorno", "badge": "SISTEMA",     "tone": "neutral" },
+      { "type": "system", "prefix": "Recarga de celular",              "key": "system:recarga", "label": "Recarga de celular", "badge": "SISTEMA", "tone": "neutral" }
+    ]
+  },
+  "reversals": {
+    "phases": [
+      {
+        "strategy": "exact_remainder",
+        "prefix": "Estorno - ",
+        "window_days": 7,
+        "role": "reversal",
+        "counterpart_role": "reversed"
+      },
+      {
+        "strategy": "counterparty_signature",
+        "prefix": "Reembolso recebido pelo Pix - ",
+        "counterpart_prefix": "Transferência enviada pelo Pix - ",
+        "window_days": 30,
+        "role": "refund",
+        "counterpart_role": "refunded"
+      },
+      {
+        "strategy": "quoted_merchant",
+        "prefix": "Estorno de ",
+        "window_days": 30,
+        "role": "reversal",
+        "counterpart_role": "reversed"
+      }
     ]
   }
 }

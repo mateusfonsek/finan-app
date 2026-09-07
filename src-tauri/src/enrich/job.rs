@@ -261,6 +261,7 @@ mod tests {
     fn fresh_conn() -> Connection {
         let conn = Connection::open_in_memory().unwrap();
         migrations::apply(&conn).unwrap();
+        crate::db::seed_from_pack(&conn, &crate::locale::LocalePack::embedded_pt_br()).unwrap();
         conn
     }
 

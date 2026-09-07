@@ -100,7 +100,7 @@
         .filter((t): t is typeof t & { fitid: string } => !!t.fitid)
         .map((t) => ({ ofx_fitid: t.fitid, date: t.date, amount: t.amount }));
       duplicateKeys = await checkExistingTxKeys(account.id, candidates);
-      reversalMap = detectReversalPairs(parsed.transactions);
+      reversalMap = detectReversalPairs(parsed.transactions, locale.reversals);
       // Default: import everything EXCEPT duplicates and reversal pairs.
       // Duplicates key on the (fitid, date, amount) triple; reversals on fitid.
       selected = new Set(

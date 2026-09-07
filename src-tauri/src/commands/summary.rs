@@ -188,25 +188,25 @@ pub fn investment_summary(
         .query_map(params![pat_ref], |row| row.get::<_, String>(0))?
         .collect::<rusqlite::Result<Vec<_>>>()?;
 
-    let mut aplicado = Decimal::ZERO;
-    let mut resgatado = Decimal::ZERO;
-    let mut aplicacoes = 0u32;
-    let mut resgates = 0u32;
+    let mut applied = Decimal::ZERO;
+    let mut redeemed = Decimal::ZERO;
+    let mut applications = 0u32;
+    let mut redemptions = 0u32;
     for s in &month_rows {
         let d = Decimal::from_str(s)
             .map_err(|e| AppError::Invalid(format!("bad amount '{s}': {e}")))?;
         if d.is_sign_negative() {
-            aplicado += -d;
-            aplicacoes += 1;
+            applied += -d;
+            applications += 1;
         } else if !d.is_zero() {
-            resgatado += d;
-            resgates += 1;
+            redeemed += d;
+            redemptions += 1;
         }
     }
 
     // All-time running balance, aggregated as Decimal in Rust to keep monetary
     // precision (rust_decimal does not pair well with SQL SUM over TEXT).
-    let saldo: Decimal = {
+    let balance: Decimal = {
         let mut all_stmt = conn.prepare(
             "SELECT t.amount FROM transactions t
              JOIN categories c ON c.id = t.category_id
@@ -220,19 +220,18 @@ pub fn investment_summary(
             let d = Decimal::from_str(amt)
                 .map_err(|e| AppError::Invalid(format!("bad amount '{amt}': {e}")))?;
             // A negative amount (a deposit) flips positive and raises the
-            // invested balance.
-            // amount positivo (resgate)   → -d negativo → diminui saldo investido.
+            // invested balance; a positive amount (a redemption) lowers it.
             s += -d;
         }
         s
     };
 
     Ok(InvestmentSummary {
-        aplicado_no_mes: aplicado.to_string(),
-        resgatado_no_mes: resgatado.to_string(),
-        aplicacoes_count: aplicacoes,
-        resgates_count: resgates,
-        saldo_acumulado: saldo.to_string(),
+        applied_in_month: applied.to_string(),
+        redeemed_in_month: redeemed.to_string(),
+        applications_count: applications,
+        redemptions_count: redemptions,
+        accumulated_balance: balance.to_string(),
     })
 }
 
@@ -431,6 +430,7 @@ mod tests {
     fn fresh_conn() -> Connection {
         let conn = Connection::open_in_memory().unwrap();
         migrations::apply(&conn).unwrap();
+        crate::db::seed_from_pack(&conn, &crate::locale::LocalePack::embedded_pt_br()).unwrap();
         conn
     }
 
@@ -628,5 +628,38 @@ mod tests {
         assert_eq!(s.len(), 10);
         assert_eq!(&s[4..5], "-");
         assert_eq!(&s[7..10], "-01");
+    }
+
+    // Compared as an exact key set, not by substring: a substring check still
+    // passes if a Portuguese name coexists (e.g. via `#[serde(alias)]` or an
+    // extra field), so it can't catch a name that was never actually removed.
+    #[test]
+    fn investment_summary_fields_serialize_in_english() {
+        let s = InvestmentSummary {
+            applied_in_month: "10.00".into(),
+            redeemed_in_month: "0".into(),
+            applications_count: 1,
+            redemptions_count: 0,
+            accumulated_balance: "10.00".into(),
+        };
+        let json = serde_json::to_string(&s).unwrap();
+        let value: serde_json::Value = serde_json::from_str(&json).unwrap();
+        let mut keys: Vec<&str> = value
+            .as_object()
+            .unwrap()
+            .keys()
+            .map(String::as_str)
+            .collect();
+        keys.sort_unstable();
+        assert_eq!(
+            keys,
+            vec![
+                "accumulated_balance",
+                "applications_count",
+                "applied_in_month",
+                "redeemed_in_month",
+                "redemptions_count",
+            ]
+        );
     }
 }

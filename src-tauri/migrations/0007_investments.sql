@@ -4,10 +4,6 @@
 -- Both leave the income/spending KPIs; only investments get dedicated tracking.
 ALTER TABLE categories ADD COLUMN is_investment INTEGER NOT NULL DEFAULT 0;
 
--- Investments category (distinct indigo colour).
-INSERT OR IGNORE INTO categories (name, color_token, kind, is_investment)
-VALUES ('Investimentos', '--color-cat-indigo', 'transfer', 1);
-
 -- Repoints the RDB seed rules from 0006 to Investments.
 UPDATE rules
 SET category_id = (SELECT id FROM categories WHERE name = 'Investimentos'),

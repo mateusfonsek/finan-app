@@ -88,17 +88,17 @@
    *  the reconciliation panel can match a manual calculation. */
   let grossInflow = $derived.by(() => {
     if (!kpis || !investments || !transfers) return 0;
-    return Number(kpis.income) + Number(investments.resgatado_no_mes) + Number(transfers.total_in);
+    return Number(kpis.income) + Number(investments.redeemed_in_month) + Number(transfers.total_in);
   });
   let grossOutflow = $derived.by(() => {
     if (!kpis || !investments || !transfers) return 0;
-    return Number(kpis.expense) + Number(investments.aplicado_no_mes) + Number(transfers.total_out);
+    return Number(kpis.expense) + Number(investments.applied_in_month) + Number(transfers.total_out);
   });
 
   /** Amount invested IN THE MONTH: deposited − withdrawn (positive = more went into investments than came out). */
   let investmentNetMonth = $derived.by(() => {
     if (!investments) return 0;
-    return Number(investments.aplicado_no_mes) - Number(investments.resgatado_no_mes);
+    return Number(investments.applied_in_month) - Number(investments.redeemed_in_month);
   });
 </script>
 
@@ -143,7 +143,7 @@
 
       <!-- Reconciliation: shows the maths adds up. Two independent columns,
            each with its own gross flow, exclusions and real result. -->
-      {#if (transfers && transfers.count > 0) || (investments && (investments.aplicacoes_count + investments.resgates_count) > 0)}
+      {#if (transfers && transfers.count > 0) || (investments && (investments.applications_count + investments.redemptions_count) > 0)}
         <details class="card px-4 py-2.5 group">
           <summary class="text-sub text-fg-muted flex items-center gap-2 list-none marker:hidden
                           hover:text-fg transition-colors duration-[var(--dur-fast)]">
@@ -156,7 +156,7 @@
             <span>{t("dashboard.calc_title")}</span>
           </summary>
           <div class="pt-3 grid grid-cols-2 gap-x-6 text-sub">
-            <!-- Coluna ENTRADAS -->
+            <!-- INFLOWS column -->
             <div class="flex flex-col gap-1">
               <div class="text-cap font-semibold text-fg-subtle pb-0.5">
                 {t("dashboard.inflows")}
@@ -171,10 +171,10 @@
                   <span class="tabular">{formatMoney(transfers.total_in)}</span>
                 </div>
               {/if}
-              {#if investments && Number(investments.resgatado_no_mes) > 0}
+              {#if investments && Number(investments.redeemed_in_month) > 0}
                 <div class="flex justify-between text-fg-subtle">
                   <span>{t("dashboard.minus_redemption")}</span>
-                  <span class="tabular">{formatMoney(investments.resgatado_no_mes)}</span>
+                  <span class="tabular">{formatMoney(investments.redeemed_in_month)}</span>
                 </div>
               {/if}
               <div class="flex justify-between border-t border-border-subtle pt-1 mt-0.5">
@@ -198,10 +198,10 @@
                   <span class="tabular">{formatMoney(transfers.total_out)}</span>
                 </div>
               {/if}
-              {#if investments && Number(investments.aplicado_no_mes) > 0}
+              {#if investments && Number(investments.applied_in_month) > 0}
                 <div class="flex justify-between text-fg-subtle">
                   <span>{t("dashboard.minus_application")}</span>
-                  <span class="tabular">{formatMoney(investments.aplicado_no_mes)}</span>
+                  <span class="tabular">{formatMoney(investments.applied_in_month)}</span>
                 </div>
               {/if}
               <div class="flex justify-between border-t border-border-subtle pt-1 mt-0.5">
@@ -216,7 +216,7 @@
 
     <!-- Dedicated investments section (kind=transfer + is_investment=1). The
          tinted border marks that this money lives outside spending/income. -->
-    {#if investments && investments.aplicacoes_count + investments.resgates_count > 0}
+    {#if investments && investments.applications_count + investments.redemptions_count > 0}
       <Card
         title={t("dashboard.investments")}
         note={t("dashboard.investments_note")}
@@ -227,19 +227,19 @@
           <div class="flex flex-col gap-0.5">
             <span class="text-foot text-fg-subtle">{t("dashboard.applied_month")}</span>
             <span class="text-title3 tabular font-semibold" style="color: var(--color-cat-investimento);">
-              {Number(investments.aplicado_no_mes) > 0 ? formatMoney(investments.aplicado_no_mes) : "—"}
+              {Number(investments.applied_in_month) > 0 ? formatMoney(investments.applied_in_month) : "—"}
             </span>
             <span class="text-cap text-fg-subtle">
-              {investments.aplicacoes_count === 1 ? t("dashboard.applications_one", { n: investments.aplicacoes_count }) : t("dashboard.applications_many", { n: investments.aplicacoes_count })}
+              {investments.applications_count === 1 ? t("dashboard.applications_one", { n: investments.applications_count }) : t("dashboard.applications_many", { n: investments.applications_count })}
             </span>
           </div>
           <div class="flex flex-col gap-0.5">
             <span class="text-foot text-fg-subtle">{t("dashboard.redeemed_month")}</span>
             <span class="text-title3 tabular font-semibold text-fg">
-              {Number(investments.resgatado_no_mes) > 0 ? formatMoney(investments.resgatado_no_mes) : "—"}
+              {Number(investments.redeemed_in_month) > 0 ? formatMoney(investments.redeemed_in_month) : "—"}
             </span>
             <span class="text-cap text-fg-subtle">
-              {investments.resgates_count === 1 ? t("dashboard.redemptions_one", { n: investments.resgates_count }) : t("dashboard.redemptions_many", { n: investments.resgates_count })}
+              {investments.redemptions_count === 1 ? t("dashboard.redemptions_one", { n: investments.redemptions_count }) : t("dashboard.redemptions_many", { n: investments.redemptions_count })}
             </span>
           </div>
           <div class="flex flex-col gap-0.5 border-l border-border-subtle pl-4">

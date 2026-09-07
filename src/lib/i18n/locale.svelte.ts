@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import type { ReversalPhase } from "$lib/ofx/reversals";
 
 // -------------------------------------------------------------------------
 // Auto-discovery of locale packs.
@@ -16,11 +17,21 @@ export type Manifest = {
   taxId: { name: string; regex: string; provider: string };
 };
 
+export type NormRule = { key_prefix: string; badge: string; tone: string };
+
 type Strings = Record<string, unknown>;
-type Pack = { code: string; manifest: Manifest; strings: Strings };
+type Pack = {
+  code: string;
+  manifest: Manifest;
+  strings: Strings;
+  reversals: ReversalPhase[];
+  normRules: NormRule[];
+  cnpjKeyPrefix: string;
+};
 
 const manifestMods = import.meta.glob("/locales/*/manifest.json", { eager: true });
 const stringsMods = import.meta.glob("/locales/*/strings.json", { eager: true });
+const rulesMods = import.meta.glob("/locales/*/rules.json", { eager: true });
 
 function codeFromPath(path: string): string {
   // "/locales/pt-BR/manifest.json" -> "pt-BR"
@@ -34,15 +45,37 @@ function pick<T>(mod: unknown): T {
 const packs: Record<string, Pack> = {};
 for (const [path, mod] of Object.entries(manifestMods)) {
   const code = codeFromPath(path);
-  packs[code] = { code, manifest: pick<Manifest>(mod), strings: packs[code]?.strings ?? {} };
+  packs[code] = {
+    code,
+    manifest: pick<Manifest>(mod),
+    strings: packs[code]?.strings ?? {},
+    reversals: packs[code]?.reversals ?? [],
+    normRules: packs[code]?.normRules ?? [],
+    cnpjKeyPrefix: packs[code]?.cnpjKeyPrefix ?? "",
+  };
 }
 for (const [path, mod] of Object.entries(stringsMods)) {
   const code = codeFromPath(path);
   if (packs[code]) packs[code].strings = pick<Strings>(mod);
 }
+for (const [path, mod] of Object.entries(rulesMods)) {
+  const code = codeFromPath(path);
+  if (!packs[code]) continue;
+  const rules = pick<{
+    reversals?: { phases?: ReversalPhase[] };
+    normalization?: { rules?: NormRule[]; cnpj_key_prefix?: string };
+  }>(mod);
+  packs[code].reversals = rules.reversals?.phases ?? [];
+  packs[code].normRules = rules.normalization?.rules ?? [];
+  packs[code].cnpjKeyPrefix = rules.normalization?.cnpj_key_prefix ?? "";
+}
 
 const DEFAULT_LOCALE = "pt-BR";
 const STORAGE_KEY = "locale";
+
+/** `app_settings` key gating the app shell behind the first-run language
+ *  choice — durable so quitting mid-onboarding doesn't drop the gate. */
+export const LOCALE_CHOSEN_KEY = "locale_chosen";
 
 function storageGet(): string | null {
   try {
@@ -70,6 +103,17 @@ function pickInitial(): string {
   if (saved && packs[saved]) return saved;
   if (packs[DEFAULT_LOCALE]) return DEFAULT_LOCALE;
   return Object.keys(packs)[0] ?? DEFAULT_LOCALE;
+}
+
+/** Matches the webview's OS language against discovered packs: exact code
+ *  first (`en-US`), then bare language prefix (`en` matches `en-US`). */
+function matchNavigatorLanguage(): string | null {
+  if (typeof navigator === "undefined" || !navigator.language) return null;
+  const nav = navigator.language;
+  if (packs[nav]) return nav;
+  const prefix = nav.split("-")[0].toLowerCase();
+  const match = Object.keys(packs).find((code) => code.split("-")[0].toLowerCase() === prefix);
+  return match ?? null;
 }
 
 function lookup(obj: unknown, path: string): unknown {
@@ -116,6 +160,18 @@ function createLocale() {
     get dateLocale(): string {
       return packs[code]?.manifest.dateLocale ?? DEFAULT_LOCALE;
     },
+    /** Reversal-detection phases for the active locale; empty disables it. */
+    get reversals(): ReversalPhase[] {
+      return packs[code]?.reversals ?? [];
+    },
+    /** Normalization rules (badge/tone per key_prefix) for the active locale. */
+    get normRules(): NormRule[] {
+      return packs[code]?.normRules ?? [];
+    },
+    /** The pack's tax-id key prefix (e.g. `cnpj`, `taxid`) — structural, not a rule. */
+    get cnpjKeyPrefix(): string {
+      return packs[code]?.cnpjKeyPrefix ?? "";
+    },
     get months(): string[] {
       return (lookup(stringsOf(code), "months") as string[]) ?? [];
     },
@@ -151,8 +207,12 @@ function createLocale() {
         // backend not available (e.g. web preview) — localStorage still holds it
       }
     },
-    /** Sync from the backend's persisted choice on boot. */
+    /** Sync from the backend's persisted choice on boot; on a genuine first
+     *  run (nothing stored yet), pre-select from the OS language instead of
+     *  always landing on the default. Never overrides a stored choice. */
     async init(): Promise<void> {
+      const firstRun = storageGet() === null;
+
       try {
         const active = await invoke<string>("get_active_locale");
         if (active && packs[active]) {
@@ -161,6 +221,13 @@ function createLocale() {
         }
       } catch {
         // ignore — fall back to localStorage/default already chosen
+      }
+
+      if (firstRun) {
+        const guess = matchNavigatorLanguage();
+        if (guess && guess !== code) {
+          await this.set(guess);
+        }
       }
     },
   };

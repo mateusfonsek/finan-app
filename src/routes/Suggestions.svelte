@@ -82,15 +82,19 @@
     return formatMoney(String(Math.abs(Number(amount))));
   }
 
-  /** Grouping type, derived from the stable key the backend returns. */
+  /** Grouping type, derived from the stable key the backend returns.
+   *  The tax-id prefix and `system:` are structural (checked in code); every
+   *  other prefix comes from the active pack's `normalization.rules`. */
   function badgeFor(key: string): { text: string; tone: string } {
-    if (key.startsWith("cnpj:")) return { text: t("suggestions.badge_cnpj"), tone: "indigo" };
-    if (key.startsWith("debito:")) return { text: t("suggestions.badge_debito"), tone: "neutral" };
-    if (key.startsWith("pix_out:")) return { text: t("suggestions.badge_pix_out"), tone: "amarelo" };
-    if (key.startsWith("pix_in:")) return { text: t("suggestions.badge_pix_in"), tone: "mercado" };
-    if (key.startsWith("ted_in:")) return { text: t("suggestions.badge_ted_in"), tone: "mercado" };
-    if (key.startsWith("boleto:")) return { text: t("suggestions.badge_boleto"), tone: "marrom" };
+    const cnpjPrefix = locale.cnpjKeyPrefix;
+    if (cnpjPrefix && key.startsWith(`${cnpjPrefix}:`)) {
+      return { text: t("suggestions.badge_tax_id"), tone: "indigo" };
+    }
     if (key.startsWith("system:")) return { text: t("suggestions.badge_system"), tone: "neutral" };
+
+    const rule = locale.normRules.find((r) => r.key_prefix && key.startsWith(`${r.key_prefix}:`));
+    if (rule) return { text: rule.badge, tone: rule.tone };
+
     return { text: t("suggestions.badge_other"), tone: "neutral" };
   }
 

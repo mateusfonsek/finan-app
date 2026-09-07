@@ -1,5 +1,5 @@
 /**
- * Movimento da interface.
+ * Interface motion.
  *
  * Two HIG rules drive this file:
  *

@@ -5,13 +5,13 @@ export interface ParsedOfx {
 }
 
 export interface ParsedAccount {
-  /** Banco normalizado: 'itau' | 'nubank' | 'bradesco' | 'unknown' */
+  /** Normalized bank: 'itau' | 'nubank' | 'bradesco' | 'unknown' */
   bank: string;
   ofxAcctid: string | null;
   ofxBankid: string | null;
   ofxFid: string | null;
   displayName: string;
-  /** `checking` = conta corrente (BANKMSGSRSV1) · `credit_card` = fatura (CREDITCARDMSGSRSV1) */
+  /** `checking` = checking account (BANKMSGSRSV1) · `credit_card` = credit card statement (CREDITCARDMSGSRSV1) */
   type: "checking" | "credit_card";
 }
 
@@ -19,7 +19,7 @@ export interface ParsedTransaction {
   fitid: string | null;
   /** ISO 8601 YYYY-MM-DD */
   date: string;
-  /** Decimal como string (ex: "-123.45") */
+  /** Decimal as a string (e.g. "-123.45") */
   amount: string;
   description: string;
 }

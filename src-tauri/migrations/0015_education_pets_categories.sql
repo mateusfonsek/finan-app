@@ -1,9 +1,8 @@
--- Two new categories: Education (tuition, courses, driving school, languages)
--- and Pets (vet, pet shop). A normal migration so existing installs get them
--- too, not just fresh ones.
+-- The 'education' and 'pets' categories now come from the active locale pack
+-- (locales/<code>/categories.json), applied by db::seed_from_pack on a fresh
+-- database. Seeding here ran before the pack was read, so it wrote Portuguese
+-- rows into every database regardless of language.
 --
--- OR IGNORE: does not overwrite a category the user already created with that
--- name or key.
-INSERT OR IGNORE INTO categories (key, name, color_token, kind, is_investment) VALUES
-  ('education', 'Educação', '--color-cat-indigo', 'expense', 0),
-  ('pets',      'Pets',     '--color-cat-marrom', 'expense', 0);
+-- Emptied rather than deleted: the name is recorded in _migrations on every
+-- existing install, and removing the entry would make apply() try to run a
+-- migration that no longer exists.

@@ -1,0 +1,15 @@
+{
+  "code": "en-US",
+  "name": "English (United States)",
+  "flag": "🇺🇸",
+  "currency": {
+    "code": "USD",
+    "locale": "en-US"
+  },
+  "dateLocale": "en-US",
+  "taxId": {
+    "name": "EIN",
+    "regex": "",
+    "provider": ""
+  }
+}

@@ -294,14 +294,14 @@
     "dropzone_desc_2": "e solte aqui — ou clique pra escolher um arquivo.",
     "reading": "Lendo arquivo…",
     "duplicate": "duplicada",
-    "role_estorno": "estorno",
-    "role_estornada": "estornada",
-    "role_reembolso": "reembolso",
-    "role_reembolsada": "reembolsada",
-    "reversal_estorno": "Esta transação é um estorno — reverte outra. Somadas dão zero. Desmarcada por padrão pra não inflar gastos/renda.",
-    "reversal_estornada": "Esta transação foi estornada (revertida pelo banco). Somadas com o estorno dão zero. Desmarcada por padrão.",
-    "reversal_reembolso": "Esta transação é um reembolso — devolução de um Pix enviado. Somadas dão zero. Desmarcada por padrão.",
-    "reversal_reembolsada": "Esta transação foi reembolsada. Somadas com o reembolso dão zero. Desmarcada por padrão.",
+    "role_reversal": "estorno",
+    "role_reversed": "estornada",
+    "role_refund": "reembolso",
+    "role_refunded": "reembolsada",
+    "reversal_reversal": "Esta transação é um estorno — reverte outra. Somadas dão zero. Desmarcada por padrão pra não inflar gastos/renda.",
+    "reversal_reversed": "Esta transação foi estornada (revertida pelo banco). Somadas com o estorno dão zero. Desmarcada por padrão.",
+    "reversal_refund": "Esta transação é um reembolso — devolução de um Pix enviado. Somadas dão zero. Desmarcada por padrão.",
+    "reversal_refunded": "Esta transação foi reembolsada. Somadas com o reembolso dão zero. Desmarcada por padrão.",
     "reversal_legend_one": "{n} par estorno/reembolso ↔ original detectado — desmarcado por padrão porque a soma é zero (não é gasto nem renda real). Marque manualmente se quiser importar mesmo assim.",
     "reversal_legend_many": "{n} pares estorno/reembolso ↔ original detectados — desmarcados por padrão porque a soma é zero (não é gasto nem renda real). Marque manualmente se quiser importar mesmo assim.",
     "preparing": "Preparando…",
@@ -354,7 +354,12 @@
     "neutralized_pairs_title": "Pares estorno/reembolso ↔ transação revertida (desmarcados por padrão)",
     "import_n_one": "Importar {n} transação",
     "import_n_many": "Importar {n} transações",
-    "toggle_all": "Selecionar todas as transações"
+    "toggle_all": "Selecionar todas as transações",
+    "account_generic": "Conta",
+    "account_card": "cartão",
+    "account_last4": "final {v}",
+    "account_branch": "ag {v}",
+    "account_number": "cc {v}"
   },
   "tx_notes": {
     "detail": "Detalhe",
@@ -386,7 +391,7 @@
     "scope_note": "Renomear ou trocar a cor vale na hora em todas as transações desta categoria."
   },
   "categories_page": {
-    "desc": "Crie, edite ou apague qualquer categoria. As 9 categorias iniciais vêm pré-criadas mas podem ser modificadas ou removidas livremente — apagar deixa as transações vinculadas sem categoria.",
+    "desc": "Crie, edite ou apague qualquer categoria. As 13 categorias iniciais vêm pré-criadas mas podem ser modificadas ou removidas livremente — apagar deixa as transações vinculadas sem categoria.",
     "delete_confirm": "Apagar \"{name}\"?",
     "delete_confirm_one": "Apagar \"{name}\"? {n} transação ficará sem categoria.",
     "delete_confirm_many": "Apagar \"{name}\"? {n} transações ficarão sem categoria."
@@ -461,7 +466,10 @@
     "title": "Suas finanças, no seu Mac.",
     "subtitle": "Sem nuvem, sem login, sem assinatura. Você arrasta o extrato OFX do seu banco e o finan app organiza tudo num arquivo SQLite local.",
     "read_error": "Erro ao ler o arquivo: {msg}",
-    "data_location": "Seus dados ficam em"
+    "data_location": "Seus dados ficam em",
+    "language_title": "Escolha seu idioma",
+    "language_desc": "Isso decide as categorias e regras que o finan app já vai trazer prontas. Dá pra mudar depois em Configurações.",
+    "language_continue": "Continuar"
   },
   "suggestions": {
     "title": "Sugestões de regras",
@@ -472,12 +480,7 @@
     "empty": "Nada por aqui — todas as contrapartes recorrentes já têm categoria, ou aumente o filtro de ocorrências.",
     "pattern_label": "Trecho",
     "create": "Criar",
-    "badge_cnpj": "CNPJ",
-    "badge_debito": "DÉBITO",
-    "badge_pix_out": "PIX →",
-    "badge_pix_in": "PIX ←",
-    "badge_ted_in": "TRANSF. ←",
-    "badge_boleto": "BOLETO",
+    "badge_tax_id": "CNPJ",
     "badge_system": "SISTEMA",
     "badge_other": "OUTRO",
     "subtitle": "Gastos recorrentes que ainda não têm categoria — débito de cartão, Pix entre pessoas, boletos. CNPJs já são resolvidos na importação; entradas ficam no Dashboard, em Fontes de renda.",
