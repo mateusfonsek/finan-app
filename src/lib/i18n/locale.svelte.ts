@@ -73,6 +73,10 @@ for (const [path, mod] of Object.entries(rulesMods)) {
 const DEFAULT_LOCALE = "pt-BR";
 const STORAGE_KEY = "locale";
 
+/** `app_settings` key gating the app shell behind the first-run language
+ *  choice — durable so quitting mid-onboarding doesn't drop the gate. */
+export const LOCALE_CHOSEN_KEY = "locale_chosen";
+
 function storageGet(): string | null {
   try {
     if (typeof localStorage !== "undefined" && typeof localStorage.getItem === "function") {
@@ -99,6 +103,17 @@ function pickInitial(): string {
   if (saved && packs[saved]) return saved;
   if (packs[DEFAULT_LOCALE]) return DEFAULT_LOCALE;
   return Object.keys(packs)[0] ?? DEFAULT_LOCALE;
+}
+
+/** Matches the webview's OS language against discovered packs: exact code
+ *  first (`en-US`), then bare language prefix (`en` matches `en-US`). */
+function matchNavigatorLanguage(): string | null {
+  if (typeof navigator === "undefined" || !navigator.language) return null;
+  const nav = navigator.language;
+  if (packs[nav]) return nav;
+  const prefix = nav.split("-")[0].toLowerCase();
+  const match = Object.keys(packs).find((code) => code.split("-")[0].toLowerCase() === prefix);
+  return match ?? null;
 }
 
 function lookup(obj: unknown, path: string): unknown {
@@ -192,8 +207,12 @@ function createLocale() {
         // backend not available (e.g. web preview) — localStorage still holds it
       }
     },
-    /** Sync from the backend's persisted choice on boot. */
+    /** Sync from the backend's persisted choice on boot; on a genuine first
+     *  run (nothing stored yet), pre-select from the OS language instead of
+     *  always landing on the default. Never overrides a stored choice. */
     async init(): Promise<void> {
+      const firstRun = storageGet() === null;
+
       try {
         const active = await invoke<string>("get_active_locale");
         if (active && packs[active]) {
@@ -202,6 +221,13 @@ function createLocale() {
         }
       } catch {
         // ignore — fall back to localStorage/default already chosen
+      }
+
+      if (firstRun) {
+        const guess = matchNavigatorLanguage();
+        if (guess && guess !== code) {
+          await this.set(guess);
+        }
       }
     },
   };
