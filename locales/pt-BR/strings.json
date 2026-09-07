@@ -466,7 +466,10 @@
     "title": "Suas finanças, no seu Mac.",
     "subtitle": "Sem nuvem, sem login, sem assinatura. Você arrasta o extrato OFX do seu banco e o finan app organiza tudo num arquivo SQLite local.",
     "read_error": "Erro ao ler o arquivo: {msg}",
-    "data_location": "Seus dados ficam em"
+    "data_location": "Seus dados ficam em",
+    "language_title": "Escolha seu idioma",
+    "language_desc": "Isso decide as categorias e regras que o finan app já vai trazer prontas. Dá pra mudar depois em Configurações.",
+    "language_continue": "Continuar"
   },
   "suggestions": {
     "title": "Sugestões de regras",

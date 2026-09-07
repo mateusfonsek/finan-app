@@ -6,9 +6,11 @@
   import Sidebar from "$lib/components/shell/Sidebar.svelte";
   import AboutDialog from "$lib/components/shell/AboutDialog.svelte";
   import ActivityCenter from "$lib/components/shell/ActivityCenter.svelte";
+  import LanguageGate from "$lib/components/shell/LanguageGate.svelte";
   import { openOfxPath } from "$lib/ofx/open";
   import { takePendingOfx } from "$lib/api/files";
-  import { locale } from "$lib/i18n/locale.svelte";
+  import { locale, LOCALE_CHOSEN_KEY } from "$lib/i18n/locale.svelte";
+  import { getAppSetting } from "$lib/api/watch";
   import { watch } from "$lib/stores/watch.svelte";
   import { routes } from "./routes/routes";
 
@@ -18,6 +20,28 @@
   const GITHUB_URL = "https://github.com/MateusFonseK/finan-app";
 
   let aboutOpen = $state(false);
+
+  // `null` while the durable flag is still loading — the gate is the safe
+  // default (shown, not skipped) both then and if the read fails, since a
+  // false negative here would let a fresh install straight past onboarding.
+  let localeChosen = $state<boolean | null>(null);
+
+  onMount(async () => {
+    try {
+      localeChosen = (await getAppSetting(LOCALE_CHOSEN_KEY)) === "1";
+    } catch {
+      localeChosen = false;
+    }
+  });
+
+  // Runs exactly once, the moment the gate first comes down (never again,
+  // since the flag is never unset) — draining a pending "Open with finan" and
+  // running the watch scan only make sense once the DB is no longer pristine.
+  $effect(() => {
+    if (!localeChosen) return;
+    void handleOpenedOfx();
+    void watch.loadEnabled().then(() => watch.refresh({ force: true }));
+  });
 
   // Scroll state of the content pane. Each screen's header is translucent
   // material pinned to the top; the rule separating it from the content only
@@ -61,6 +85,7 @@
   };
 
   function onKeydown(e: KeyboardEvent) {
+    if (!localeChosen) return;
     if (!(e.metaKey || e.ctrlKey)) return;
     const target = e.target as HTMLElement | null;
     const inEditable =
@@ -104,18 +129,21 @@
 
   onMount(() => {
     const unlisten: Array<() => void> = [];
-    listen("menu:about", () => (aboutOpen = true)).then((u) => unlisten.push(u));
-    listen<string>("menu:navigate", (e) => push(e.payload)).then((u) => unlisten.push(u));
+    // The native menu and the "open with finan" flow reach the webview
+    // regardless of what it renders, so each handler re-checks the gate
+    // itself instead of trusting that registration implies it's down.
+    listen("menu:about", () => localeChosen && (aboutOpen = true)).then((u) => unlisten.push(u));
+    listen<string>("menu:navigate", (e) => localeChosen && push(e.payload)).then((u) =>
+      unlisten.push(u),
+    );
     listen("menu:github", () => void openUrl(GITHUB_URL)).then((u) => unlisten.push(u));
-    listen("open-ofx", () => void handleOpenedOfx()).then((u) => unlisten.push(u));
-    // Cold start: the file may already be queued before this listener exists.
-    void handleOpenedOfx();
+    listen("open-ofx", () => localeChosen && void handleOpenedOfx()).then((u) =>
+      unlisten.push(u),
+    );
 
-    // Scan triggers: app launch and window focus. Focus is what makes a
-    // filesystem watcher unnecessary — the user sends the file from their phone
-    // and then comes to look at the Mac.
-    void watch.loadEnabled().then(() => watch.refresh({ force: true }));
-    const onFocus = () => void watch.refresh();
+    // Focus is what makes a filesystem watcher unnecessary — the user sends
+    // the file from their phone and then comes to look at the Mac.
+    const onFocus = () => localeChosen && void watch.refresh();
     window.addEventListener("focus", onFocus);
     unlisten.push(() => window.removeEventListener("focus", onFocus));
 
@@ -123,20 +151,26 @@
   });
 </script>
 
-<div class="h-screen grid grid-cols-[236px_1fr] overflow-hidden">
-  <Sidebar onAbout={() => (aboutOpen = true)} />
-  <!-- `data-scrolled` feeds the sticky header's edge effect: the separating
-       rule only exists when content passes beneath it. -->
-  <main
-    bind:this={scroller}
-    onscroll={onMainScroll}
-    data-scrolled={scrolled}
-    class="bg-bg overflow-y-auto"
-  >
-    <Router {routes} onRouteLoaded={resetScroll} />
-  </main>
-</div>
+{#if localeChosen}
+  <div class="h-screen grid grid-cols-[236px_1fr] overflow-hidden">
+    <Sidebar onAbout={() => (aboutOpen = true)} />
+    <!-- `data-scrolled` feeds the sticky header's edge effect: the separating
+         rule only exists when content passes beneath it. -->
+    <main
+      bind:this={scroller}
+      onscroll={onMainScroll}
+      data-scrolled={scrolled}
+      class="bg-bg overflow-y-auto"
+    >
+      <Router {routes} onRouteLoaded={resetScroll} />
+    </main>
+  </div>
 
-<ActivityCenter />
+  <ActivityCenter />
 
-<AboutDialog open={aboutOpen} onClose={() => (aboutOpen = false)} />
+  <AboutDialog open={aboutOpen} onClose={() => (aboutOpen = false)} />
+{:else if localeChosen === false}
+  <!-- No Sidebar, no Router, no ActivityCenter: the initial-setup screen
+       replaces the shell entirely rather than sitting disabled inside it. -->
+  <LanguageGate onConfirm={() => (localeChosen = true)} />
+{/if}
