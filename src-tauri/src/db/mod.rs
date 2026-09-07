@@ -40,10 +40,14 @@ pub fn init(app: &AppHandle) -> AppResult<Db> {
 }
 
 /// Seed a **fresh** database from the active locale pack. Categories are matched
-/// by their stable `key`: an existing seeded row (created by the SQL migrations)
-/// is renamed to the pack's `name`; a key the migrations didn't seed is inserted.
-/// Seed rules are inserted mapped by category key, skipping patterns already
-/// present. Safe to call only on a fresh DB (never overwrites user edits).
+/// by their stable `key`: a row with a matching key is updated in place, and a
+/// key with no matching row is inserted. Migrations seed no rows of their own
+/// (a fresh DB's `categories` table starts empty), so every call currently
+/// takes the insert path — but matching by key first keeps the function safe
+/// to call again against a DB that already has some category rows, instead of
+/// hitting a UNIQUE violation. Seed rules are inserted mapped by category key,
+/// skipping patterns already present. Safe to call only on a fresh DB (never
+/// overwrites user edits).
 pub fn seed_from_pack(conn: &Connection, pack: &LocalePack) -> AppResult<()> {
     for c in &pack.categories {
         let updated = conn.execute(
