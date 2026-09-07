@@ -7,7 +7,7 @@
 //!
 //! `pt-BR` is the reference pack: every other one must match its shape.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
 use regex::Regex;
@@ -197,6 +197,184 @@ fn rule_categories_resolve_to_declared_keys() {
                 "{code}: duplicate seed pattern {pattern:?} — seed_from_pack skips \
                  a pattern that already exists, so the second one silently vanishes"
             );
+        }
+    }
+}
+
+#[test]
+fn normalization_is_wellformed() {
+    for (code, dir) in packs() {
+        let norm = json(&dir, "rules.json")["normalization"].clone();
+
+        let mask = norm["cpf_mask_regex"].as_str().unwrap_or_default();
+        if !mask.trim().is_empty() {
+            Regex::new(mask)
+                .unwrap_or_else(|e| panic!("{code}: cpf_mask_regex does not compile: {e}"));
+        }
+
+        for rule in norm["rules"].as_array().into_iter().flatten() {
+            let kind = rule["type"].as_str().unwrap_or_default();
+            let prefix = rule["prefix"].as_str().unwrap_or_default();
+            assert!(!prefix.is_empty(), "{code}: a normalization rule has no prefix");
+            assert!(
+                rule["label"].as_str().is_some_and(|s| !s.is_empty()),
+                "{code}/{prefix}: normalization rule needs a label"
+            );
+
+            match kind {
+                "strip" | "masked" => assert!(
+                    rule["key_prefix"].as_str().is_some_and(|s| !s.is_empty()),
+                    "{code}/{prefix}: a {kind} rule needs key_prefix"
+                ),
+                "system" => assert!(
+                    rule["key"].as_str().is_some_and(|s| !s.is_empty()),
+                    "{code}/{prefix}: a system rule needs key"
+                ),
+                other => panic!(
+                    "{code}/{prefix}: normalization type must be strip|masked|system, \
+                     got {other:?} — an unknown type is skipped in silence"
+                ),
+            }
+        }
+    }
+}
+
+#[test]
+fn reversal_phases_are_wellformed() {
+    const ROLES: [&str; 4] = ["reversal", "reversed", "refund", "refunded"];
+
+    for (code, dir) in packs() {
+        let phases = json(&dir, "rules.json")["reversals"]["phases"].clone();
+        for phase in phases.as_array().into_iter().flatten() {
+            let strategy = phase["strategy"].as_str().unwrap_or_default();
+            let prefix = phase["prefix"].as_str().unwrap_or_default();
+            assert!(!prefix.is_empty(), "{code}: a reversal phase has no prefix");
+
+            assert!(
+                phase["window_days"].as_u64().is_some_and(|d| d > 0),
+                "{code}/{prefix}: window_days must be a positive integer"
+            );
+
+            for field in ["role", "counterpart_role"] {
+                let role = phase[field].as_str().unwrap_or_default();
+                assert!(
+                    ROLES.contains(&role),
+                    "{code}/{prefix}: {field} must be one of {ROLES:?}, got {role:?} \
+                     — the UI builds a string key from it (import.role_<role>)"
+                );
+            }
+
+            match strategy {
+                "exact_remainder" | "quoted_merchant" => {}
+                "counterparty_signature" => assert!(
+                    phase["counterpart_prefix"].as_str().is_some_and(|s| !s.is_empty()),
+                    "{code}/{prefix}: counterparty_signature needs counterpart_prefix"
+                ),
+                other => panic!(
+                    "{code}/{prefix}: strategy must be exact_remainder|\
+                     counterparty_signature|quoted_merchant, got {other:?}"
+                ),
+            }
+        }
+    }
+}
+
+/// Flattens a strings tree into dot-paths. An array counts as one path, not one
+/// per index — its length is checked separately.
+fn flatten_paths(value: &Value, prefix: &str, out: &mut BTreeMap<String, String>) {
+    match value {
+        Value::Object(map) => {
+            for (k, v) in map {
+                let path = if prefix.is_empty() {
+                    k.clone()
+                } else {
+                    format!("{prefix}.{k}")
+                };
+                flatten_paths(v, &path, out);
+            }
+        }
+        Value::String(s) => {
+            out.insert(prefix.to_string(), s.clone());
+        }
+        Value::Array(items) => {
+            let joined: Vec<&str> = items.iter().filter_map(Value::as_str).collect();
+            out.insert(prefix.to_string(), joined.join("\u{1}"));
+        }
+        _ => {}
+    }
+}
+
+fn strings_of(code: &str) -> BTreeMap<String, String> {
+    let mut out = BTreeMap::new();
+    flatten_paths(
+        &json(&repo_root().join("locales").join(code), "strings.json"),
+        "",
+        &mut out,
+    );
+    out
+}
+
+/// Every `{placeholder}` in a value, as a set.
+fn placeholders(text: &str) -> BTreeSet<String> {
+    let re = Regex::new(r"\{([a-zA-Z_][a-zA-Z0-9_]*)\}").expect("static regex");
+    re.captures_iter(text)
+        .map(|c| c[1].to_string())
+        .collect()
+}
+
+#[test]
+fn strings_keys_match_the_reference() {
+    let reference = strings_of(REFERENCE);
+    assert!(!reference.is_empty(), "the reference pack has no strings");
+
+    for (code, _) in packs() {
+        if code == REFERENCE {
+            continue;
+        }
+        let theirs = strings_of(&code);
+        let ref_keys: BTreeSet<&String> = reference.keys().collect();
+        let their_keys: BTreeSet<&String> = theirs.keys().collect();
+
+        let missing: Vec<&&String> = ref_keys.difference(&their_keys).collect();
+        let extra: Vec<&&String> = their_keys.difference(&ref_keys).collect();
+        assert!(
+            missing.is_empty(),
+            "{code}: missing string keys — each one falls back to {REFERENCE} \
+             at runtime, in silence: {missing:?}"
+        );
+        assert!(extra.is_empty(), "{code}: string keys nothing reads: {extra:?}");
+    }
+}
+
+/// A translator dropping `{taxId}` breaks the sentence, and nothing else says so.
+#[test]
+fn string_placeholders_match_the_reference() {
+    let reference = strings_of(REFERENCE);
+
+    for (code, _) in packs() {
+        if code == REFERENCE {
+            continue;
+        }
+        for (key, value) in strings_of(&code) {
+            let Some(ref_value) = reference.get(&key) else {
+                continue;
+            };
+            assert_eq!(
+                placeholders(&value),
+                placeholders(ref_value),
+                "{code}/{key}: placeholders differ from {REFERENCE}"
+            );
+        }
+    }
+}
+
+#[test]
+fn calendar_arrays_have_the_expected_lengths() {
+    for (code, dir) in packs() {
+        let s = json(&dir, "strings.json");
+        for (key, expected) in [("months", 12), ("months_short", 12), ("weekdays_short", 7)] {
+            let len = s[key].as_array().map(Vec::len).unwrap_or(0);
+            assert_eq!(len, expected, "{code}: {key} must have {expected} entries");
         }
     }
 }
