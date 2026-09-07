@@ -37,6 +37,12 @@ locales/
    - `normalization`: how your banks phrase statement lines (Pix, debit, boleto…).
      Each entry maps a description prefix to a readable label. Leave the list
      empty if you don't need it — descriptions fall back to their raw text.
+   - `reversals`: how your banks phrase a reversal/refund pair. Each phase picks
+     a pairing `strategy` — `exact_remainder`, `counterparty_signature` or
+     `quoted_merchant` — and supplies the prefix, the window in days and the two
+     roles (`reversal`/`reversed`, `refund`/`refunded`). Array order is
+     execution order, and an earlier phase wins a contested transaction. Leave
+     `phases` empty to disable reversal detection for your locale.
 5. **`strings.json`** — translate every value. Keep the **keys** unchanged.
    `{v}`, `{name}` etc. are interpolation placeholders — keep them.
 6. Rebuild the app. Your language appears in **Settings → Idioma** automatically.
@@ -50,3 +56,23 @@ locales/
 - Existing categories in a user's database are their own data and are **not**
   renamed when the language changes — only fresh databases are seeded from the
   active pack.
+- **Graceful degradation is the design, not a gap.** Nothing forces you to fill
+  in every field. The **`en-US`** pack ships with empty `taxId.regex`,
+  `taxId.provider`, `cnae_map` and `reversals.phases`, because US statements
+  carry no EIN, there is no free public company-lookup equivalent to BrasilAPI,
+  and US reversal phrasing couldn't be verified. The app degrades cleanly: no
+  tax-id enrichment, no CNAE-based suggestions, no reversal detection — the
+  rest of the pack (categories, seed rules, strings) works exactly as with any
+  other locale. Ship what you can verify; leave the rest empty.
+
+## Checking your pack
+
+```sh
+cargo test --manifest-path src-tauri/Cargo.toml contract::
+```
+
+Validates every folder here against `pt-BR`: identical category keys, colour
+tokens that exist in `src/app.css`, rules pointing at declared categories, an
+identical set of string keys, and matching `{placeholders}`. Every one of these
+fails silently at runtime, which is why the test exists — run it before opening
+a PR.

@@ -1,12 +1,14 @@
 <div align="center">
 
+<sub><a href="README.pt-BR.md">🇧🇷 Leia em português</a></sub>
+
 <img src="src-tauri/icons/icon.png" width="116" alt="finan app" />
 
 # finan app
 
-**O dinheiro é seu. Os dados também.**
+**Your money. Your data too.**
 
-Finanças pessoais **100% locais** no seu Mac — sem nuvem, sem conta, sem rastreamento.
+100% local personal finance for your Mac — no cloud, no account, no tracking.
 
 <br>
 
@@ -20,18 +22,18 @@ Finanças pessoais **100% locais** no seu Mac — sem nuvem, sem conta, sem rast
 
 <br>
 
-<a href="#-instalação">Instalação</a> ·
-<a href="#-funcionalidades">Funcionalidades</a> ·
-<a href="#-privacidade">Privacidade</a> ·
-<a href="#%EF%B8%8F-buildar-do-código">Buildar</a>
+<a href="#-installation">Installation</a> ·
+<a href="#-features">Features</a> ·
+<a href="#-privacy">Privacy</a> ·
+<a href="#%EF%B8%8F-building-from-source">Build</a>
 
 </div>
 
 <br>
 
-O **finan app** organiza suas finanças pessoais sem que seus dados saiam do seu computador. Você importa o extrato `.ofx` do banco, ele categoriza com regras, sugere padrões e mostra tudo num painel claro. Tudo fica num único arquivo no seu Mac e nunca vai pra lugar nenhum.
+**finan app** organizes your personal finances without your data ever leaving your computer. You import your bank's `.ofx` statement, it categorizes with rules, suggests patterns and shows everything on a clear dashboard. Everything lives in a single file on your Mac and never goes anywhere else.
 
-E é **leve**: ~13 MB que baixam num instante, abrem rápido e quase não ocupam espaço no seu Mac.
+And it's **light**: ~13 MB that download in an instant, open fast and barely take up space on your Mac.
 
 <br>
 
@@ -39,73 +41,74 @@ E é **leve**: ~13 MB que baixam num instante, abrem rápido e quase não ocupam
 
 <table>
   <tr>
-    <td width="33%" valign="top"><img src="docs/screenshots/transacoes.png" alt="Transações" /><p align="center"><sub><b>Transações</b> — categorize e crie regras</sub></p></td>
-    <td width="33%" valign="top"><img src="docs/screenshots/importar.png" alt="Importar OFX" /><p align="center"><sub><b>Importar</b> — solte o OFX e revise</sub></p></td>
-    <td width="33%" valign="top"><img src="docs/screenshots/calendario.png" alt="Calendário" /><p align="center"><sub><b>Calendário</b> — vencimentos e pagamentos</sub></p></td>
+    <td width="33%" valign="top"><img src="docs/screenshots/transacoes.png" alt="Transactions" /><p align="center"><sub><b>Transactions</b> — categorize and create rules</sub></p></td>
+    <td width="33%" valign="top"><img src="docs/screenshots/importar.png" alt="Import OFX" /><p align="center"><sub><b>Import</b> — drop the OFX and review</sub></p></td>
+    <td width="33%" valign="top"><img src="docs/screenshots/calendario.png" alt="Calendar" /><p align="center"><sub><b>Calendar</b> — due dates and payments</sub></p></td>
   </tr>
 </table>
 
-## ✨ Funcionalidades
+## ✨ Features
 
-- 📥 **Importar OFX** — arraste o extrato (ou abra com o finan app) e revise antes de salvar; deduplica transações e detecta estornos automaticamente.
-- 🏷️ **Categorias e regras** — categorize manualmente ou crie regras (por trecho da descrição) que se aplicam sozinhas.
-- 💡 **Sugestões automáticas** — o app detecta gastos recorrentes sem categoria e sugere regras prontas.
-- 📊 **Dashboard** — renda, gastos e saldo do mês, gastos por categoria, fontes de renda (com marcação de recorrentes), investimentos e tendência dos últimos 12 meses.
-- 📅 **Calendário** — vencimentos e pagamentos derivados das suas regras.
-- 💾 **Backup** — exporte e restaure o seu banco de dados a qualquer momento.
-- 🪶 **Leve e rápido** — ~13 MB pra baixar, ~18 MB instalado. Abre num piscar e quase não pesa no seu Mac.
-- 🖥️ **Nativo do macOS** — menu nativo, atalhos de teclado, tema claro/escuro, universal (Apple Silicon + Intel).
+- 📥 **Import OFX** — drag in the statement (or open it with finan app) and review before saving; deduplicates transactions and detects reversals automatically.
+- 🏷️ **Categories and rules** — categorize manually or create rules (matching a piece of the description) that apply themselves.
+- 💡 **Automatic suggestions** — the app detects recurring uncategorized spending and suggests ready-made rules.
+- 📊 **Dashboard** — the month's income, spending and balance, spending by category, income sources (with recurring ones flagged), investments and the trend over the last 12 months.
+- 📅 **Calendar** — due dates and payments derived from your rules.
+- 💾 **Backup** — export and restore your database at any time.
+- 🌍 **Multi-language** — the UI, the default categories and the auto-classification rules all live in [locale packs](locales/README.md). Adding a language is copying a folder and translating JSON. Ships with Portuguese (Brazil) and English (US).
+- 🪶 **Light and fast** — ~13 MB to download, ~18 MB installed. Opens in a blink and barely weighs on your Mac.
+- 🖥️ **Native to macOS** — native menu, keyboard shortcuts, light/dark theme, universal (Apple Silicon + Intel).
 
-## 📥 Instalação
+## 📥 Installation
 
-1. Baixe o `.dmg` mais recente na aba **[Releases](https://github.com/MateusFonseK/finan-app/releases/latest)**.
-2. Abra o `.dmg` e arraste o **finan app** pra pasta **Aplicativos**.
-3. **Primeira abertura** — o app **não é assinado** com conta paga da Apple. Como foi baixado da web, na primeira vez o macOS bloqueia com um aviso do tipo *"A Apple não pôde verificar se o 'finan app' está livre de malware…"* (botões **Mover para o Lixo** e **OK** — clique em **OK**, não no lixo).
+1. Download the latest `.dmg` from the **[Releases](https://github.com/MateusFonseK/finan-app/releases/latest)** tab.
+2. Open the `.dmg` and drag **finan app** into the **Applications** folder.
+3. **First launch** — the app is **not signed** with a paid Apple account. Because it was downloaded from the web, the first time macOS blocks it with a warning like *"Apple could not verify 'finan app' is free of malware…"* (buttons **Move to Trash** and **OK** — click **OK**, not the trash).
 
-   **Jeito garantido** — rode no Terminal:
+   **Guaranteed way** — run in Terminal:
    ```sh
    xattr -dr com.apple.quarantine "/Applications/finan app.app"
    ```
-   Depois é só abrir normalmente.
+   Then just open it normally.
 
-   **Alternativa sem terminal:** **Ajustes do Sistema → Privacidade e Segurança** → seção **Segurança** → **"Abrir Mesmo Assim"**. (O botão só aparece logo após tentar abrir o app.)
+   **Alternative without the terminal:** **System Settings → Privacy & Security** → **Security** section → **"Open Anyway"**. (The button only appears right after you try to open the app.)
 
-> O navegador marca arquivos baixados com uma flag de "quarentena"; sem notarização da Apple, o Gatekeeper pede essa confirmação manual na primeira vez. O código é aberto — você pode auditar e/ou buildar você mesmo.
+> The browser marks downloaded files with a "quarantine" flag; without Apple notarization, Gatekeeper asks for this manual confirmation the first time. The code is open — you can audit it and/or build it yourself.
 
-## 🔒 Privacidade
+## 🔒 Privacy
 
-Não há conta, login, telemetria ou anúncios. Tudo fica em `~/Library/Application Support/app.finan/finan.db`, no seu Mac.
+There is no account, login, telemetry or ads. Everything lives in `~/Library/Application Support/app.finan/finan.db`, on your Mac.
 
-A **única** requisição de rede acontece **durante a importação**: o app consulta a [BrasilAPI](https://brasilapi.com.br) para descobrir o nome de empresas a partir do **CNPJ** que aparece nas transações e sugerir categorias automaticamente. Sai apenas o **número do CNPJ** (informação pública) — nunca valores, descrições nem dados pessoais. Se as transações importadas não tiverem CNPJ, nenhuma requisição é feita.
+The **only** network request the app can ever make happens **during import**, and only when two things are both true: the active [locale pack](locales/README.md) declares a tax-id format and a lookup provider, **and** you've turned the lookup on in Settings — it's opt-in and off by default. Today that's the **pt-BR** pack, which queries [BrasilAPI](https://brasilapi.com.br) to resolve a company name from the **CNPJ** found in a transaction description and suggest a category. Only the **CNPJ digits** (public information) ever leave your Mac — never amounts, descriptions or personal data. The **en-US** pack ships with no tax-id format and no provider at all, so with it active the app makes **no network request, ever**.
 
-## 🛠️ Buildar do código
+## 🛠️ Building from source
 
-Pré-requisitos: [Rust](https://rustup.rs), [Node 22+](https://nodejs.org) e [pnpm](https://pnpm.io).
+Prerequisites: [Rust](https://rustup.rs), [Node 22+](https://nodejs.org) and [pnpm](https://pnpm.io).
 
 ```sh
 pnpm install
 
-# desenvolvimento
+# development
 pnpm tauri dev
 
-# build universal (Apple Silicon + Intel)
+# universal build (Apple Silicon + Intel)
 rustup target add aarch64-apple-darwin x86_64-apple-darwin
 pnpm tauri build --target universal-apple-darwin
 ```
 
-O `.app` e o `.dmg` saem em `src-tauri/target/universal-apple-darwin/release/bundle/`.
+The `.app` and the `.dmg` come out at `src-tauri/target/universal-apple-darwin/release/bundle/`.
 
-Para contribuir (formato de commit e como as releases funcionam), veja [CONTRIBUTING.md](CONTRIBUTING.md).
+To contribute (commit format and how releases work), see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## 🧱 Stack
 
-[Tauri 2](https://tauri.app) (Rust) · [Svelte 5](https://svelte.dev) · SQLite (rusqlite). Sem backend, sem telemetria.
+[Tauri 2](https://tauri.app) (Rust) · [Svelte 5](https://svelte.dev) · SQLite (rusqlite). No backend, no telemetry.
 
-## 📄 Licença
+## 📄 License
 
 [MIT](LICENSE) © 2026 Mateus Fonseca
 
 <div align="center">
 <br>
-<sub>Feito com cuidado. 🌱</sub>
+<sub>Made with care. 🌱</sub>
 </div>
