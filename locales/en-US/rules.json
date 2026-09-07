@@ -3,7 +3,7 @@
   "seed_rules": [
     { "pattern": "UBER",          "category": "transport",    "priority": 8, "display_name": "Uber" },
     { "pattern": "LYFT",          "category": "transport",    "priority": 8, "display_name": "Lyft" },
-    { "pattern": "SHELL",         "category": "transport",    "priority": 8, "display_name": "Shell" },
+    { "pattern": "SHELL ",        "category": "transport",    "priority": 8, "display_name": "Shell" },
     { "pattern": "CHEVRON",       "category": "transport",    "priority": 8, "display_name": "Chevron" },
     { "pattern": "DELTA AIR",     "category": "transport",    "priority": 8, "display_name": "Delta" },
     { "pattern": "DOORDASH",      "category": "restaurant",   "priority": 8, "display_name": "DoorDash" },

@@ -386,7 +386,7 @@
     "scope_note": "Renaming or changing the color takes effect immediately on every transaction in this category."
   },
   "categories_page": {
-    "desc": "Create, edit, or delete any category. The 9 starter categories come pre-created but can be freely modified or removed — deleting one leaves its transactions uncategorized.",
+    "desc": "Create, edit, or delete any category. The 13 starter categories come pre-created but can be freely modified or removed — deleting one leaves its transactions uncategorized.",
     "delete_confirm": "Delete \"{name}\"?",
     "delete_confirm_one": "Delete \"{name}\"? {n} transaction will become uncategorized.",
     "delete_confirm_many": "Delete \"{name}\"? {n} transactions will become uncategorized."
@@ -466,7 +466,7 @@
   "suggestions": {
     "title": "Rule suggestions",
     "desc_strong": "Expenses",
-    "desc": " that recur without a tax ID (card debit, person-to-person transfers, bills). Tax IDs are already resolved automatically on the import screen. Inflows don't appear here — income is tracked by counterparty in the Dashboard (Income Sources).",
+    "desc": " that recur without a tax ID (card debit, person-to-person transfers, bills). Inflows don't appear here — income is tracked by counterparty in the Dashboard (Income Sources).",
     "recurring_no_category": "Uncategorized recurrences",
     "min_occurrences": "min. occurrences",
     "empty": "Nothing here — every recurring counterparty already has a category, or raise the occurrence filter.",
@@ -480,7 +480,7 @@
     "badge_boleto": "BILL",
     "badge_system": "SYSTEM",
     "badge_other": "OTHER",
-    "subtitle": "Recurring expenses that don't have a category yet — card debit, person-to-person transfers, bills. Tax IDs are already resolved during import; inflows live in the Dashboard, under Income Sources.",
+    "subtitle": "Recurring expenses that don't have a category yet — card debit, person-to-person transfers, bills. Inflows live in the Dashboard, under Income Sources.",
     "empty_title": "Nothing pending here"
   },
   "settings": {
