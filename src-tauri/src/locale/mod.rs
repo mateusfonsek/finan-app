@@ -159,6 +159,9 @@ pub struct RulesDef {
     #[serde(default)]
     pub seed_rules: Vec<SeedRule>,
     pub normalization: Normalization,
+    /// Read only by the contract test (`embedded_pt_br_declares_reversal_phases`)
+    /// and by the frontend's own `import.meta.glob` copy of `rules.json`.
+    #[allow(dead_code)]
     #[serde(default)]
     pub reversals: Reversals,
 }
