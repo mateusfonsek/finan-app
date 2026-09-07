@@ -354,7 +354,12 @@
     "neutralized_pairs_title": "Pares estorno/reembolso ↔ transação revertida (desmarcados por padrão)",
     "import_n_one": "Importar {n} transação",
     "import_n_many": "Importar {n} transações",
-    "toggle_all": "Selecionar todas as transações"
+    "toggle_all": "Selecionar todas as transações",
+    "account_generic": "Conta",
+    "account_card": "cartão",
+    "account_last4": "final {v}",
+    "account_branch": "ag {v}",
+    "account_number": "cc {v}"
   },
   "tx_notes": {
     "detail": "Detalhe",

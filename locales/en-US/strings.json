@@ -354,7 +354,12 @@
     "neutralized_pairs_title": "Reversal/refund ↔ reversed transaction pairs (unchecked by default)",
     "import_n_one": "Import {n} transaction",
     "import_n_many": "Import {n} transactions",
-    "toggle_all": "Select all transactions"
+    "toggle_all": "Select all transactions",
+    "account_generic": "Account",
+    "account_card": "card",
+    "account_last4": "ending {v}",
+    "account_branch": "branch {v}",
+    "account_number": "acct {v}"
   },
   "tx_notes": {
     "detail": "Detail",

@@ -1,4 +1,5 @@
 import { Ofx } from "ofx-data-extractor";
+import { t } from "$lib/i18n/locale.svelte";
 import type {
   ParsedAccount,
   ParsedOfx,
@@ -144,17 +145,17 @@ function formatDisplayName(
   acctid: string | null,
   type: "checking" | "credit_card",
 ): string {
-  const bankLabel = bank === "unknown" ? "Conta" : capitalize(bank);
+  const bankLabel = bank === "unknown" ? t("import.account_generic") : capitalize(bank);
   if (type === "credit_card") {
     // A card only has ACCTID (a long UUID). Shows "Bank · card · last XXXX".
     const tail = acctid ? acctid.slice(-4) : null;
-    const parts = [bankLabel, "cartão"];
-    if (tail) parts.push(`final ${tail}`);
+    const parts = [bankLabel, t("import.account_card")];
+    if (tail) parts.push(t("import.account_last4", { v: tail }));
     return parts.join(" · ");
   }
   const parts = [bankLabel];
-  if (branchid) parts.push(`ag ${branchid}`);
-  if (acctid) parts.push(`cc ${acctid}`);
+  if (branchid) parts.push(t("import.account_branch", { v: branchid }));
+  if (acctid) parts.push(t("import.account_number", { v: acctid }));
   return parts.join(" · ");
 }
 
