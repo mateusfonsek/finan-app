@@ -279,8 +279,13 @@ fn reversal_phases_are_wellformed() {
     }
 }
 
-/// Flattens a strings tree into dot-paths. An array counts as one path, not one
-/// per index — its length is checked separately.
+/// Flattens a strings tree into dot-paths. An all-string array (`months`, ...)
+/// collapses to one path, because it is a single translatable unit whose
+/// length is checked separately by `calendar_arrays_have_the_expected_lengths`.
+/// An array holding anything else (e.g. `about.specs`, an array of `{label,
+/// value}` objects) is indexed instead, because collapsing it would hide the
+/// individual leaf strings from parity — every pack would compare equal
+/// regardless of how many entries or fields it actually has.
 fn flatten_paths(value: &Value, prefix: &str, out: &mut BTreeMap<String, String>) {
     match value {
         Value::Object(map) => {
@@ -297,8 +302,14 @@ fn flatten_paths(value: &Value, prefix: &str, out: &mut BTreeMap<String, String>
             out.insert(prefix.to_string(), s.clone());
         }
         Value::Array(items) => {
-            let joined: Vec<&str> = items.iter().filter_map(Value::as_str).collect();
-            out.insert(prefix.to_string(), joined.join("\u{1}"));
+            if items.iter().all(Value::is_string) {
+                let joined: Vec<&str> = items.iter().filter_map(Value::as_str).collect();
+                out.insert(prefix.to_string(), joined.join("\u{1}"));
+            } else {
+                for (i, item) in items.iter().enumerate() {
+                    flatten_paths(item, &format!("{prefix}.{i}"), out);
+                }
+            }
         }
         _ => {}
     }
