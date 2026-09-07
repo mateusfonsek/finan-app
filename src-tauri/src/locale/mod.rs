@@ -6,6 +6,9 @@
 //! can't be read (e.g. `cargo test`, or a broken bundle), we fall back to the
 //! `pt-BR` pack embedded at compile time so the app always has a valid locale.
 
+#[cfg(test)]
+mod contract;
+
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
