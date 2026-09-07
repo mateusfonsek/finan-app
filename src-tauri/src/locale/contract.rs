@@ -396,6 +396,17 @@ fn string_placeholders_match_the_reference() {
     }
 }
 
+/// The field-by-field checks below cannot see a type error or an absent
+/// required block: a pack that fails to deserialize falls back to embedded
+/// pt-BR at runtime with nothing but a stderr line.
+#[test]
+fn every_pack_loads_into_a_localepack() {
+    for (code, dir) in packs() {
+        crate::locale::LocalePack::load_from_dir(&dir)
+            .unwrap_or_else(|e| panic!("{code}: pack does not load: {e}"));
+    }
+}
+
 #[test]
 fn calendar_arrays_have_the_expected_lengths() {
     for (code, dir) in packs() {
