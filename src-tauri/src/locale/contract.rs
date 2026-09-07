@@ -214,6 +214,8 @@ fn normalization_is_wellformed() {
                 .unwrap_or_else(|e| panic!("{code}: cpf_mask_regex does not compile: {e}"));
         }
 
+        let mut has_masked_rule = false;
+
         for rule in norm["rules"].as_array().into_iter().flatten() {
             let kind = rule["type"].as_str().unwrap_or_default();
             let prefix = rule["prefix"].as_str().unwrap_or_default();
@@ -234,6 +236,9 @@ fn normalization_is_wellformed() {
                         "{code}/{prefix}: a {kind} rule needs a non-empty badge — \
                          without it the suggestion chip falls through to badge_other"
                     );
+                    if kind == "masked" {
+                        has_masked_rule = true;
+                    }
                 }
                 "system" => assert!(
                     rule["key"].as_str().is_some_and(|s| !s.is_empty()),
@@ -252,6 +257,14 @@ fn normalization_is_wellformed() {
                     "{code}/{prefix}: tone must be one of {BADGE_TONES:?}, got {tone:?}"
                 );
             }
+        }
+
+        if has_masked_rule {
+            assert!(
+                !mask.trim().is_empty(),
+                "{code}: a masked rule depends on cpf_mask_regex, which is empty — \
+                 the rule would never fire"
+            );
         }
     }
 }
