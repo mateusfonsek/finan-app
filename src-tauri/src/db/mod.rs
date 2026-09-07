@@ -112,11 +112,20 @@ pub fn is_pristine(conn: &Connection) -> AppResult<bool> {
 /// Replace pack-seeded data wholesale. Safe ONLY on a pristine DB — the caller
 /// checks. Renaming categories by key is not enough on its own: the previous
 /// pack's seed rules would survive and the new pack's would never be inserted.
-pub fn reseed_from_pack(conn: &Connection, pack: &LocalePack) -> AppResult<()> {
-    conn.execute("DELETE FROM rule_patterns", [])?;
-    conn.execute("DELETE FROM rules", [])?;
-    conn.execute("DELETE FROM categories", [])?;
-    seed_from_pack(conn, pack)
+///
+/// Runs as one transaction: the three deletes and `seed_from_pack`'s inserts
+/// either all land or none do. Without this, a failure partway (a malformed
+/// pack, a full disk) could leave the database with zero categories and zero
+/// rules — worse than either the old or the new pack — with no way back
+/// except another successful reseed.
+pub fn reseed_from_pack(conn: &mut Connection, pack: &LocalePack) -> AppResult<()> {
+    let tx = conn.transaction()?;
+    tx.execute("DELETE FROM rule_patterns", [])?;
+    tx.execute("DELETE FROM rules", [])?;
+    tx.execute("DELETE FROM categories", [])?;
+    seed_from_pack(&tx, pack)?;
+    tx.commit()?;
+    Ok(())
 }
 
 #[cfg(test)]
@@ -182,10 +191,10 @@ mod tests {
 
     #[test]
     fn reseed_from_pack_replaces_pt_br_with_en_us() {
-        let conn = fresh_conn();
+        let mut conn = fresh_conn();
         seed_from_pack(&conn, &LocalePack::embedded_pt_br()).unwrap();
 
-        reseed_from_pack(&conn, &en_us_pack()).unwrap();
+        reseed_from_pack(&mut conn, &en_us_pack()).unwrap();
 
         let names: Vec<String> = conn
             .prepare("SELECT name FROM categories ORDER BY name")
@@ -224,11 +233,11 @@ mod tests {
 
     #[test]
     fn reseed_from_pack_twice_is_stable() {
-        let conn = fresh_conn();
+        let mut conn = fresh_conn();
         seed_from_pack(&conn, &LocalePack::embedded_pt_br()).unwrap();
 
-        reseed_from_pack(&conn, &en_us_pack()).unwrap();
-        reseed_from_pack(&conn, &en_us_pack()).unwrap();
+        reseed_from_pack(&mut conn, &en_us_pack()).unwrap();
+        reseed_from_pack(&mut conn, &en_us_pack()).unwrap();
 
         let category_count: i64 = conn
             .query_row("SELECT COUNT(*) FROM categories", [], |r| r.get(0))
@@ -239,5 +248,54 @@ mod tests {
             .query_row("SELECT COUNT(*) FROM rule_patterns", [], |r| r.get(0))
             .unwrap();
         assert_eq!(pattern_count as usize, en_us_pack().rules.seed_rules.len());
+    }
+
+    /// Proves the rollback, not just that a transaction wrapper exists: a
+    /// pack with one category violating the `kind` CHECK constraint fails
+    /// partway through `seed_from_pack`, after the deletes already ran (in
+    /// the same, still-uncommitted transaction) and after several earlier
+    /// categories in the broken pack were already (re)inserted. The original
+    /// pt-BR data must still be there afterward, untouched.
+    #[test]
+    fn reseed_from_pack_rolls_back_a_failure_partway() {
+        let mut conn = fresh_conn();
+        let original = LocalePack::embedded_pt_br();
+        seed_from_pack(&conn, &original).unwrap();
+
+        let mut broken = original.clone();
+        assert!(
+            broken.categories.len() > 1,
+            "the pt-BR pack needs at least two categories for this test to be meaningful"
+        );
+        broken.categories[1].kind = "bogus".to_string();
+
+        let result = reseed_from_pack(&mut conn, &broken);
+        assert!(
+            result.is_err(),
+            "a CHECK-constraint violation on `kind` must surface as an error"
+        );
+
+        let names: std::collections::BTreeSet<String> = conn
+            .prepare("SELECT name FROM categories")
+            .unwrap()
+            .query_map([], |r| r.get(0))
+            .unwrap()
+            .collect::<rusqlite::Result<_>>()
+            .unwrap();
+        let original_names: std::collections::BTreeSet<String> =
+            original.categories.iter().map(|c| c.name.clone()).collect();
+        assert_eq!(
+            names, original_names,
+            "a failed reseed must leave the pre-reseed categories intact, not an empty table"
+        );
+
+        let pattern_count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM rule_patterns", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(
+            pattern_count as usize,
+            original.rules.seed_rules.len(),
+            "a failed reseed must leave the pre-reseed rules intact, not an empty table"
+        );
     }
 }

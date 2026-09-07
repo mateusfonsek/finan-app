@@ -405,9 +405,9 @@ pub fn set_active_locale(
     let pack = load_pack(state.locales_root.as_deref(), &code);
 
     {
-        let conn = db.conn.lock().expect("db mutex poisoned");
+        let mut conn = db.conn.lock().expect("db mutex poisoned");
         if crate::db::is_pristine(&conn)? {
-            crate::db::reseed_from_pack(&conn, &pack)?;
+            crate::db::reseed_from_pack(&mut conn, &pack)?;
         }
     }
 
