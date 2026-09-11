@@ -64,15 +64,11 @@
   },
   "common": {
     "cancel": "Cancel",
-    "save": "Save",
     "delete": "Delete",
-    "edit": "Edit",
     "close": "Close",
-    "language": "Language",
     "loading": "Loading…",
     "actions": "Actions",
-    "create": "Create",
-    "retry": "Try again"
+    "create": "Create"
   },
   "month_stepper": {
     "prev_year": "Previous year",
@@ -157,7 +153,6 @@
     "empty": "No transactions yet",
     "import_link": "Import an OFX",
     "empty_desc": "Import your bank's .ofx statement and transactions show up here, already categorized by your rules.",
-    "sort_by": "Sort by {col}",
     "sort_asc": "{col} — lowest to highest",
     "sort_desc": "{col} — highest to lowest",
     "sort_date_asc": "Date — oldest to most recent",
@@ -212,7 +207,6 @@
     "empty_title": "No rules yet"
   },
   "rule_form": {
-    "form_edit": "Edit rule",
     "form_new": "New rule",
     "pattern_label": "Description snippet",
     "patterns_label": "Description snippets",
@@ -226,7 +220,6 @@
     "due_day": "Due on day",
     "due_day_title": "Day of the month the bill is due. Leave empty if the rule has no fixed due date.",
     "saving": "Saving…",
-    "save": "Save",
     "add": "Add",
     "pattern_required": "Pattern can't be empty.",
     "category_required": "Select a category.",
@@ -414,7 +407,6 @@
     "or": "or",
     "then_use": "use category",
     "no_category": "— none —",
-    "pattern_hint": "Searched for within the description, anywhere. Case-insensitive.",
     "patterns_hint": "The rule applies when ANY of these appear in the description. Use short, stable snippets — pasting the whole statement line breaks if the bank changes a number.",
     "due_day_hint": "Day of the month the bill is due — this is what places the rule on the calendar. Empty = no fixed due date.",
     "priority_hint": "When two rules match the same transaction, the higher-priority one wins.",
@@ -426,7 +418,6 @@
     "count_one": "1 transaction",
     "count_many": "{n} transactions",
     "total": "{value} total",
-    "loading": "Loading…",
     "empty_title": "No transaction matches this rule",
     "empty_desc": "No description in your statement contains this rule's snippets. Check whether they're worded the way your bank writes them.",
     "no_category": "No category",
@@ -444,32 +435,23 @@
     "by_rule": "rule \"{rule}\"",
     "apply_one": "Apply 1 change",
     "apply_many": "Apply {n} changes",
-    "apply_none": "Apply",
     "selected_count": "{n} of {total} selected",
     "selected_none": "None selected",
     "applying": "Applying…",
     "nothing_to_do": "The rules are already applied — no transaction would change category.",
     "applied_one": "1 transaction recategorized.",
-    "applied_many": "{n} transactions recategorized.",
-    "checking": "Checking…"
+    "applied_many": "{n} transactions recategorized."
   },
   "rules_page": {
     "desc": "Rules like \"if description contains X, category Y\" are applied automatically on every import. Manual categorization is never overwritten.",
     "applying": "Checking…",
     "apply": "Review and apply",
     "save_changes": "Save changes",
-    "delete_confirm": "Delete rule \"{pattern}\"?",
-    "applied_none": "No transaction was categorized (no pattern matched).",
-    "applied_one": "{n} transaction categorized automatically.",
-    "applied_many": "{n} transactions categorized automatically."
+    "delete_confirm": "Delete rule \"{pattern}\"?"
   },
   "calendar_page": {
-    "desc_1": "Heatmap of",
-    "desc_strong": "real",
-    "desc_2": "inflows/outflows (excluding transfers and investments). Click a day to see everything that happened, grouped by type.",
     "inflows": "Inflows",
     "outflows": "Outflows",
-    "loading": "loading…",
     "net": "Net",
     "subtitle": "Real inflows and outflows for the month, day by day (transfers and investments excluded). Click a day to see everything that happened."
   },

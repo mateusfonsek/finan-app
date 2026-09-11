@@ -2,8 +2,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { EnrichEvent } from "$lib/bindings";
 
 const api = vi.hoisted(() => ({
-  startCnpjEnrichment: vi.fn(),
-  cancelCnpjEnrichment: vi.fn(),
+  startTaxIdEnrichment: vi.fn(),
+  cancelTaxIdEnrichment: vi.fn(),
 }));
 vi.mock("$lib/api/enrichJob", () => api);
 
@@ -14,7 +14,7 @@ const emptyReport = { created_rules: [], txs_classified: 0, unresolved: [] };
 /** Puts the test in control of when each event arrives. */
 function captureEmitter() {
   let emit: (e: EnrichEvent) => void = () => {};
-  api.startCnpjEnrichment.mockImplementation(
+  api.startTaxIdEnrichment.mockImplementation(
     async (_id: number | null, onEvent: (e: EnrichEvent) => void) => {
       emit = onEvent;
     },
@@ -23,8 +23,8 @@ function captureEmitter() {
 }
 
 beforeEach(() => {
-  api.startCnpjEnrichment.mockReset();
-  api.cancelCnpjEnrichment.mockReset();
+  api.startTaxIdEnrichment.mockReset();
+  api.cancelTaxIdEnrichment.mockReset();
 });
 
 describe("activity store", () => {
@@ -74,7 +74,7 @@ describe("activity store", () => {
 
   it("a failure to start becomes an error state, not a leaking exception", async () => {
     const s = createActivityStore();
-    api.startCnpjEnrichment.mockRejectedValue(new Error("enrichment already running"));
+    api.startTaxIdEnrichment.mockRejectedValue(new Error("enrichment already running"));
 
     await s.start(1);
 
@@ -109,7 +109,7 @@ describe("activity store", () => {
 
   it("an error shows even when no lookup ever happened", async () => {
     const s = createActivityStore();
-    api.startCnpjEnrichment.mockRejectedValue(new Error("enrichment already running"));
+    api.startTaxIdEnrichment.mockRejectedValue(new Error("enrichment already running"));
 
     await s.start(1);
 
@@ -120,7 +120,7 @@ describe("activity store", () => {
   it("cancel asks the backend to stop", async () => {
     const s = createActivityStore();
     await s.cancel();
-    expect(api.cancelCnpjEnrichment).toHaveBeenCalledOnce();
+    expect(api.cancelTaxIdEnrichment).toHaveBeenCalledOnce();
   });
 
   it("patchReport swaps the report without touching the rest of the state", async () => {

@@ -1,6 +1,7 @@
 <script lang="ts">
   import { formatMoney } from "$lib/format/money";
   import { locale } from "$lib/i18n/locale.svelte";
+  import { leadingBlanks, weekdayOrder } from "./week";
   import type { CalendarEvent } from "$lib/bindings";
 
   const t = locale.t;
@@ -37,7 +38,7 @@
   type DayCell = {
     day: number | null;
     isToday: boolean;
-    /** Regras vencendo neste dia (com due_day == d) */
+    /** Rules falling due on this day (due_day == d). */
     due: CalendarEvent[];
   };
 
@@ -45,12 +46,13 @@
     today.slice(0, 7) === month ? Number(today.slice(8, 10)) : -1,
   );
 
-  let cells = $derived(buildGrid(month, today, events));
+  let cells = $derived(buildGrid(month, today, events, locale.firstDayOfWeek));
 
   function buildGrid(
     monthStr: string,
     todayStr: string,
     evs: CalendarEvent[],
+    firstDayOfWeek: number,
   ): DayCell[] {
     const [yStr, mStr] = monthStr.split("-");
     const year = Number(yStr);
@@ -73,7 +75,7 @@
     }
 
     const out: DayCell[] = [];
-    for (let i = 0; i < startWeekday; i++) {
+    for (let i = 0; i < leadingBlanks(startWeekday, firstDayOfWeek); i++) {
       out.push({ day: null, isToday: false, due: [] });
     }
     for (let d = 1; d <= daysInMonth; d++) {
@@ -134,9 +136,9 @@
 
 <div class="card overflow-hidden">
   <div class="grid grid-cols-7 border-b border-border-subtle">
-    {#each locale.weekdaysShort as wd}
+    {#each weekdayOrder(locale.firstDayOfWeek) as wd}
       <div class="px-2 py-2 text-cap font-medium text-fg-subtle text-center">
-        {wd}
+        {locale.weekdaysShort[wd]}
       </div>
     {/each}
   </div>

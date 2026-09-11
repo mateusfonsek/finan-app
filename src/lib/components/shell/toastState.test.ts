@@ -15,11 +15,11 @@ function withDiscovery(hash = "h1") {
 }
 
 describe("phaseOf", () => {
-  it("esconde quando não há descoberta", () => {
+  it("hides when there is no discovery", () => {
     expect(phaseOf(initialToastState, false)).toBe("hidden");
   });
 
-  it("nasce expandida — é o momento em que o app avisa o que chegou", () => {
+  it("starts expanded — this is the moment the app announces what arrived", () => {
     expect(phaseOf(withDiscovery(), false)).toBe("expanded");
   });
 
@@ -40,7 +40,7 @@ describe("phaseOf", () => {
     expect(phaseOf(s, false)).toBe("expanded");
   });
 
-  it("nunca fica escondida por conta própria: sem import, sempre é expanded ou collapsed", () => {
+  it("never hides on its own: with no import running it is expanded or collapsed", () => {
     // The regression that caused this bug — the notification vanished and the
     // discovery stayed unreachable until the app was reopened.
     const estados = [
@@ -74,28 +74,28 @@ describe("syncHash", () => {
 });
 
 describe("autoCollapseArmed", () => {
-  it("arma numa descoberta recém-chegada", () => {
+  it("arms on a freshly arrived discovery", () => {
     expect(autoCollapseArmed(withDiscovery(), false, false)).toBe(true);
   });
 
-  it("não arma sob o cursor — encolher enquanto se lê é hostil", () => {
+  it("does not arm under the cursor — collapsing mid-read is hostile", () => {
     expect(autoCollapseArmed(withDiscovery(), false, true)).toBe(false);
   });
 
-  it("não arma depois de já ter encolhido sozinha", () => {
+  it("does not arm once it has already collapsed on its own", () => {
     expect(autoCollapseArmed(autoCollapse(withDiscovery()), false, false)).toBe(false);
   });
 
-  it("não arma depois que o usuário reabriu: aí foi escolha dele", () => {
+  it("does not arm after the user reopened it: the shape is their choice now", () => {
     const s = expand(autoCollapse(withDiscovery()));
     expect(autoCollapseArmed(s, false, false)).toBe(false);
   });
 
-  it("não arma durante um import", () => {
+  it("does not arm while an import is running", () => {
     expect(autoCollapseArmed(withDiscovery(), true, false)).toBe(false);
   });
 
-  it("não arma sem descoberta", () => {
+  it("does not arm with no discovery", () => {
     expect(autoCollapseArmed(initialToastState, false, false)).toBe(false);
   });
 

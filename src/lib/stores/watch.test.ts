@@ -47,7 +47,7 @@ describe("watch store", () => {
     api.getAppSetting.mockResolvedValue("1");
   });
 
-  it("expõe descobertas que parseiam, com contagem e período", async () => {
+  it("exposes discoveries that parse, with their count and date range", async () => {
     api.scanWatchedFolders.mockResolvedValue([discovered("h1", "extrato.ofx")]);
     loadOfxFromPath.mockResolvedValue(parsed(87));
 
@@ -64,7 +64,7 @@ describe("watch store", () => {
     });
   });
 
-  it("marca como invalid e não expõe arquivo que não parseia", async () => {
+  it("a file that does not parse is marked invalid and never exposed", async () => {
     api.scanWatchedFolders.mockResolvedValue([discovered("h2", "lixo.ofx")]);
     loadOfxFromPath.mockRejectedValue(new Error("not ofx"));
 
@@ -75,7 +75,7 @@ describe("watch store", () => {
     expect(api.markFile).toHaveBeenCalledWith("h2", "invalid");
   });
 
-  it("falha de leitura não marca invalid — o arquivo continua pendente", async () => {
+  it("a read failure does not mark invalid — the file stays pending", async () => {
     // An iCloud stub evicted back to a placeholder, a moved file, permission
     // denied: `invalid` is permanent and would bury the statement forever, since
     // the key is the content hash.
@@ -91,7 +91,7 @@ describe("watch store", () => {
     expect(store.pendingCount).toBe(0);
   });
 
-  it("arquivo que não deu pra ler volta a aparecer na varredura seguinte", async () => {
+  it("a file that could not be read comes back on the next scan", async () => {
     api.scanWatchedFolders.mockResolvedValue([discovered("h7", "nubank.ofx")]);
     loadOfxFromPath.mockRejectedValueOnce(
       new OfxReadError("/tmp/nubank.ofx", new Error("No such file or directory")),
@@ -109,7 +109,7 @@ describe("watch store", () => {
     expect(store.discoveries[0]).toMatchObject({ hash: "h7", txCount: 12 });
   });
 
-  it("pedido de abertura é entregue uma vez só", async () => {
+  it("an open request is served exactly once", async () => {
     const store = createWatchStore();
     const discovery = {
       hash: "h8",
@@ -143,7 +143,7 @@ describe("watch store", () => {
     expect(store.pendingCount).toBe(0);
   });
 
-  it("não varre de novo dentro da janela de throttle", async () => {
+  it("does not scan again inside the throttle window", async () => {
     api.scanWatchedFolders.mockResolvedValue([]);
     const store = createWatchStore();
 
@@ -153,7 +153,7 @@ describe("watch store", () => {
     expect(api.scanWatchedFolders).toHaveBeenCalledTimes(1);
   });
 
-  it("força a varredura quando pedido explicitamente", async () => {
+  it("scans anyway when forced", async () => {
     api.scanWatchedFolders.mockResolvedValue([]);
     const store = createWatchStore();
 
@@ -163,7 +163,7 @@ describe("watch store", () => {
     expect(api.scanWatchedFolders).toHaveBeenCalledTimes(2);
   });
 
-  it("não varre quando a feature está desligada", async () => {
+  it("does not scan while the feature is off", async () => {
     api.getAppSetting.mockResolvedValue(null);
     const store = createWatchStore();
 
@@ -183,7 +183,7 @@ describe("watch store", () => {
     expect(store.enabled).toBe(true);
   });
 
-  it("habilitar força varredura imediata", async () => {
+  it("enabling scans immediately", async () => {
     api.scanWatchedFolders.mockResolvedValue([]);
     const store = createWatchStore();
 
@@ -214,7 +214,7 @@ describe("watch store", () => {
     expect(store.pendingCount).toBe(0);
   });
 
-  it("desabilitar não varre", async () => {
+  it("disabling does not scan", async () => {
     const store = createWatchStore();
 
     await store.setEnabled(false);
@@ -222,7 +222,7 @@ describe("watch store", () => {
     expect(api.scanWatchedFolders).not.toHaveBeenCalled();
   });
 
-  it("duas chamadas concorrentes de refresh compartilham uma única leitura de settings", async () => {
+  it("two concurrent refreshes share a single settings read", async () => {
     api.scanWatchedFolders.mockResolvedValue([]);
     const store = createWatchStore();
 
@@ -233,7 +233,7 @@ describe("watch store", () => {
     expect(api.getAppSetting).toHaveBeenCalledTimes(1);
   });
 
-  it("resolve durante uma varredura em andamento não revive o arquivo já resolvido", async () => {
+  it("resolving mid-scan does not revive the file the scan still had in its snapshot", async () => {
     let releaseScan!: (files: ReturnType<typeof discovered>[]) => void;
     const scanPromise = new Promise<ReturnType<typeof discovered>[]>((resolve) => {
       releaseScan = resolve;

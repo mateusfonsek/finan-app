@@ -19,7 +19,10 @@ locales/
    Use **language-REGION**, not just language — the classification rules are
    country-specific (a Brazilian CNPJ ≠ a UK company number).
 2. **`manifest.json`** — set `code`, `name`, `flag`, `currency` (ISO code +
-   `Intl` locale), `dateLocale`, and `taxId`:
+   `Intl` locale), `dateLocale`, `firstDayOfWeek`, and `taxId`:
+   - `firstDayOfWeek`: the weekday the calendar grid starts on, `0` = Sunday
+     through `6` = Saturday (most of Europe wants `1`). Omitting it means
+     Sunday.
    - `regex`: how a business tax id appears in a bank statement description
      (Brazil: CNPJ `NN.NNN.NNN/NNNN-NN`). Leave `regex` empty to disable tax-id
      enrichment for your locale.
@@ -45,6 +48,9 @@ locales/
      `phases` empty to disable reversal detection for your locale.
 5. **`strings.json`** — translate every value. Keep the **keys** unchanged.
    `{v}`, `{name}` etc. are interpolation placeholders — keep them.
+   `weekdays_short` is the one array whose ORDER is fixed: it is indexed by the
+   weekday number, so it always starts at Sunday, whatever `firstDayOfWeek`
+   says. Rotating it yourself would desync it from the grid, silently.
 6. Rebuild the app. Your language appears in **Settings → Idioma** automatically.
 
 ## Notes

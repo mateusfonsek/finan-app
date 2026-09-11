@@ -71,7 +71,7 @@ impl EnrichJob {
 /// block, it only spawns.
 #[tauri::command]
 #[specta::specta]
-pub fn start_cnpj_enrichment(
+pub fn start_tax_id_enrichment(
     app: AppHandle,
     account_id: Option<i64>,
     on_event: Channel<EnrichEvent>,
@@ -146,7 +146,7 @@ pub fn start_cnpj_enrichment(
 /// work, not undoing the work done.
 #[tauri::command]
 #[specta::specta]
-pub fn cancel_cnpj_enrichment(job: State<'_, EnrichJob>) {
+pub fn cancel_tax_id_enrichment(job: State<'_, EnrichJob>) {
     job.request_cancel();
 }
 

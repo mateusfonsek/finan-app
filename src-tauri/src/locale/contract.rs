@@ -80,6 +80,17 @@ fn manifest_is_wellformed() {
             "{code}: currency.locale must be set — Intl needs it to format money"
         );
 
+        // Indexing `weekdays_short` stays Sunday-first in every pack; this
+        // field only rotates the calendar grid. A pack that omits it falls
+        // back to Sunday, so the failure it guards against is a typo'd or
+        // out-of-range value, which would silently shift the whole month.
+        let first_day = m["firstDayOfWeek"].as_i64();
+        assert!(
+            first_day.is_some_and(|d| (0..=6).contains(&d)),
+            "{code}: firstDayOfWeek must be an integer 0-6 (0 = Sunday), got {:?}",
+            m["firstDayOfWeek"]
+        );
+
         let regex = m["taxId"]["regex"].as_str().unwrap_or_default();
         if !regex.trim().is_empty() {
             Regex::new(regex)
@@ -418,6 +429,104 @@ fn every_pack_loads_into_a_localepack() {
         crate::locale::LocalePack::load_from_dir(&dir)
             .unwrap_or_else(|e| panic!("{code}: pack does not load: {e}"));
     }
+}
+
+/// A string key nothing reads is not inert: `strings_keys_match_the_reference`
+/// forces every future pack to translate it, so dead keys tax translators
+/// forever. Nothing else notices, because an unused key never fails at runtime.
+///
+/// A key counts as reached four ways, matching how the code actually asks for
+/// one. The failure message names all four, because the day someone invents a
+/// fifth this test must be a signpost rather than an obstacle.
+#[test]
+fn every_string_key_is_reached_by_code() {
+    let mut frontend = String::new();
+    for entry in walk(&repo_root().join("src")) {
+        let ext = entry.extension().and_then(|e| e.to_str()).unwrap_or("");
+        if matches!(ext, "ts" | "svelte") && entry.file_name().is_some_and(|n| n != "bindings.ts") {
+            frontend.push_str(&std::fs::read_to_string(&entry).expect("readable source"));
+            frontend.push('\n');
+        }
+    }
+    let mut backend = String::new();
+    for entry in walk(&repo_root().join("src-tauri").join("src")) {
+        if entry.extension().and_then(|e| e.to_str()) == Some("rs") {
+            backend.push_str(&std::fs::read_to_string(&entry).expect("readable source"));
+            backend.push('\n');
+        }
+    }
+
+    // `t("nav." + item.key)` and `` t(`import.role_${role}`) `` build a key at
+    // runtime; everything under the literal prefix is reachable.
+    let concat = Regex::new(r#"["`]([a-z_0-9]+(?:\.[a-z_0-9]+)*[._])["`]?\s*\+"#).expect("static regex");
+    let interp = Regex::new(r#"`([a-z_0-9]+(?:\.[a-z_0-9]+)*[._])\$\{"#).expect("static regex");
+    let prefixes: BTreeSet<String> = concat
+        .captures_iter(&frontend)
+        .chain(interp.captures_iter(&frontend))
+        .map(|c| c[1].to_string())
+        .collect();
+
+    let quoted = |haystack: &str, key: &str| {
+        haystack.contains(&format!("\"{key}\""))
+            || haystack.contains(&format!("'{key}'"))
+            || haystack.contains(&format!("`{key}`"))
+    };
+
+    let reached = |key: &str| {
+        if quoted(&frontend, key) {
+            return true;
+        }
+        if prefixes.iter().any(|p| key.starts_with(p.as_str())) {
+            return true;
+        }
+        // `LocalePack::menu_str` looks menu labels up by leaf name.
+        if let Some(leaf) = key.strip_prefix("menu.") {
+            if quoted(&backend, leaf) {
+                return true;
+            }
+        }
+        // `locale.raw("about.specs")` pulls a whole subtree in one read.
+        let mut ancestor = key;
+        while let Some((parent, _)) = ancestor.rsplit_once('.') {
+            if quoted(&frontend, parent) {
+                return true;
+            }
+            ancestor = parent;
+        }
+        false
+    };
+
+    let dead: Vec<String> = strings_of(REFERENCE)
+        .keys()
+        .filter(|k| !reached(k))
+        .cloned()
+        .collect();
+
+    assert!(
+        dead.is_empty(),
+        "these {REFERENCE} string keys are reached by no code: {dead:?}\n\
+         Delete them from every pack, or — if one IS used — make the use \
+         visible to this test: quote the full dot-path, use a literal prefix \
+         the concatenation can be read from, read an ancestor with \
+         `locale.raw`, or look it up by leaf through `menu_str`."
+    );
+}
+
+/// Every file under `dir`, recursively.
+fn walk(dir: &Path) -> Vec<PathBuf> {
+    let mut out = Vec::new();
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return out;
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            out.extend(walk(&path));
+        } else {
+            out.push(path);
+        }
+    }
+    out
 }
 
 #[test]

@@ -14,6 +14,7 @@ export type Manifest = {
   flag: string;
   currency: { code: string; locale: string };
   dateLocale: string;
+  firstDayOfWeek: number;
   taxId: { name: string; regex: string; provider: string };
 };
 
@@ -159,6 +160,11 @@ function createLocale() {
     },
     get dateLocale(): string {
       return packs[code]?.manifest.dateLocale ?? DEFAULT_LOCALE;
+    },
+    /** Weekday the calendar grid starts on (`Date.getDay()` value). Sunday when
+     *  the pack does not say — `weekdays_short` is Sunday-indexed regardless. */
+    get firstDayOfWeek(): number {
+      return packs[code]?.manifest.firstDayOfWeek ?? 0;
     },
     /** Reversal-detection phases for the active locale; empty disables it. */
     get reversals(): ReversalPhase[] {
