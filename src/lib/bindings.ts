@@ -409,6 +409,14 @@ async incomeSources(month: string | null) : Promise<Result<IncomeSource[], strin
     else return { status: "error", error: e  as any };
 }
 },
+async dataFreshness() : Promise<Result<AccountFreshness[], string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("data_freshness") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 /**
  * Returns the absolute path of the active SQLite DB file as a string.
  */
@@ -596,6 +604,18 @@ export type Account = { id: number; name: string; bank: string | null; ofx_accti
  * categorizes transactions from this account.
  */
 kind: string; created_at: string }
+export type AccountFreshness = { account_id: number; 
+/**
+ * Already human-readable: the importer builds it from the OFX ("Nubank ·
+ * cartão"), so it carries the account kind without a field of its own.
+ */
+name: string; 
+/**
+ * Newest transaction date (`YYYY-MM-DD`) on this account. `None` for an
+ * account that has none — an import that created the account and then
+ * failed must not pass for data.
+ */
+latest_date: string | null }
 export type AutoClassifyReport = { created_rules: Rule[]; txs_classified: number; unresolved: CnpjResolution[] }
 /**
  * A calendar event: a rule plus an optional due day plus an optional matching

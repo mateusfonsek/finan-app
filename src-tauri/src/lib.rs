@@ -50,6 +50,7 @@ pub fn run() {
         commands::summary::investment_summary,
         commands::summary::transfer_summary,
         commands::summary::income_sources,
+        commands::freshness::data_freshness,
         commands::backup::db_path,
         commands::backup::read_file_bytes,
         commands::openfile::take_pending_ofx,

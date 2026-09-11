@@ -287,6 +287,17 @@
     "biggest_expenses": "Biggest expenses this month",
     "no_transf_invest": "excl. transfers/investments"
   },
+  "freshness": {
+    "up_to": "Data through {date}",
+    "current": "up to date",
+    "behind_one": "1 day missing",
+    "behind_many": "{n} days missing",
+    "review_one": "Review 1 statement",
+    "review_many": "Review {n} statements",
+    "enable_watch": "Turn on watched folder",
+    "by_account": "Per account",
+    "account_up_to": "through {date}"
+  },
   "import": {
     "drop_ofx_error": "Drop an .ofx file.",
     "dropzone_title": "Drag your OFX statement here",
@@ -513,7 +524,11 @@
     "enrich_desc": "During import, queries an external service to identify the company behind each {taxId} in the description and suggest a category. Requires internet.",
     "enrich_provider": "Lookup: {provider}",
     "enrich_on": "On",
-    "enrich_off": "Off"
+    "enrich_off": "Off",
+    "freshness_title": "Data freshness notice",
+    "freshness_desc": "Shows on the dashboard how far your data goes and how many days are missing since the newest imported transaction.",
+    "freshness_on": "On",
+    "freshness_off": "Off"
   },
   "watch": {
     "section_title": "Automatic import",
