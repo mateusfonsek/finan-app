@@ -287,6 +287,17 @@
     "biggest_expenses": "Maiores gastos do mês",
     "no_transf_invest": "sem transf./invest."
   },
+  "freshness": {
+    "up_to": "Dados até {date}",
+    "current": "em dia",
+    "behind_one": "falta 1 dia",
+    "behind_many": "faltam {n} dias",
+    "review_one": "Rever 1 extrato",
+    "review_many": "Rever {n} extratos",
+    "enable_watch": "Ligar pasta observada",
+    "by_account": "Detalhe por conta",
+    "account_up_to": "até {date}"
+  },
   "import": {
     "drop_ofx_error": "Solte um arquivo .ofx.",
     "dropzone_title": "Arraste seu extrato OFX",
@@ -513,7 +524,11 @@
     "enrich_desc": "Durante o import, consulta um serviço externo pra descobrir a empresa por trás de cada {taxId} na descrição e sugerir categoria. Requer internet.",
     "enrich_provider": "Consulta: {provider}",
     "enrich_on": "Ativado",
-    "enrich_off": "Desativado"
+    "enrich_off": "Desativado",
+    "freshness_title": "Aviso de frescor dos dados",
+    "freshness_desc": "Mostra no painel até quando seus dados vão e quantos dias faltam desde o último lançamento importado.",
+    "freshness_on": "Ativado",
+    "freshness_off": "Desativado"
   },
   "watch": {
     "section_title": "Importação automática",

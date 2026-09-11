@@ -32,6 +32,7 @@
     updateWatchedFolderPath,
   } from "$lib/api/watch";
   import { enrichmentStatus, setEnrichmentEnabled } from "$lib/api/enrichment";
+  import { freshnessEnabled, setFreshnessEnabled } from "$lib/api/freshness";
   import type { EnrichmentStatus, WatchedFolder } from "$lib/bindings";
 
   const t = locale.t;
@@ -48,6 +49,13 @@
   async function toggleEnrich(value: boolean) {
     await setEnrichmentEnabled(value);
     enrich = await enrichmentStatus();
+  }
+
+  let freshness = $state(true);
+
+  async function toggleFreshness(value: boolean) {
+    await setFreshnessEnabled(value);
+    freshness = value;
   }
 
   let folders = $state<WatchedFolder[]>([]);
@@ -101,6 +109,7 @@
       path = await dbPath();
       void healthCheck().then((h) => (version = h.version)).catch(() => {});
       await loadEnrich();
+      freshness = await freshnessEnabled();
       await watch.loadEnabled();
       if (watch.enabled) await loadFolders();
     } catch (e) {
@@ -367,6 +376,25 @@
       </div>
     </Card>
   {/if}
+
+  <!-- ── Data freshness notice ──────────────────────────────────────────── -->
+  <Card title={t("settings.freshness_title")}>
+    <div class="flex items-start justify-between gap-4">
+      <p class="text-sub text-fg-muted leading-relaxed min-w-0">
+        {t("settings.freshness_desc")}
+      </p>
+      <div class="flex items-center gap-2.5 shrink-0">
+        <span class="text-foot text-fg-subtle">
+          {freshness ? t("settings.freshness_on") : t("settings.freshness_off")}
+        </span>
+        <Switch
+          checked={freshness}
+          onChange={toggleFreshness}
+          label={t("settings.freshness_title")}
+        />
+      </div>
+    </div>
+  </Card>
 
   <!-- ── Automatic import ───────────────────────────────────────────────── -->
   <Card title={t("watch.section_title")}>

@@ -16,8 +16,10 @@
   import TopCategoriesList from "$lib/components/dashboard/TopCategoriesList.svelte";
   import IncomeSourcesPanel from "$lib/components/dashboard/IncomeSourcesPanel.svelte";
   import RecentList from "$lib/components/dashboard/RecentList.svelte";
+  import FreshnessBar from "$lib/components/dashboard/FreshnessBar.svelte";
   import { formatMoney } from "$lib/format/money";
   import { filters } from "$lib/stores/filters.svelte";
+  import { watch } from "$lib/stores/watch.svelte";
   import {
     incomeSources,
     investmentSummary,
@@ -27,6 +29,8 @@
     transferSummary,
   } from "$lib/api/summary";
   import { topExpenses } from "$lib/api/transactions";
+  import { dataFreshness, freshnessEnabled } from "$lib/api/freshness";
+  import { computeFreshness, type Freshness } from "$lib/format/freshness";
   import type {
     CategorySpend,
     ExpenseRow,
@@ -44,6 +48,8 @@
   let investments = $state<InvestmentSummary | null>(null);
   let transfers = $state<TransferSummary | null>(null);
   let sources = $state<IncomeSource[]>([]);
+  /** `null` when the notice is switched off, or when nothing was imported yet. */
+  let freshness = $state<Freshness | null>(null);
   let loading = $state(true);
   let error = $state<string | null>(null);
 
@@ -68,9 +74,26 @@
     }
   }
 
+  /** Secondary information in its own try: the dashboard must still render if
+   *  this fails, and it does not depend on the selected month. */
+  async function loadFreshness() {
+    try {
+      if (!(await freshnessEnabled())) return;
+      // What the bar offers depends on the watched folder. Settling that flag
+      // before the bar exists is what stops it from flashing "turn the folder
+      // on" at someone who already did — the store shares one in-flight read,
+      // so asking here costs nothing.
+      await watch.loadEnabled();
+      freshness = computeFreshness(await dataFreshness(), new Date());
+    } catch {
+      freshness = null;
+    }
+  }
+
   onMount(async () => {
     try {
       byMonth = await summaryByMonth(12);
+      await loadFreshness();
       await refresh();
     } catch (e) {
       error = e instanceof Error ? e.message : String(e);
@@ -112,6 +135,12 @@
   {:else if error}
     <ErrorNote message={error} />
   {:else}
+    <!-- Above the KPIs because it qualifies them: every number below is only
+         as current as this line says. -->
+    {#if freshness}
+      <div in:rise><FreshnessBar {freshness} /></div>
+    {/if}
+
     {#if kpis}
       <!-- Headline KPIs count only REAL spending and income. The caption says
            what is left out. -->
