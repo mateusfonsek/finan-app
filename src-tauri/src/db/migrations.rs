@@ -68,6 +68,10 @@ const MIGRATIONS: &[(&str, &str)] = &[
         "0017_rule_patterns",
         include_str!("../../migrations/0017_rule_patterns.sql"),
     ),
+    (
+        "0018_bill_settlements",
+        include_str!("../../migrations/0018_bill_settlements.sql"),
+    ),
 ];
 
 /// Applies pending migrations. Returns `true` when this call created a **brand
@@ -268,6 +272,7 @@ mod tests {
                 "0015_education_pets_categories".to_string(),
                 "0016_watched_folders".to_string(),
                 "0017_rule_patterns".to_string(),
+                "0018_bill_settlements".to_string(),
             ]
         );
     }
@@ -358,5 +363,100 @@ mod tests {
             [],
         );
         assert!(result.is_err(), "the same folder cannot be added twice");
+    }
+
+    #[test]
+    fn creates_bill_settlements_table() {
+        let conn = Connection::open_in_memory().unwrap();
+        apply(&conn).unwrap();
+
+        assert!(table_exists(&conn, "bill_settlements"));
+    }
+
+    #[test]
+    fn rules_default_to_paying_in_the_month_they_are_due() {
+        let conn = Connection::open_in_memory().unwrap();
+        apply(&conn).unwrap();
+        conn.execute(
+            "INSERT INTO categories (name, color_token, kind) VALUES ('X', NULL, 'expense')",
+            [],
+        )
+        .unwrap();
+        let cat = conn.last_insert_rowid();
+        conn.execute(
+            "INSERT INTO rules (category_id, priority, due_day) VALUES (?1, 0, 6)",
+            [cat],
+        )
+        .unwrap();
+
+        let lead: i64 = conn
+            .query_row("SELECT pay_lead_months FROM rules", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(lead, 0, "an existing rule must keep behaving as it did");
+    }
+
+    /// One row per occurrence: settling the same bill twice must collide rather
+    /// than leave two rows disagreeing about the same month.
+    #[test]
+    fn a_bill_is_settled_at_most_once_per_month() {
+        let conn = Connection::open_in_memory().unwrap();
+        apply(&conn).unwrap();
+        conn.execute(
+            "INSERT INTO categories (name, color_token, kind) VALUES ('X', NULL, 'expense')",
+            [],
+        )
+        .unwrap();
+        let cat = conn.last_insert_rowid();
+        conn.execute(
+            "INSERT INTO rules (category_id, priority, due_day) VALUES (?1, 0, 6)",
+            [cat],
+        )
+        .unwrap();
+        let rule = conn.last_insert_rowid();
+
+        conn.execute(
+            "INSERT INTO bill_settlements (rule_id, due_month) VALUES (?1, '2026-08')",
+            [rule],
+        )
+        .unwrap();
+        let again = conn.execute(
+            "INSERT INTO bill_settlements (rule_id, due_month) VALUES (?1, '2026-08')",
+            [rule],
+        );
+
+        assert!(again.is_err());
+    }
+
+    /// The settlement is the user's statement that the bill is paid. Losing the
+    /// transaction must not silently unpay it.
+    #[test]
+    fn deleting_a_rule_drops_its_settlements() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.pragma_update(None, "foreign_keys", "ON").unwrap();
+        apply(&conn).unwrap();
+        conn.execute(
+            "INSERT INTO categories (name, color_token, kind) VALUES ('X', NULL, 'expense')",
+            [],
+        )
+        .unwrap();
+        let cat = conn.last_insert_rowid();
+        conn.execute(
+            "INSERT INTO rules (category_id, priority, due_day) VALUES (?1, 0, 6)",
+            [cat],
+        )
+        .unwrap();
+        let rule = conn.last_insert_rowid();
+        conn.execute(
+            "INSERT INTO bill_settlements (rule_id, due_month) VALUES (?1, '2026-08')",
+            [rule],
+        )
+        .unwrap();
+
+        conn.execute("DELETE FROM rules WHERE id = ?1", [rule]).unwrap();
+
+        let left: i64 = conn
+            .query_row("SELECT COUNT(*) FROM bill_settlements", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(left, 0);
     }
 }
