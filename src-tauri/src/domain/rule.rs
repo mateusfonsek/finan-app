@@ -15,7 +15,6 @@ pub struct Rule {
     /// Which month this bill's payment lands in, relative to the due date.
     /// `0` = the month it falls due; `1` = the month before. Anything the user
     /// has not set stays `0`, which is how the calendar always behaved.
-    #[serde(default)]
     pub pay_lead_months: i32,
     /// Friendly label (e.g. legal name from a CNPJ lookup). NULL means none,
     /// and the UI falls back to the first pattern.
@@ -35,7 +34,6 @@ pub struct RuleWithCount {
     /// Which month this bill's payment lands in, relative to the due date.
     /// `0` = the month it falls due; `1` = the month before. Anything the user
     /// has not set stays `0`, which is how the calendar always behaved.
-    #[serde(default)]
     pub pay_lead_months: i32,
     pub display_name: Option<String>,
     pub created_at: String,
