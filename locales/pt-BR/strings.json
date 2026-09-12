@@ -315,8 +315,8 @@
   "freshness": {
     "up_to": "Dados até {date}",
     "current": "em dia",
-    "behind_one": "falta 1 dia",
-    "behind_many": "faltam {n} dias",
+    "behind_one": "1 dia não importado",
+    "behind_many": "{n} dias não importados",
     "review_one": "Rever 1 extrato",
     "review_many": "Rever {n} extratos",
     "enable_watch": "Ligar pasta observada",
