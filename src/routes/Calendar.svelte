@@ -8,6 +8,7 @@
   import Spinner from "$lib/components/ui/Spinner.svelte";
   import MonthStepper from "$lib/components/shell/MonthStepper.svelte";
   import CalendarGrid, { type DayFlow } from "$lib/components/calendar/CalendarGrid.svelte";
+  import BillPopover from "$lib/components/calendar/BillPopover.svelte";
   import DayDetails from "$lib/components/calendar/DayDetails.svelte";
   import { formatMoney } from "$lib/format/money";
   import { filters } from "$lib/stores/filters.svelte";
@@ -24,6 +25,8 @@
 
   /** Dia selecionado (1..31). null = nenhum. */
   let selectedDay = $state<number | null>(null);
+
+  let openBill = $state<{ event: CalendarEvent; anchor: HTMLElement } | null>(null);
 
   /** Today in the reader's timezone. `toISOString()` returns UTC: at night,
    *  west of Greenwich, it has already rolled over — and the calendar was
@@ -204,10 +207,22 @@
       {events}
       {selectedDay}
       onSelectDay={(d) => (selectedDay = d)}
+      onSelectBill={(event, anchor) => (openBill = { event, anchor })}
     />
 
     <aside class="flex flex-col gap-4">
       <DayDetails {selectedDate} {transactions} {categories} {events} {today} />
     </aside>
   </div>
+
+  {#if openBill}
+    <BillPopover
+      event={openBill.event}
+      dueMonth={viewMonth}
+      anchor={openBill.anchor}
+      {today}
+      onClose={() => (openBill = null)}
+      onChanged={() => void loadMonthData(viewMonth)}
+    />
+  {/if}
 </Page>
