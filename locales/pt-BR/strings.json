@@ -240,6 +240,18 @@
     "category_required": "Selecione uma categoria.",
     "due_day_invalid": "Dia do vencimento deve estar entre 1 e 31 (ou vazio)."
   },
+  "rule_due_picker": {
+    "title": "Vencimento no dia {day}",
+    "title_any": "Marcar vencimento",
+    "desc": "A conta escolhida passa a vencer todo dia {day}, não só neste mês.",
+    "desc_any": "Escolha o dia do mês e a conta que passa a vencer nele, todo mês.",
+    "day_label": "Dia",
+    "search": "Buscar conta…",
+    "currently": "hoje dia {day}",
+    "assign": "Usar dia {day}",
+    "already": "Já é o dia {day}",
+    "empty": "Nenhuma regra encontrada"
+  },
   "dashboard": {
     "expenses": "Gastos",
     "income": "Renda",
