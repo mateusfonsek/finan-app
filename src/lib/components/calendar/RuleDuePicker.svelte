@@ -3,6 +3,7 @@
   import { Button } from "$lib/components/ui/button";
   import Spinner from "$lib/components/ui/Spinner.svelte";
   import EmptyState from "$lib/components/ui/EmptyState.svelte";
+  import Icon from "$lib/components/ui/Icon.svelte";
   import { locale } from "$lib/i18n/locale.svelte";
   import { dialog, scrim } from "$lib/motion";
   import { listRulesWithCount, updateRule } from "$lib/api/rules";
@@ -78,12 +79,27 @@
       busyId = null;
     }
   }
+
+  function onkeydown(e: KeyboardEvent) {
+    if (e.key === "Escape") {
+      e.preventDefault();
+      onClose();
+    }
+  }
 </script>
 
-<div class="fixed inset-0 z-40 bg-black/40" transition:scrim onclick={onClose} aria-hidden="true"></div>
+<svelte:window {onkeydown} />
+
+<button
+  type="button"
+  aria-label={t("common.close")}
+  onclick={onClose}
+  transition:scrim
+  class="fixed inset-0 z-70 bg-black/40"
+></button>
 
 <div
-  class="fixed left-1/2 top-1/2 z-50 w-[420px] max-h-[70vh] -translate-x-1/2 -translate-y-1/2
+  class="fixed left-1/2 top-1/2 z-80 w-[420px] max-h-[70vh] -translate-x-1/2 -translate-y-1/2
          card flex flex-col overflow-hidden"
   transition:dialog
   role="dialog"
@@ -105,10 +121,12 @@
       bind:this={closeEl}
       type="button"
       onclick={onClose}
-      class="press text-fg-muted hover:text-fg shrink-0 text-callout"
       aria-label={t("common.close")}
+      class="press w-6 h-6 shrink-0 grid place-items-center rounded-full
+             text-fg-subtle hover:text-fg hover:bg-hover
+             transition-colors duration-[var(--dur-fast)]"
     >
-      ✕
+      <Icon name="x" size={13} stroke={2} />
     </button>
   </header>
 
