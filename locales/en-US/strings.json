@@ -315,8 +315,8 @@
   "freshness": {
     "up_to": "Data through {date}",
     "current": "up to date",
-    "behind_one": "1 day missing",
-    "behind_many": "{n} days missing",
+    "behind_one": "1 day not imported",
+    "behind_many": "{n} days not imported",
     "review_one": "Review 1 statement",
     "review_many": "Review {n} statements",
     "enable_watch": "Turn on watched folder",
