@@ -22,6 +22,7 @@
       categoryId: number;
       priority: number;
       dueDay: number | null;
+      payLeadMonths: number;
     }) => Promise<void>;
   };
 
@@ -32,6 +33,7 @@
   let priority = $state(0);
   /** Svelte 5 coerces <input type="number"> to number | null. */
   let dueDayValue = $state<number | null>(null);
+  let payLeadMonths = $state(0);
   let busy = $state(false);
   let error = $state<string | null>(null);
 
@@ -58,11 +60,12 @@
     }
     busy = true;
     try {
-      await onSave({ patterns: filled, categoryId, priority, dueDay });
+      await onSave({ patterns: filled, categoryId, priority, dueDay, payLeadMonths });
       rows = rowsFrom([]);
       categoryId = null;
       priority = 0;
       dueDayValue = null;
+      payLeadMonths = 0;
     } catch (e) {
       error = e instanceof Error ? e.message : String(e);
     } finally {
@@ -84,7 +87,7 @@
     <PatternListEditor {rows} onChange={(next) => (rows = next)} />
   </div>
 
-  <div class="grid grid-cols-[1fr_84px_96px_auto] gap-2.5 items-end">
+  <div class="grid grid-cols-[1fr_84px_96px_148px_auto] gap-2.5 items-end">
     <label class="flex flex-col gap-1 min-w-0">
       <span class="text-foot text-fg-subtle">{t("rule_form.category")}</span>
       <select
@@ -119,6 +122,14 @@
         bind:value={dueDayValue}
         class="field tabular"
       />
+    </label>
+
+    <label class="flex flex-col gap-1">
+      <span class="text-foot text-fg-subtle">{t("rule_form.pay_lead_label")}</span>
+      <select class="field" bind:value={payLeadMonths}>
+        <option value={0}>{t("rule_form.pay_lead_same")}</option>
+        <option value={1}>{t("rule_form.pay_lead_previous")}</option>
+      </select>
     </label>
 
     <Button type="submit" disabled={busy}>

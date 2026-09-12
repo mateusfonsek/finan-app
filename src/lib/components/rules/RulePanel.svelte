@@ -34,6 +34,7 @@
         priority: number;
         dueDay: number | null;
         displayName: string | null;
+        payLeadMonths: number;
       },
     ) => Promise<void>;
   };
@@ -52,6 +53,7 @@
   let priority = $state(0);
   /** Svelte 5 coerces <input type="number"> to number | null. */
   let dueDayValue = $state<number | null>(null);
+  let payLeadMonths = $state(rule.pay_lead_months);
   let busy = $state(false);
   let error = $state<string | null>(null);
 
@@ -62,6 +64,7 @@
     categoryId = rule.category_id;
     priority = rule.priority;
     dueDayValue = rule.due_day;
+    payLeadMonths = rule.pay_lead_months;
     error = null;
   });
 
@@ -95,6 +98,7 @@
         // Preserved: the label comes from import (legal name from the tax id)
         // and is not editable here — omitting it would wipe it in the backend.
         displayName: rule.display_name,
+        payLeadMonths,
       });
       onClose();
     } catch (e) {
@@ -238,6 +242,14 @@
           class="field tabular w-24"
         />
         <span class="text-cap text-fg-faint leading-snug">{t("rule_panel.due_day_hint")}</span>
+      </label>
+
+      <label class="flex flex-col gap-1">
+        <span class="text-foot text-fg-subtle">{t("rule_form.pay_lead_label")}</span>
+        <select class="field" bind:value={payLeadMonths}>
+          <option value={0}>{t("rule_form.pay_lead_same")}</option>
+          <option value={1}>{t("rule_form.pay_lead_previous")}</option>
+        </select>
       </label>
 
       <label class="flex flex-col gap-1">
