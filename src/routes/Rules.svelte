@@ -57,12 +57,14 @@
     categoryId: number;
     priority: number;
     dueDay: number | null;
+    payLeadMonths: number;
   }) {
     await createRule({
       patterns: data.patterns,
       category_id: data.categoryId,
       priority: data.priority,
       due_day: data.dueDay,
+      pay_lead_months: data.payLeadMonths,
     });
     await refresh();
   }
@@ -75,6 +77,7 @@
       priority: number;
       dueDay: number | null;
       displayName: string | null;
+      payLeadMonths: number;
     },
   ) {
     await updateRule(ruleId, {
@@ -85,6 +88,7 @@
       // The backend always does `SET display_name = ?`; without resending, the
       // label from import would be wiped on every edit.
       display_name: data.displayName,
+      pay_lead_months: data.payLeadMonths,
     });
     await refresh();
   }
