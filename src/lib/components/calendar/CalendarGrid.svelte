@@ -3,8 +3,7 @@
   import { locale } from "$lib/i18n/locale.svelte";
   import { leadingBlanks, weekdayOrder } from "./week";
   import Icon from "$lib/components/ui/Icon.svelte";
-  import { billState, daysOverdue, dueDateOf, type BillState } from "./bill";
-  import type { IconName } from "$lib/components/ui/icons";
+  import { BILL_ICON, billState, daysOverdue, dueDateOf, type BillState } from "./bill";
   import type { CalendarEvent } from "$lib/bindings";
 
   const t = locale.t;
@@ -95,12 +94,6 @@
     }
     return out;
   }
-
-  const BILL_ICON: Record<BillState, IconName> = {
-    paid: "check",
-    overdue: "circleAlert",
-    pending: "clock",
-  };
 
   function billStyle(state: BillState): string {
     const token =
