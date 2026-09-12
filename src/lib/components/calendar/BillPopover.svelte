@@ -46,6 +46,7 @@
   });
 
   $effect(() => {
+    if (billStatus === "paid") return;
     const id = event.rule_id;
     void transactionsMatchingRule(id)
       .then((r) => (candidates = r.transactions))
@@ -153,6 +154,10 @@
 
   <div class="hairline"></div>
 
+  {#if error}
+    <p class="text-foot text-neg">{error}</p>
+  {/if}
+
   {#if billStatus === "paid"}
     <div class="flex items-center justify-between gap-2">
       {#if event.manually_settled}
@@ -196,10 +201,6 @@
         </ul>
       {/if}
     </div>
-
-    {#if error}
-      <p class="text-foot text-neg">{error}</p>
-    {/if}
 
     <div class="flex items-center justify-end gap-2 pt-0.5">
       <!-- Where the due day and the lead actually live. The popover settles one
