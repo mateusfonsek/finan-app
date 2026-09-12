@@ -1,4 +1,4 @@
-use rusqlite::params;
+use rusqlite::{params, OptionalExtension};
 use tauri::State;
 
 use crate::db::Db;
@@ -174,13 +174,29 @@ pub fn create_rule(db: State<'_, Db>, input: NewRule) -> AppResult<Rule> {
 #[tauri::command]
 #[specta::specta]
 pub fn update_rule(db: State<'_, Db>, rule_id: i64, input: UpdateRule) -> AppResult<Rule> {
+    let mut conn = db.conn.lock().expect("db mutex poisoned");
+    update_rule_with_conn(&mut conn, rule_id, input)
+}
+
+fn update_rule_with_conn(
+    conn: &mut rusqlite::Connection,
+    rule_id: i64,
+    input: UpdateRule,
+) -> AppResult<Rule> {
     let patterns = clean_patterns(&input.patterns)?;
     validate_due_day(input.due_day)?;
     validate_pay_lead_months(input.pay_lead_months)?;
-    let mut conn = db.conn.lock().expect("db mutex poisoned");
 
     {
         let tx = conn.transaction()?;
+        let previous_due_day: Option<i32> = tx
+            .query_row(
+                "SELECT due_day FROM rules WHERE id = ?1",
+                params![rule_id],
+                |row| row.get(0),
+            )
+            .optional()?
+            .flatten();
         let changed = tx.execute(
             "UPDATE rules
              SET category_id = ?1, priority = ?2, due_day = ?3, display_name = ?4,
@@ -198,12 +214,23 @@ pub fn update_rule(db: State<'_, Db>, rule_id: i64, input: UpdateRule) -> AppRes
         if changed == 0 {
             return Err(AppError::Invalid(format!("rule {rule_id} not found")));
         }
+        // An occurrence IS (rule, due month), so a rule with no due day has no
+        // occurrences and a settlement on one is a row about something that no
+        // longer exists — invisible in every surface, with no way to undo it,
+        // and still holding its transaction out of derivation for every other
+        // rule. Clearing the due day clears them and releases the transaction.
+        if previous_due_day.is_some() && input.due_day.is_none() {
+            tx.execute(
+                "DELETE FROM bill_settlements WHERE rule_id = ?1",
+                params![rule_id],
+            )?;
+        }
         replace_patterns(&tx, rule_id, &patterns)?;
         tx.commit()?;
     }
 
-    apply_rules_internal(&mut conn, None)?;
-    fetch_rule(&conn, rule_id)
+    apply_rules_internal(conn, None)?;
+    fetch_rule(conn, rule_id)
 }
 
 #[tauri::command]
@@ -674,6 +701,7 @@ fn calendar_events_with_conn(
 mod tests {
     use super::apply_rules_internal;
     use crate::db::migrations;
+    use crate::domain::rule::UpdateRule;
     use rusqlite::{params, Connection};
 
     fn fresh_conn() -> Connection {
@@ -1396,5 +1424,49 @@ mod tests {
         let events = super::calendar_events_with_conn(&conn, "2026-08").unwrap();
 
         assert_eq!(events[0].paid_date, None, "August must not claim September's payment");
+    }
+
+    /// Clearing a rule's due day destroys its occurrences, so the settlements
+    /// hanging off them must go too: otherwise they are unreachable in every
+    /// surface — none of which renders an event without a due day — while the
+    /// transaction they cite stays out of derivation for every other rule.
+    #[test]
+    fn clearing_a_rules_due_day_drops_its_settlements() {
+        let (mut conn, cat) = calendar_fixture();
+        let energia = bill_rule(&conn, cat, "ENERGIA", 6, 0);
+        let other = bill_rule(&conn, cat, "ENERGIA", 20, 0);
+        let tx = payment(&conn, "2026-08-04", "ENERGIA ELETRICA");
+        crate::commands::bills::settle(&conn, energia, "2026-08", Some(tx)).unwrap();
+
+        let before = super::calendar_events_with_conn(&conn, "2026-08").unwrap();
+        let other_before = before.iter().find(|e| e.rule_id == other).unwrap();
+        assert_eq!(other_before.paid_date, None, "the linked transaction is held out");
+
+        super::update_rule_with_conn(
+            &mut conn,
+            energia,
+            UpdateRule {
+                patterns: vec!["ENERGIA".into()],
+                category_id: cat,
+                priority: 0,
+                due_day: None,
+                pay_lead_months: 0,
+                display_name: None,
+            },
+        )
+        .unwrap();
+
+        let left: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM bill_settlements WHERE rule_id = ?1",
+                params![energia],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(left, 0);
+
+        let after = super::calendar_events_with_conn(&conn, "2026-08").unwrap();
+        let other_after = after.iter().find(|e| e.rule_id == other).unwrap();
+        assert_eq!(other_after.paid_date.as_deref(), Some("2026-08-04"));
     }
 }
