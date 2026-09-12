@@ -11,6 +11,7 @@
   import { settleBill, unsettleBill } from "$lib/api/bills";
   import TransactionSearchDialog from "./TransactionSearchDialog.svelte";
   import { billState, daysOverdue, dueDateOf } from "./bill";
+  import { placePopover } from "./placement";
   import type { CalendarEvent, Transaction } from "$lib/bindings";
 
   const t = locale.t;
@@ -29,7 +30,6 @@
   let { event, dueMonth, anchor, today, onClose, onChanged }: Props = $props();
 
   const WIDTH = 320;
-  const MARGIN = 8;
 
   let panelEl: HTMLElement | undefined = $state();
   let candidates = $state<Transaction[] | null>(null);
@@ -45,11 +45,21 @@
   let billStatus = $derived(billState(event, dueMonth, today));
   let due = $derived(dueDateOf(event, dueMonth));
 
-  let style = $derived.by(() => {
-    const r = anchor.getBoundingClientRect();
-    const left = Math.min(Math.max(MARGIN, r.left), window.innerWidth - WIDTH - MARGIN);
-    return `position: fixed; top: ${r.bottom + 6}px; left: ${left}px; width: ${WIDTH}px;`;
-  });
+  // The panel is as tall as its candidate list, and chips on the month's last
+  // row sit against the bottom edge. `max-height` is what keeps the actions on
+  // screen there; the candidate list is the only part that can shrink, so it
+  // absorbs the cut and scrolls.
+  let place = $derived(
+    placePopover(anchor.getBoundingClientRect(), {
+      width: window.innerWidth,
+      height: window.innerHeight,
+    }, WIDTH),
+  );
+
+  let style = $derived(
+    `position: fixed; ${place.up ? "bottom" : "top"}: ${place.offset}px;` +
+      ` left: ${place.left}px; width: ${WIDTH}px; max-height: ${place.maxHeight}px;`,
+  );
 
   $effect(() => {
     if (billStatus === "paid") return;
@@ -149,9 +159,9 @@
 <div
   bind:this={panelEl}
   use:portal
-  transition:popover={{ origin: "top left" }}
+  transition:popover={{ origin: place.up ? "bottom left" : "top left" }}
   style={style}
-  class="material-pop z-50 p-3 flex flex-col gap-2.5"
+  class="material-pop z-50 p-3 flex flex-col gap-2.5 overflow-hidden"
   role="dialog"
   aria-label={event.pattern}
 >
@@ -204,14 +214,14 @@
       </span>
     </label>
 
-    <div class="flex flex-col gap-1">
+    <div class="flex flex-col gap-1 min-h-0">
       <span class="text-foot text-fg-subtle">{t("bill_popover.pick_transaction")}</span>
       {#if candidates === null}
         <div class="py-2 grid place-items-center"><Spinner size={14} /></div>
       {:else if candidates.length === 0}
         <p class="text-foot text-fg-faint leading-relaxed">{t("bill_popover.no_candidates")}</p>
       {:else}
-        <ul class="max-h-[196px] overflow-y-auto card-inset divide-y divide-border-subtle">
+        <ul class="min-h-0 max-h-[196px] overflow-y-auto card-inset divide-y divide-border-subtle">
           {#each candidates as tx (tx.id)}
             <li>
               <label class="flex items-center gap-2 px-2 py-1.5 cursor-default hover:bg-hover">
