@@ -13,14 +13,16 @@
   import RuleDuePicker from "$lib/components/calendar/RuleDuePicker.svelte";
   import { formatMoney } from "$lib/format/money";
   import { filters } from "$lib/stores/filters.svelte";
-  import { calendarEvents } from "$lib/api/rules";
+  import { calendarEvents, listRules } from "$lib/api/rules";
   import { listTransactions } from "$lib/api/transactions";
   import { listCategories } from "$lib/api/categories";
-  import type { CalendarEvent, Category, Transaction } from "$lib/bindings";
+  import { monthBillTotals } from "$lib/components/calendar/bill";
+  import type { CalendarEvent, Category, Rule, Transaction } from "$lib/bindings";
 
   let events = $state<CalendarEvent[]>([]);
   let transactions = $state<Transaction[]>([]);
   let categories = $state<Category[]>([]);
+  let rules = $state<Rule[]>([]);
   let loading = $state(false);
   let error = $state<string | null>(null);
 
@@ -108,6 +110,21 @@
     return { inflow, outflow, net: inflow - outflow };
   });
 
+  let billTotals = $derived(monthBillTotals(events, viewMonth, today));
+
+  /** Rules with no due day never reach `events` — `calendar_events` only
+   *  returns a rule with a due day or a payment — so the month strip needs its
+   *  own load to count them. */
+  let withoutDueDay = $derived(rules.filter((r) => r.due_day === null).length);
+
+  async function loadRulesOnce(): Promise<void> {
+    try {
+      rules = await listRules();
+    } catch (e) {
+      console.error("[calendar] failed to load rules", e);
+    }
+  }
+
   /**
    * Loads categories ONCE. Separate from the monthly flow so the $effect that
    * loads month data does not track `categories.length` and fire again after
@@ -148,6 +165,7 @@
 
   onMount(() => {
     void loadCategoriesOnce();
+    void loadRulesOnce();
   });
 
   // The only reactive effect: refetch and reset the selection when the month
@@ -192,6 +210,34 @@
         {monthTotals.outflow > 0 ? formatMoney(String(monthTotals.outflow)) : "—"}
       </span>
     </div>
+    {#if billTotals.upcoming > 0 || billTotals.overdue > 0}
+      <div class="flex items-center gap-2">
+        <span class="text-foot text-fg-subtle">{t("calendar_page.bills")}</span>
+        <span class="text-callout text-fg">
+          {billTotals.upcoming === 1
+            ? t("calendar_page.upcoming_one")
+            : t("calendar_page.upcoming_many", { n: billTotals.upcoming })}
+        </span>
+        {#if billTotals.overdue > 0}
+          <span class="text-callout text-neg font-medium">
+            {billTotals.overdue === 1
+              ? t("calendar_page.overdue_one")
+              : t("calendar_page.overdue_many", { n: billTotals.overdue })}
+          </span>
+        {/if}
+      </div>
+    {/if}
+    {#if withoutDueDay > 0}
+      <button
+        type="button"
+        onclick={() => { markDueDay = null; pickerOpen = true; }}
+        class="text-foot text-fg-subtle hover:text-fg transition-colors duration-[var(--dur-fast)]"
+      >
+        {withoutDueDay === 1
+          ? t("calendar_page.no_due_one")
+          : t("calendar_page.no_due_many", { n: withoutDueDay })}
+      </button>
+    {/if}
     <div class="flex items-center gap-2 ml-auto">
       {#if loading}
         <Spinner size={12} class="text-fg-faint" />
@@ -247,6 +293,9 @@
   <RuleDuePicker
     day={markDueDay}
     onClose={() => (pickerOpen = false)}
-    onChanged={() => void loadMonthData(viewMonth)}
+    onChanged={() => {
+      void loadMonthData(viewMonth);
+      void loadRulesOnce();
+    }}
   />
 {/if}

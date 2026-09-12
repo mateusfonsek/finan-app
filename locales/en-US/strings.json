@@ -484,7 +484,14 @@
     "inflows": "Inflows",
     "outflows": "Outflows",
     "net": "Net",
-    "subtitle": "Real inflows and outflows for the month, day by day (transfers and investments excluded). Click a day to see everything that happened."
+    "subtitle": "Real inflows and outflows for the month, day by day (transfers and investments excluded). Click a day to see everything that happened.",
+    "bills": "Bills",
+    "no_due_one": "1 rule with no due day",
+    "no_due_many": "{n} rules with no due day",
+    "upcoming_one": "1 upcoming",
+    "upcoming_many": "{n} upcoming",
+    "overdue_one": "· 1 overdue",
+    "overdue_many": "· {n} overdue"
   },
   "onboarding": {
     "title": "Your finances, on your Mac.",
