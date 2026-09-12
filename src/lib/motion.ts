@@ -47,10 +47,13 @@ export function popover(
 ): TransitionConfig {
   if (reducedMotion()) return fadeOnly(DUR.fast);
   (node as HTMLElement).style.transformOrigin = origin;
+  // A popover that opens above its trigger travels the other way: it arrives
+  // from below and leaves back down, towards the thing that spawned it.
+  const dy = origin.startsWith("bottom") ? 5 : -5;
   return {
     duration: DUR.base,
     easing: SNAP,
-    css: (t, u) => `opacity: ${t}; transform: scale(${1 - u * 0.05}) translateY(${-u * 5}px)`,
+    css: (t, u) => `opacity: ${t}; transform: scale(${1 - u * 0.05}) translateY(${u * dy}px)`,
   };
 }
 
