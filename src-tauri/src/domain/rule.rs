@@ -133,7 +133,13 @@ pub struct CalendarEvent {
     pub category_name: String,
     pub category_color_token: Option<String>,
     pub due_day: Option<i32>,
-    pub paid_day: Option<i32>,
+    /// Full payment date (`YYYY-MM-DD`), not a day of the month: with
+    /// `pay_lead_months` the payment lives in another month, and 1..31 does not
+    /// say which.
+    pub paid_date: Option<String>,
     pub paid_amount: Option<String>,
     pub paid_transaction_id: Option<i64>,
+    /// Came from `bill_settlements` rather than from the derivation, so the UI
+    /// can offer to undo it.
+    pub manually_settled: bool,
 }
