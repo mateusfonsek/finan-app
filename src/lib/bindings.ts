@@ -270,16 +270,15 @@ async applyRuleChoices(choices: RuleChoice[]) : Promise<Result<number, string>> 
 }
 },
 /**
- * Crosses rules with the month's transactions to build calendar events.
+ * Crosses rules with transactions to build the month's calendar events.
  * 
- * Per rule:
- * - `due_day` set: emits an event with the due date, even with no match
- * - a matching transaction in the month: enriches it with paid_day,
- * paid_amount and paid_transaction_id
- * - `due_day` NULL and no match: the rule does NOT appear ("only shows when
- * paid", which is the user's mental model)
+ * Resolution order per rule, stopping at the first hit:
+ * 1. a row in `bill_settlements` for this occurrence — the user's word wins;
+ * 2. a transaction matching any snippet in `month - pay_lead_months`;
+ * 3. otherwise the state follows `due_day` alone.
  * 
- * With several matches in the same month, the earliest one wins.
+ * A rule with no `due_day` and no payment does not appear, which is the user's
+ * mental model: it only shows up once it costs something.
  */
 async calendarEvents(month: string) : Promise<Result<CalendarEvent[], string>> {
     try {
