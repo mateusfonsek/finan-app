@@ -2,6 +2,9 @@
   import { formatMoney } from "$lib/format/money";
   import { locale } from "$lib/i18n/locale.svelte";
   import EmptyState from "$lib/components/ui/EmptyState.svelte";
+  import Icon from "$lib/components/ui/Icon.svelte";
+  import { billState, daysOverdue, dueDateOf, type BillState } from "./bill";
+  import type { IconName } from "$lib/components/ui/icons";
   import type { CalendarEvent, Category, Transaction } from "$lib/bindings";
 
   const t = locale.t;
@@ -25,15 +28,6 @@
     return events.filter((e) => e.due_day === day);
   });
 
-  type BillState = "paid" | "overdue" | "pending";
-
-  function billState(e: CalendarEvent): BillState {
-    if (e.paid_day != null) return "paid";
-    if (!selectedDate || !today) return "pending";
-    // Overdue when the selected day is before today AND it is unpaid.
-    return selectedDate < today.slice(0, 10) ? "overdue" : "pending";
-  }
-
   function billColor(state: BillState): string {
     return state === "paid"
       ? "var(--color-pos)"
@@ -42,13 +36,32 @@
         : "var(--color-cat-amarelo)";
   }
 
+  const BILL_ICON: Record<BillState, IconName> = {
+    paid: "check",
+    overdue: "circleAlert",
+    pending: "clock",
+  };
+
   function billStatusText(e: CalendarEvent, state: BillState): string {
     if (state === "paid") {
+      if (e.paid_date == null) return t("day_details.paid_outside");
+      const shown = formatShort(e.paid_date);
       return e.paid_amount
-        ? t("day_details.paid_amount", { day: e.paid_day ?? "", amount: formatMoney(e.paid_amount) })
-        : t("day_details.paid", { day: e.paid_day ?? "" });
+        ? t("day_details.paid_amount", { date: shown, amount: formatMoney(e.paid_amount) })
+        : t("day_details.paid", { date: shown });
     }
-    return state === "overdue" ? t("day_details.overdue") : t("day_details.pending");
+    if (state !== "overdue") return t("day_details.pending");
+    const due = dueDateOf(e, selectedDate!.slice(0, 7));
+    const n = due ? daysOverdue(due, today.slice(0, 10)) : 0;
+    return n === 1 ? t("day_details.overdue_one") : t("day_details.overdue_days", { n });
+  }
+
+  function formatShort(iso: string): string {
+    const [y, m, d] = iso.split("-").map(Number);
+    return new Date(y, m - 1, d).toLocaleDateString(locale.dateLocale, {
+      day: "numeric",
+      month: "short",
+    });
   }
 
   type Bucket = "gastos" | "renda" | "transfer" | "investimento";
@@ -140,14 +153,14 @@
     <EmptyState icon="inbox" title={t("day_details.empty_none")} compact />
   {:else}
     {#if dueOnSelectedDay.length > 0}
-      <!-- Contas com vencimento neste dia, com estado visual claro -->
+      <!-- Bills falling due on the selected day. -->
       <section class="border-b border-border-subtle">
         <div class="px-4 py-1.5 bg-surface-2/60 text-cap font-semibold text-fg-subtle">
           {t("day_details.due_bills")}
         </div>
         <ul>
           {#each dueOnSelectedDay as e (e.rule_id)}
-            {@const state = billState(e)}
+            {@const state = billState(e, selectedDate.slice(0, 7), today.slice(0, 10))}
             {@const color = billColor(state)}
             <li
               class="px-4 py-2 border-t border-border-subtle first:border-t-0 flex items-start gap-2.5 min-w-0"
@@ -158,10 +171,10 @@
                   : ""}
             >
               <span
-                class="w-[17px] h-[17px] mt-px rounded-full grid place-items-center text-cap2 font-bold shrink-0"
+                class="w-[17px] h-[17px] mt-px rounded-full grid place-items-center shrink-0"
                 style="color: {color}; background: color-mix(in oklch, {color} 18%, transparent);"
               >
-                {state === "paid" ? "✓" : state === "overdue" ? "!" : "•"}
+                <Icon name={BILL_ICON[state]} size={10} stroke={2.2} />
               </span>
               <div class="flex-1 min-w-0 flex flex-col gap-0.5">
                 <span class="text-sub text-fg font-medium truncate" title={e.pattern}>
