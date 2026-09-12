@@ -91,10 +91,10 @@
     "day_aria_flow": "Day {day} — inflows {inflow}, outflows {outflow}",
     "outflows_title": "Outflows: {value}",
     "inflows_title": "Inflows: {value}",
-    "bill_paid": " — paid on day {day}",
-    "bill_paid_amount": " — paid on day {day} · {amount}",
-    "bill_overdue": " — overdue (day {day})",
-    "bill_due": " — due on day {day}"
+    "bill_state_paid": "paid",
+    "bill_state_pending": "upcoming",
+    "bill_state_overdue_days": "{n} days overdue",
+    "bill_state_overdue_one": "1 day overdue"
   },
   "day_details": {
     "selected_day": "Selected day",
