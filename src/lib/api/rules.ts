@@ -29,6 +29,10 @@ export async function createRule(input: NewRule): Promise<Rule> {
   return unwrap(await commands.createRule(input));
 }
 
+/** `update_rule` writes every column unconditionally, and `UpdateRule` is
+ *  `#[serde(default)]`, so an omitted field is not "leave it alone" — it is
+ *  "reset it". Every call site must send the whole rule, and every field added
+ *  to `UpdateRule` must be added to all of them. */
 export async function updateRule(ruleId: number, input: UpdateRule): Promise<Rule> {
   return unwrap(await commands.updateRule(ruleId, input));
 }

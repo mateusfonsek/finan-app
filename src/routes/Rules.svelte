@@ -85,8 +85,6 @@
       category_id: data.categoryId,
       priority: data.priority,
       due_day: data.dueDay,
-      // The backend always does `SET display_name = ?`; without resending, the
-      // label from import would be wiped on every edit.
       display_name: data.displayName,
       pay_lead_months: data.payLeadMonths,
     });
