@@ -1,6 +1,15 @@
 import type { CalendarEvent } from "$lib/bindings";
+import type { IconName } from "$lib/components/ui/icons";
 
 export type BillState = "paid" | "overdue" | "pending";
+
+/** Single source for what a bill state looks like — CalendarGrid, DayDetails
+ *  and the legend all render from this, so they cannot silently disagree. */
+export const BILL_ICON: Record<BillState, IconName> = {
+  paid: "check",
+  overdue: "circleAlert",
+  pending: "clock",
+};
 
 /** The occurrence's due date in the month being viewed, `null` for a rule with
  *  no due day. Day 31 lands on the last day of a short month rather than
