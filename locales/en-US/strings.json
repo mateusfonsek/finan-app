@@ -240,6 +240,18 @@
     "category_required": "Select a category.",
     "due_day_invalid": "Due day must be between 1 and 31 (or empty)."
   },
+  "rule_due_picker": {
+    "title": "Due on day {day}",
+    "title_any": "Set a due day",
+    "desc": "The bill you pick falls due on day {day} every month, not just this one.",
+    "desc_any": "Pick the day of the month, and the bill that falls due on it every month.",
+    "day_label": "Day",
+    "search": "Search bills…",
+    "currently": "now day {day}",
+    "assign": "Use day {day}",
+    "already": "Already day {day}",
+    "empty": "No rule found"
+  },
   "dashboard": {
     "expenses": "Expenses",
     "income": "Income",
