@@ -23,6 +23,17 @@ fn validate_due_day(d: Option<i32>) -> AppResult<()> {
     Ok(())
 }
 
+/// The column takes any integer; this takes what the form offers. Widening the
+/// form later is a UI change, not a migration.
+fn validate_pay_lead_months(v: i32) -> AppResult<()> {
+    if !(0..=1).contains(&v) {
+        return Err(AppError::Invalid(format!(
+            "pay_lead_months must be 0 or 1 (got: {v})"
+        )));
+    }
+    Ok(())
+}
+
 /// Normalizes the snippet list from the UI: trims, drops empties and removes
 /// duplicates (case-insensitively, which is how matching works). Preserves the
 /// order the user typed.
@@ -68,7 +79,7 @@ fn patterns_of(conn: &rusqlite::Connection, rule_id: i64) -> rusqlite::Result<Ve
 pub fn list_rules(db: State<'_, Db>) -> AppResult<Vec<Rule>> {
     let conn = db.conn.lock().expect("db mutex poisoned");
     let mut stmt = conn.prepare(
-        "SELECT id, category_id, priority, due_day, display_name, created_at
+        "SELECT id, category_id, priority, due_day, display_name, created_at, pay_lead_months
          FROM rules
          ORDER BY priority DESC, created_at DESC",
     )?;
@@ -82,6 +93,7 @@ pub fn list_rules(db: State<'_, Db>) -> AppResult<Vec<Rule>> {
             due_day: row.get(3)?,
             display_name: row.get(4)?,
             created_at: row.get(5)?,
+            pay_lead_months: row.get(6)?,
         })
     })?;
     rows.collect::<rusqlite::Result<Vec<_>>>()
@@ -97,6 +109,7 @@ pub fn list_rules_with_count(db: State<'_, Db>) -> AppResult<Vec<RuleWithCount>>
     let conn = db.conn.lock().expect("db mutex poisoned");
     let mut stmt = conn.prepare(
         "SELECT r.id, r.category_id, r.priority, r.due_day, r.display_name, r.created_at,
+                r.pay_lead_months,
                 (SELECT COUNT(*) FROM transactions t
                   WHERE EXISTS (
                       SELECT 1 FROM rule_patterns p
@@ -116,7 +129,8 @@ pub fn list_rules_with_count(db: State<'_, Db>) -> AppResult<Vec<RuleWithCount>>
             due_day: row.get(3)?,
             display_name: row.get(4)?,
             created_at: row.get(5)?,
-            transaction_count: row.get::<_, i64>(6)? as u32,
+            pay_lead_months: row.get(6)?,
+            transaction_count: row.get::<_, i64>(7)? as u32,
         })
     })?;
     rows.collect::<rusqlite::Result<Vec<_>>>()
@@ -128,18 +142,20 @@ pub fn list_rules_with_count(db: State<'_, Db>) -> AppResult<Vec<RuleWithCount>>
 pub fn create_rule(db: State<'_, Db>, input: NewRule) -> AppResult<Rule> {
     let patterns = clean_patterns(&input.patterns)?;
     validate_due_day(input.due_day)?;
+    validate_pay_lead_months(input.pay_lead_months)?;
     let mut conn = db.conn.lock().expect("db mutex poisoned");
 
     let id = {
         let tx = conn.transaction()?;
         tx.execute(
-            "INSERT INTO rules (category_id, priority, due_day, display_name)
-             VALUES (?1, ?2, ?3, ?4)",
+            "INSERT INTO rules (category_id, priority, due_day, display_name, pay_lead_months)
+             VALUES (?1, ?2, ?3, ?4, ?5)",
             params![
                 input.category_id,
                 input.priority,
                 input.due_day,
                 input.display_name.as_deref().map(str::trim),
+                input.pay_lead_months,
             ],
         )?;
         let id = tx.last_insert_rowid();
@@ -157,19 +173,22 @@ pub fn create_rule(db: State<'_, Db>, input: NewRule) -> AppResult<Rule> {
 pub fn update_rule(db: State<'_, Db>, rule_id: i64, input: UpdateRule) -> AppResult<Rule> {
     let patterns = clean_patterns(&input.patterns)?;
     validate_due_day(input.due_day)?;
+    validate_pay_lead_months(input.pay_lead_months)?;
     let mut conn = db.conn.lock().expect("db mutex poisoned");
 
     {
         let tx = conn.transaction()?;
         let changed = tx.execute(
             "UPDATE rules
-             SET category_id = ?1, priority = ?2, due_day = ?3, display_name = ?4
-             WHERE id = ?5",
+             SET category_id = ?1, priority = ?2, due_day = ?3, display_name = ?4,
+                 pay_lead_months = ?5
+             WHERE id = ?6",
             params![
                 input.category_id,
                 input.priority,
                 input.due_day,
                 input.display_name.as_deref().map(str::trim),
+                input.pay_lead_months,
                 rule_id
             ],
         )?;
@@ -464,7 +483,7 @@ pub fn apply_rules_internal(
 fn fetch_rule(conn: &rusqlite::Connection, id: i64) -> AppResult<Rule> {
     let patterns = patterns_of(conn, id)?;
     conn.query_row(
-        "SELECT id, category_id, priority, due_day, display_name, created_at
+        "SELECT id, category_id, priority, due_day, display_name, created_at, pay_lead_months
          FROM rules WHERE id = ?1",
         params![id],
         |row| {
@@ -476,6 +495,7 @@ fn fetch_rule(conn: &rusqlite::Connection, id: i64) -> AppResult<Rule> {
                 due_day: row.get(3)?,
                 display_name: row.get(4)?,
                 created_at: row.get(5)?,
+                pay_lead_months: row.get(6)?,
             })
         },
     )
@@ -1143,6 +1163,14 @@ mod tests {
         assert_eq!(reach, 3);
         assert_eq!(listed.len() as i64, reach, "list and count must agree");
         assert!(!listed.iter().any(|d| d.contains("padaria")));
+    }
+
+    #[test]
+    fn pay_lead_months_accepts_only_what_the_form_offers() {
+        assert!(super::validate_pay_lead_months(0).is_ok());
+        assert!(super::validate_pay_lead_months(1).is_ok());
+        assert!(super::validate_pay_lead_months(2).is_err());
+        assert!(super::validate_pay_lead_months(-1).is_err());
     }
 
     #[test]

@@ -234,7 +234,7 @@ fn insert_rule(
         params![id, tax_id],
     )?;
     Ok(c.query_row(
-        "SELECT id, category_id, priority, due_day, display_name, created_at
+        "SELECT id, category_id, priority, due_day, display_name, created_at, pay_lead_months
          FROM rules WHERE id = ?1",
         params![id],
         |row| {
@@ -246,6 +246,7 @@ fn insert_rule(
                 due_day: row.get(3)?,
                 display_name: row.get(4)?,
                 created_at: row.get(5)?,
+                pay_lead_months: row.get(6)?,
             })
         },
     )?)
