@@ -250,12 +250,12 @@
       {#if events.some((e) => e.due_day != null)}
         <div class="flex items-center gap-2 ml-auto">
           {#each [["pending", "--color-cat-amarelo", "calendar.legend_pending"], ["overdue", "--color-neg", "calendar.legend_overdue"], ["paid", "--color-pos", "calendar.legend_paid"]] as [key, token, label]}
-            <span
-              class="inline-flex items-center gap-1 rounded-full px-1.5 py-px font-medium"
-              style="color: var({token}); background: color-mix(in oklch, var({token}) 14%, transparent);"
-            >
-              <span class="font-bold">
-                {key === "paid" ? "✓" : key === "overdue" ? "!" : "•"}
+            <span class="flex items-center gap-1.5">
+              <span
+                class="w-[14px] h-[14px] rounded-[4px] grid place-items-center"
+                style="color: var({token}); background: color-mix(in oklch, var({token}) 16%, transparent);"
+              >
+                <Icon name={BILL_ICON[key as BillState]} size={9} stroke={2.4} />
               </span>
               {t(label)}
             </span>
