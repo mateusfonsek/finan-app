@@ -144,8 +144,8 @@
               disabled={busyId !== null || !dayIsValid}
             >
               {r.due_day === effectiveDay
-                ? t("rule_due_picker.already")
-                : t("rule_due_picker.assign")}
+                ? t("rule_due_picker.already", { day: effectiveDay! })
+                : t("rule_due_picker.assign", { day: effectiveDay! })}
             </Button>
           </li>
         {/each}
