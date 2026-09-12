@@ -289,6 +289,22 @@ async calendarEvents(month: string) : Promise<Result<CalendarEvent[], string>> {
     else return { status: "error", error: e  as any };
 }
 },
+async settleBill(ruleId: number, dueMonth: string, transactionId: number | null) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("settle_bill", { ruleId, dueMonth, transactionId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async unsettleBill(ruleId: number, dueMonth: string) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("unsettle_bill", { ruleId, dueMonth }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async resolveTaxId(taxId: string) : Promise<Result<TaxIdResolution, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("resolve_tax_id", { taxId }) };
@@ -626,7 +642,18 @@ export type CalendarEvent = { rule_id: number;
  * The snippet that actually matched — or the rule's first one, when the
  * event exists only because of `due_day` and nothing matched yet.
  */
-pattern: string; category_name: string; category_color_token: string | null; due_day: number | null; paid_day: number | null; paid_amount: string | null; paid_transaction_id: number | null }
+pattern: string; category_name: string; category_color_token: string | null; due_day: number | null; 
+/**
+ * Full payment date (`YYYY-MM-DD`), not a day of the month: with
+ * `pay_lead_months` the payment lives in another month, and 1..31 does not
+ * say which.
+ */
+paid_date: string | null; paid_amount: string | null; paid_transaction_id: number | null; 
+/**
+ * Came from `bill_settlements` rather than from the derivation, so the UI
+ * can offer to undo it.
+ */
+manually_settled: boolean }
 export type Category = { id: number; name: string; color_token: string | null; kind: string; is_investment: boolean; created_at: string }
 export type CategorySpend = { category_id: number | null; name: string; color_token: string | null; total: string; percent: number }
 export type CategoryWithCount = { id: number; name: string; color_token: string | null; kind: string; created_at: string; transaction_count: number }
@@ -714,7 +741,13 @@ export type NewAccount = { name: string; bank: string | null; ofx_acctid: string
  */
 kind?: string }
 export type NewCategory = { name: string; color_token: string | null; kind: string }
-export type NewRule = { patterns: string[]; category_id: number; priority: number; due_day: number | null; display_name?: string | null }
+export type NewRule = { patterns: string[]; category_id: number; priority: number; due_day: number | null; 
+/**
+ * Which month this bill's payment lands in, relative to the due date.
+ * `0` = the month it falls due; `1` = the month before. Anything the user
+ * has not set stays `0`, which is how the calendar always behaved.
+ */
+pay_lead_months?: number; display_name?: string | null }
 export type NewTransaction = { date: string; 
 /**
  * Decimal as string. Backend converts via rust_decimal.
@@ -731,6 +764,12 @@ patterns: string[]; category_id: number; priority: number;
  * only shows on the calendar when it matches a transaction.
  */
 due_day: number | null; 
+/**
+ * Which month this bill's payment lands in, relative to the due date.
+ * `0` = the month it falls due; `1` = the month before. Anything the user
+ * has not set stays `0`, which is how the calendar always behaved.
+ */
+pay_lead_months: number; 
 /**
  * Friendly label (e.g. legal name from a CNPJ lookup). NULL means none,
  * and the UI falls back to the first pattern.
@@ -784,7 +823,13 @@ export type RuleSuggestion = { key: string; label: string; suggested_pattern: st
  * A rule plus how many transactions it reaches — for the Rules screen, where
  * the question is "is this rule catching anything?".
  */
-export type RuleWithCount = { id: number; patterns: string[]; category_id: number; priority: number; due_day: number | null; display_name: string | null; created_at: string; 
+export type RuleWithCount = { id: number; patterns: string[]; category_id: number; priority: number; due_day: number | null; 
+/**
+ * Which month this bill's payment lands in, relative to the due date.
+ * `0` = the month it falls due; `1` = the month before. Anything the user
+ * has not set stays `0`, which is how the calendar always behaved.
+ */
+pay_lead_months: number; display_name: string | null; created_at: string; 
 /**
  * Transactions whose description matches ANY of the rule's snippets,
  * regardless of their current category. This is reach, not authorship: a
@@ -812,7 +857,13 @@ export type TransferSummary = { total_out: string; total_in: string; count: numb
  */
 export type TxKey = { ofx_fitid: string; date: string; amount: string }
 export type UpdateCategory = { name: string; color_token: string | null; kind: string }
-export type UpdateRule = { patterns: string[]; category_id: number; priority: number; due_day: number | null; display_name?: string | null }
+export type UpdateRule = { patterns: string[]; category_id: number; priority: number; due_day: number | null; 
+/**
+ * Which month this bill's payment lands in, relative to the due date.
+ * `0` = the month it falls due; `1` = the month before. Anything the user
+ * has not set stays `0`, which is how the calendar always behaved.
+ */
+pay_lead_months?: number; display_name?: string | null }
 export type WatchedFolder = { id: number; path: string; 
 /**
  * Short display name ("finan", "Downloads"), derived from the last path
