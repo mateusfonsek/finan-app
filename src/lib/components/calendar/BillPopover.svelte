@@ -68,7 +68,13 @@
     // so a `fixed` popover positioned once from `anchor` would float away
     // from its chip on scroll. Close instead of re-tracking the anchor —
     // that is what native macOS menus do.
-    const onScroll = () => close();
+    // A scroll INSIDE the panel is the user reading the candidate list, not
+    // leaving the popover. Only a scroll of what lies behind detaches it from
+    // its chip, and only that should close it.
+    const onScroll = (e: Event) => {
+      if (panelEl?.contains(e.target as Node)) return;
+      close();
+    };
     window.addEventListener("keydown", onKey, true);
     window.addEventListener("mousedown", onDown);
     window.addEventListener("scroll", onScroll, true);
@@ -188,7 +194,7 @@
       {:else if candidates.length === 0}
         <p class="text-foot text-fg-faint leading-relaxed">{t("bill_popover.no_candidates")}</p>
       {:else}
-        <ul class="max-h-[132px] overflow-y-auto card-inset divide-y divide-border-subtle">
+        <ul class="max-h-[196px] overflow-y-auto card-inset divide-y divide-border-subtle">
           {#each candidates as tx (tx.id)}
             <li>
               <label class="flex items-center gap-2 px-2 py-1.5 cursor-default hover:bg-hover">
@@ -202,6 +208,7 @@
           {/each}
         </ul>
       {/if}
+
     </div>
 
     <div class="flex items-center justify-end gap-2 pt-0.5">
@@ -223,3 +230,4 @@
     </div>
   {/if}
 </div>
+
