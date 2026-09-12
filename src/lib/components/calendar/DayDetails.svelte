@@ -24,11 +24,14 @@
 
   let selectedDay = $derived(selectedDate == null ? null : Number(selectedDate.slice(8, 10)));
 
-  /** Eventos com vencimento no dia selecionado. */
+  /** Bills falling due on the selected day, compared through `dueDateOf` so a
+   *  day-31 bill lands on the last day of a short month — the grid clamps the
+   *  same way, and a raw `due_day` comparison made the two disagree: the chip
+   *  showed on 28 February and clicking it listed nothing. */
   let dueOnSelectedDay = $derived.by<CalendarEvent[]>(() => {
     if (!selectedDate) return [];
-    const day = Number(selectedDate.slice(8, 10));
-    return events.filter((e) => e.due_day === day);
+    const month = selectedDate.slice(0, 7);
+    return events.filter((e) => dueDateOf(e, month) === selectedDate);
   });
 
   function billColor(state: BillState): string {
