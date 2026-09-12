@@ -30,13 +30,26 @@
    *  to cover a few months of statements without loading a lifetime of them. */
   const RECENT_LIMIT = 60;
 
+  /** Long enough that a typed word is one query, short enough to feel immediate. */
+  const DEBOUNCE_MS = 180;
+
   let q = $state("");
+  /** `q` settled. The query runs off this, so typing a word costs one request. */
+  let query = $state("");
   let suggested = $state<Transaction[] | null>(null);
   let others = $state<Transaction[] | null>(null);
+  /** A query is in flight over results already on screen. Distinct from the
+   *  first load, which has nothing to show yet. */
+  let refreshing = $state(false);
   let links = $state<BillLink[]>([]);
   let chosen = $state<number | null>(null);
   let error = $state<string | null>(null);
   let closeEl: HTMLButtonElement | undefined = $state();
+
+  /** Only the newest query may write its results. Responses can land out of
+   *  order, and a stale one overwriting a fresh one shows results for a term
+   *  the user already moved past — with the field saying something else. */
+  let issued = 0;
 
   onMount(() => {
     void Promise.all([transactionsMatchingRule(ruleId), billLinks()])
@@ -51,12 +64,23 @@
     queueMicrotask(() => closeEl?.focus());
   });
 
-  // Refetches as the term changes. `listTransactions` searches description and
-  // notes server-side, which is what reaches transactions this rule's snippets
-  // never match — the whole reason this dialog exists.
   $effect(() => {
-    const term = q.trim();
-    others = null;
+    const typed = q;
+    const handle = setTimeout(() => (query = typed.trim()), DEBOUNCE_MS);
+    return () => clearTimeout(handle);
+  });
+
+  // Refetches as the settled term changes. `listTransactions` searches
+  // description and notes server-side, which is what reaches transactions this
+  // rule's snippets never match — the whole reason this dialog exists.
+  //
+  // `others` is deliberately NOT cleared here. Clearing it would collapse the
+  // list to a spinner between every query, and with a content-sized dialog that
+  // means the whole panel shrinks and grows under the cursor as you type.
+  $effect(() => {
+    const term = query;
+    const mine = ++issued;
+    refreshing = true;
     void listTransactions({
       account_id: null,
       month: null,
@@ -64,8 +88,15 @@
       q: term === "" ? null : term,
       limit: term === "" ? RECENT_LIMIT : null,
     })
-      .then((r) => (others = r))
-      .catch(() => (others = []));
+      .then((r) => {
+        if (mine === issued) others = r;
+      })
+      .catch(() => {
+        if (mine === issued) others = [];
+      })
+      .finally(() => {
+        if (mine === issued) refreshing = false;
+      });
   });
 
   let suggestedIds = $derived(new Set((suggested ?? []).map((t) => t.id)));
@@ -73,7 +104,10 @@
   /** A suggestion is still a suggestion while it matches what was typed; the
    *  section is a shortcut, not a separate search. */
   let shownSuggested = $derived.by(() => {
-    const term = q.trim().toLowerCase();
+    // Filters on the settled term, not the raw one, so both sections change in
+    // the same frame. Filtering this one instantly is free, but it would make
+    // the list update in two stages — the small version of the same jitter.
+    const term = query.toLowerCase();
     const list = suggested ?? [];
     if (term === "") return list;
     return list.filter((tx) => tx.description.toLowerCase().includes(term));
@@ -135,7 +169,7 @@
 ></button>
 
 <div
-  class="fixed left-1/2 top-1/2 z-80 w-[560px] max-h-[76vh] -translate-x-1/2 -translate-y-1/2
+  class="fixed left-1/2 top-1/2 z-80 w-[560px] -translate-x-1/2 -translate-y-1/2
          card flex flex-col overflow-hidden"
   transition:dialog
   role="dialog"
@@ -163,10 +197,23 @@
   <div class="px-4 py-2 border-b border-border-subtle">
     <!-- One field, deliberately: the term is the filter. A date range would
          need a backend that does not have one. -->
-    <input class="field w-full" bind:value={q} placeholder={t("tx_search.search")} />
+    <div class="relative">
+      <input class="field w-full pr-7" bind:value={q} placeholder={t("tx_search.search")} />
+      <!-- Absolutely placed so an in-flight query never moves the field, the
+           list, or the panel around it. -->
+      {#if refreshing && !loading}
+        <span class="absolute right-2 top-1/2 -translate-y-1/2 text-fg-faint">
+          <Spinner size={12} />
+        </span>
+      {/if}
+    </div>
   </div>
 
-  <div class="overflow-y-auto flex-1">
+  <!-- A fixed height, not a content-sized one: a search panel whose frame
+       resizes with the result count jumps under the cursor on every keystroke.
+       The other dialogs in this app size to their content because their content
+       does not change while open. -->
+  <div class="overflow-y-auto h-[46vh]">
     {#if loading}
       <div class="py-10 grid place-items-center"><Spinner size={16} /></div>
     {:else if nothing}
