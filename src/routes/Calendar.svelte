@@ -10,6 +10,7 @@
   import CalendarGrid, { type DayFlow } from "$lib/components/calendar/CalendarGrid.svelte";
   import BillPopover from "$lib/components/calendar/BillPopover.svelte";
   import DayDetails from "$lib/components/calendar/DayDetails.svelte";
+  import RuleDuePicker from "$lib/components/calendar/RuleDuePicker.svelte";
   import { formatMoney } from "$lib/format/money";
   import { filters } from "$lib/stores/filters.svelte";
   import { calendarEvents } from "$lib/api/rules";
@@ -27,6 +28,11 @@
   let selectedDay = $state<number | null>(null);
 
   let openBill = $state<{ event: CalendarEvent; anchor: HTMLElement } | null>(null);
+
+  // Two entry points, one dialog: a day clicked in the grid fixes the day, the
+  // month strip leaves it for the dialog to ask.
+  let pickerOpen = $state(false);
+  let markDueDay = $state<number | null>(null);
 
   /** Today in the reader's timezone. `toISOString()` returns UTC: at night,
    *  west of Greenwich, it has already rolled over — and the calendar was
@@ -211,7 +217,17 @@
     />
 
     <aside class="flex flex-col gap-4">
-      <DayDetails {selectedDate} {transactions} {categories} {events} {today} />
+      <DayDetails
+        {selectedDate}
+        {transactions}
+        {categories}
+        {events}
+        {today}
+        onMarkDue={(d) => {
+          markDueDay = d;
+          pickerOpen = true;
+        }}
+      />
     </aside>
   </div>
 
@@ -226,3 +242,11 @@
     />
   {/if}
 </Page>
+
+{#if pickerOpen}
+  <RuleDuePicker
+    day={markDueDay}
+    onClose={() => (pickerOpen = false)}
+    onChanged={() => void loadMonthData(viewMonth)}
+  />
+{/if}

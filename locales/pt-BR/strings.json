@@ -126,7 +126,8 @@
     "paid_outside": "Paga fora do extrato",
     "overdue_one": "Vencida há 1 dia",
     "overdue_days": "Vencida há {n} dias",
-    "pending": "Pendente"
+    "pending": "Pendente",
+    "mark_due": "Marcar vencimento no dia {day}"
   },
   "about": {
     "tagline": "O dinheiro é seu. Os dados também.",

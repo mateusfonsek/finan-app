@@ -17,9 +17,13 @@
     events?: CalendarEvent[];
     /** Today as YYYY-MM-DD, to decide overdue vs pending. */
     today?: string;
+    /** Opens the picker that gives a rule this day as its due day. */
+    onMarkDue?: (day: number) => void;
   };
 
-  let { selectedDate, transactions, categories, events = [], today = "" }: Props = $props();
+  let { selectedDate, transactions, categories, events = [], today = "", onMarkDue }: Props = $props();
+
+  let selectedDay = $derived(selectedDate == null ? null : Number(selectedDate.slice(8, 10)));
 
   /** Eventos com vencimento no dia selecionado. */
   let dueOnSelectedDay = $derived.by<CalendarEvent[]>(() => {
@@ -147,10 +151,26 @@
     {/if}
   </header>
 
+  {#snippet markDueAction()}
+    {#if onMarkDue && selectedDay != null}
+      <button
+        type="button"
+        onclick={() => onMarkDue(selectedDay)}
+        class="press-sm w-full px-4 py-2 flex items-center gap-2 text-sub text-fg-muted
+               hover:text-fg hover:bg-hover border-t border-border-subtle
+               transition-colors duration-[var(--dur-fast)]"
+      >
+        <Icon name="plus" size={12} stroke={2.2} />
+        {t("day_details.mark_due", { day: selectedDay })}
+      </button>
+    {/if}
+  {/snippet}
+
   {#if !selectedDate}
     <EmptyState icon="calendar" title={t("day_details.select_day")} description={t("day_details.empty_select")} compact />
   {:else if !hasAny}
     <EmptyState icon="inbox" title={t("day_details.empty_none")} compact />
+    {@render markDueAction()}
   {:else}
     {#if dueOnSelectedDay.length > 0}
       <!-- Bills falling due on the selected day. -->
@@ -192,6 +212,7 @@
             </li>
           {/each}
         </ul>
+        {@render markDueAction()}
       </section>
     {/if}
 
