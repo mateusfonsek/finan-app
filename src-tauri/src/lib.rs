@@ -37,6 +37,8 @@ pub fn run() {
         commands::rules::preview_rule_application,
         commands::rules::apply_rule_choices,
         commands::rules::calendar_events,
+        commands::bills::settle_bill,
+        commands::bills::unsettle_bill,
         commands::tax_id::resolve_tax_id,
         commands::suggestions::suggest_rules,
         commands::suggestions::suggest_pattern_for,
