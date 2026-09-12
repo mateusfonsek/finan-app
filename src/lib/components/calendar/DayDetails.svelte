@@ -18,9 +18,20 @@
     today?: string;
     /** Opens the picker that gives a rule this day as its due day. */
     onMarkDue?: (day: number) => void;
+    /** Opens the settle popover on a bill. The grid only reaches the first two
+     *  bills of a day; this list is the way to every one of them. */
+    onSelectBill?: (event: CalendarEvent, anchor: HTMLElement) => void;
   };
 
-  let { selectedDate, transactions, categories, events = [], today = "", onMarkDue }: Props = $props();
+  let {
+    selectedDate,
+    transactions,
+    categories,
+    events = [],
+    today = "",
+    onMarkDue,
+    onSelectBill,
+  }: Props = $props();
 
   let selectedDay = $derived(selectedDate == null ? null : Number(selectedDate.slice(8, 10)));
 
@@ -178,32 +189,39 @@
             {@const state = billState(e, selectedDate.slice(0, 7), today.slice(0, 10))}
             {@const color = billColor(state)}
             <li
-              class="px-4 py-2 border-t border-border-subtle first:border-t-0 flex items-start gap-2.5 min-w-0"
+              class="border-t border-border-subtle first:border-t-0"
               style={state === "paid"
                 ? "background: color-mix(in oklch, var(--color-pos) 6%, transparent);"
                 : state === "overdue"
                   ? "background: color-mix(in oklch, var(--color-neg) 6%, transparent);"
                   : ""}
             >
-              <span
-                class="w-[17px] h-[17px] mt-px rounded-full grid place-items-center shrink-0"
-                style="color: {color}; background: color-mix(in oklch, {color} 18%, transparent);"
+              <button
+                type="button"
+                onclick={(ev) => onSelectBill?.(e, ev.currentTarget)}
+                class="press-sm w-full px-4 py-2 flex items-start gap-2.5 min-w-0 text-left
+                       hover:bg-hover transition-colors duration-[var(--dur-fast)]"
               >
-                <Icon name={BILL_ICON[state]} size={10} stroke={2.2} />
-              </span>
-              <div class="flex-1 min-w-0 flex flex-col gap-0.5">
-                <span class="text-sub text-fg font-medium truncate" title={e.pattern}>
-                  {e.pattern}
+                <span
+                  class="w-[17px] h-[17px] mt-px rounded-full grid place-items-center shrink-0"
+                  style="color: {color}; background: color-mix(in oklch, {color} 18%, transparent);"
+                >
+                  <Icon name={BILL_ICON[state]} size={10} stroke={2.2} />
                 </span>
-                <span class="text-cap" style="color: {color};">
-                  {billStatusText(e, state)}
-                </span>
-              </div>
-              {#if state === "paid" && e.paid_amount}
-                <span class="text-sub tabular shrink-0 font-medium" style="color: {color};">
-                  {formatMoney(e.paid_amount)}
-                </span>
-              {/if}
+                <div class="flex-1 min-w-0 flex flex-col gap-0.5">
+                  <span class="text-sub text-fg font-medium truncate" title={e.pattern}>
+                    {e.pattern}
+                  </span>
+                  <span class="text-cap" style="color: {color};">
+                    {billStatusText(e, state)}
+                  </span>
+                </div>
+                {#if state === "paid" && e.paid_amount}
+                  <span class="text-sub tabular shrink-0 font-medium" style="color: {color};">
+                    {formatMoney(e.paid_amount)}
+                  </span>
+                {/if}
+              </button>
             </li>
           {/each}
         </ul>

@@ -273,6 +273,7 @@
           markDueDay = d;
           pickerOpen = true;
         }}
+        onSelectBill={(event, anchor) => (openBill = { event, anchor })}
       />
     </aside>
   </div>
