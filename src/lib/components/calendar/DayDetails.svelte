@@ -170,7 +170,6 @@
     <EmptyState icon="calendar" title={t("day_details.select_day")} description={t("day_details.empty_select")} compact />
   {:else if !hasAny}
     <EmptyState icon="inbox" title={t("day_details.empty_none")} compact />
-    {@render markDueAction()}
   {:else}
     {#if dueOnSelectedDay.length > 0}
       <!-- Bills falling due on the selected day. -->
@@ -212,7 +211,6 @@
             </li>
           {/each}
         </ul>
-        {@render markDueAction()}
       </section>
     {/if}
 
@@ -281,4 +279,6 @@
       </div>
     {/if}
   {/if}
+
+  {@render markDueAction()}
 </div>
