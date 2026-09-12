@@ -94,6 +94,21 @@
     "bill_state_overdue_days": "{n} days overdue",
     "bill_state_overdue_one": "1 day overdue"
   },
+  "bill_popover": {
+    "due_on": "Due {date}",
+    "paid_on": "Paid {date} · {amount}",
+    "paid_outside": "Paid outside the statement",
+    "from_statement": "Recognized from the statement",
+    "settled_by_you": "You marked this paid",
+    "undo": "Undo",
+    "outside_title": "I paid outside the statement",
+    "outside_desc": "Cash, or someone paid for me. No amount enters the numbers.",
+    "pick_transaction": "Or point at the transaction that paid it (optional)",
+    "no_candidates": "No transaction matches this rule's snippets.",
+    "open_rule": "Open rule",
+    "settle": "Settle bill",
+    "settling": "Settling…"
+  },
   "day_details": {
     "selected_day": "Selected day",
     "select_day": "Select a day",

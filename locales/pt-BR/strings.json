@@ -94,6 +94,21 @@
     "bill_state_overdue_days": "vencida há {n} dias",
     "bill_state_overdue_one": "vencida há 1 dia"
   },
+  "bill_popover": {
+    "due_on": "Vence {date}",
+    "paid_on": "Paga em {date} · {amount}",
+    "paid_outside": "Paga fora do extrato",
+    "from_statement": "Reconhecida pelo extrato",
+    "settled_by_you": "Você marcou como paga",
+    "undo": "Desfazer",
+    "outside_title": "Paguei por fora do extrato",
+    "outside_desc": "Dinheiro, ou alguém pagou por mim. Nenhum valor entra nos números.",
+    "pick_transaction": "Ou aponte a transação que pagou esta conta (opcional)",
+    "no_candidates": "Nenhuma transação casa com os padrões desta regra.",
+    "open_rule": "Ver regra",
+    "settle": "Quitar conta",
+    "settling": "Quitando…"
+  },
   "day_details": {
     "selected_day": "Dia selecionado",
     "select_day": "Selecione um dia",
