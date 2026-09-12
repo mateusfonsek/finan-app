@@ -502,33 +502,53 @@ fn fetch_rule(conn: &rusqlite::Connection, id: i64) -> AppResult<Rule> {
     .map_err(AppError::from)
 }
 
-/// Crosses rules with the month's transactions to build calendar events.
+/// `month` (`YYYY-MM`) moved `back` whole months. Arithmetic on a month index
+/// rather than on a date, so December does not need a special case.
+fn month_shifted(month: &str, back: i64) -> AppResult<String> {
+    let bad = || AppError::Invalid(format!("month must be 'YYYY-MM' (got: '{month}')"));
+    if month.len() != 7 {
+        return Err(bad());
+    }
+    let year: i64 = month[0..4].parse().map_err(|_| bad())?;
+    let m: i64 = month[5..7].parse().map_err(|_| bad())?;
+    let index = year * 12 + (m - 1) - back;
+    Ok(format!(
+        "{:04}-{:02}",
+        index.div_euclid(12),
+        index.rem_euclid(12) + 1
+    ))
+}
+
+/// Crosses rules with transactions to build the month's calendar events.
 ///
-/// Per rule:
-/// - `due_day` set: emits an event with the due date, even with no match
-/// - a matching transaction in the month: enriches it with paid_day,
-///   paid_amount and paid_transaction_id
-/// - `due_day` NULL and no match: the rule does NOT appear ("only shows when
-///   paid", which is the user's mental model)
+/// Resolution order per rule, stopping at the first hit:
+/// 1. a row in `bill_settlements` for this occurrence — the user's word wins;
+/// 2. a transaction matching any snippet in `month - pay_lead_months`;
+/// 3. otherwise the state follows `due_day` alone.
 ///
-/// With several matches in the same month, the earliest one wins.
+/// A rule with no `due_day` and no payment does not appear, which is the user's
+/// mental model: it only shows up once it costs something.
 #[tauri::command]
 #[specta::specta]
 pub fn calendar_events(db: State<'_, Db>, month: String) -> AppResult<Vec<CalendarEvent>> {
+    let conn = db.conn.lock().expect("db mutex poisoned");
+    calendar_events_with_conn(&conn, &month)
+}
+
+fn calendar_events_with_conn(
+    conn: &rusqlite::Connection,
+    month: &str,
+) -> AppResult<Vec<CalendarEvent>> {
     if month.len() != 7 || !month.contains('-') {
         return Err(AppError::Invalid(format!(
             "month must be 'YYYY-MM' (got: '{month}')"
         )));
     }
 
-    let conn = db.conn.lock().expect("db mutex poisoned");
-    let date_prefix = format!("{month}-%");
-
-    // Step 1: load all rules with category info + their patterns.
-    type RuleRow = (i64, Vec<String>, Option<i32>, String, Option<String>);
+    type RuleRow = (i64, Vec<String>, Option<i32>, String, Option<String>, i64);
     let rule_rows: Vec<RuleRow> = {
         let mut stmt = conn.prepare(
-            "SELECT r.id, r.due_day, c.name, c.color_token
+            "SELECT r.id, r.due_day, c.name, c.color_token, r.pay_lead_months
              FROM rules r
              JOIN categories c ON c.id = r.category_id
              ORDER BY r.created_at DESC",
@@ -538,72 +558,108 @@ pub fn calendar_events(db: State<'_, Db>, month: String) -> AppResult<Vec<Calend
                 let id: i64 = row.get(0)?;
                 Ok((
                     id,
-                    patterns_of(&conn, id)?,
+                    patterns_of(conn, id)?,
                     row.get(1)?,
                     row.get(2)?,
                     row.get(3)?,
+                    row.get(4)?,
                 ))
             })?
             .collect::<rusqlite::Result<Vec<_>>>()?;
         rows
     };
 
-    // Step 2: load transactions of the month (id, date, amount, description).
+    // Both candidate months in one read: the lead is 0 or 1, so no rule can
+    // need anything older than the previous month.
+    let previous = month_shifted(month, 1)?;
     type TxRow = (i64, String, String, String);
     let tx_rows: Vec<TxRow> = {
         let mut stmt = conn.prepare(
             "SELECT id, date, amount, description
              FROM transactions
-             WHERE date LIKE ?1
+             WHERE (date LIKE ?1 OR date LIKE ?2)
+               AND id NOT IN (
+                   SELECT transaction_id FROM bill_settlements
+                    WHERE transaction_id IS NOT NULL
+               )
              ORDER BY date ASC, id ASC",
         )?;
         let rows = stmt
-            .query_map(params![date_prefix], |row| {
-                Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?))
-            })?
+            .query_map(
+                params![format!("{month}-%"), format!("{previous}-%")],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+            )?
             .collect::<rusqlite::Result<Vec<_>>>()?;
         rows
     };
 
-    // Step 3: for each rule, find first matching tx in the month.
     let mut events: Vec<CalendarEvent> = Vec::new();
-    for (rule_id, patterns, due_day, cat_name, cat_color) in rule_rows {
-        let patterns_lc: Vec<String> = patterns.iter().map(|p| p.to_lowercase()).collect();
-        // Walk transactions by date: the month's first one matching ANY
-        // snippet pays the event. Iterating by transaction (not by snippet)
-        // keeps "earliest wins" even with several snippets.
-        let matched = tx_rows.iter().find_map(|(tx_id, date, amount, desc)| {
-            let desc_lc = desc.to_lowercase();
-            let hit = patterns_lc.iter().position(|p| desc_lc.contains(p))?;
-            Some((tx_id, date, amount, hit))
-        });
+    for (rule_id, patterns, due_day, cat_name, cat_color, lead) in rule_rows {
+        let settlement: Option<(Option<i64>,)> = conn
+            .query_row(
+                "SELECT transaction_id FROM bill_settlements
+                  WHERE rule_id = ?1 AND due_month = ?2",
+                params![rule_id, month],
+                |row| Ok((row.get(0)?,)),
+            )
+            .ok();
 
-        // Event label: the snippet that matched, or the first one when the
+        let patterns_lc: Vec<String> = patterns.iter().map(|p| p.to_lowercase()).collect();
+        let pay_month = month_shifted(month, lead)?;
+        let pay_prefix = format!("{pay_month}-");
+
+        let (paid_date, paid_amount, paid_tx_id, manually_settled, hit) = match settlement {
+            Some((linked,)) => {
+                let paid = linked.and_then(|id| {
+                    conn.query_row(
+                        "SELECT date, amount FROM transactions WHERE id = ?1",
+                        params![id],
+                        |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)),
+                    )
+                    .ok()
+                    .map(|(date, amount)| (date, amount, id))
+                });
+                match paid {
+                    Some((date, amount, id)) => (Some(date), Some(amount), Some(id), true, None),
+                    None => (None, None, None, true, None),
+                }
+            }
+            None => {
+                let matched = tx_rows
+                    .iter()
+                    .filter(|(_, date, _, _)| date.starts_with(&pay_prefix))
+                    .find_map(|(tx_id, date, amount, desc)| {
+                        let desc_lc = desc.to_lowercase();
+                        let hit = patterns_lc.iter().position(|p| desc_lc.contains(p))?;
+                        Some((*tx_id, date.clone(), amount.clone(), hit))
+                    });
+                match matched {
+                    Some((tx_id, date, amount, hit)) => {
+                        (Some(date), Some(amount), Some(tx_id), false, Some(hit))
+                    }
+                    None => (None, None, None, false, None),
+                }
+            }
+        };
+
+        // Label: the snippet that actually matched, or the first one when the
         // event exists only because of the due date.
-        let label = match matched {
-            Some((_, _, _, hit)) => patterns[hit].clone(),
+        let label = match hit {
+            Some(i) => patterns[i].clone(),
             None => patterns.first().cloned().unwrap_or_default(),
         };
 
-        let (paid_day, paid_amount, paid_tx_id) = match matched {
-            Some((tx_id, date, amount, _)) => {
-                let day: Option<i32> = date.get(8..10).and_then(|s| s.parse().ok());
-                (day, Some(amount.clone()), Some(*tx_id))
-            }
-            None => (None, None, None),
-        };
-
-        // Show the rule when it has a due day OR matched a transaction.
-        if due_day.is_some() || paid_tx_id.is_some() {
+        if due_day.is_some() || paid_date.is_some() || manually_settled {
             events.push(CalendarEvent {
                 rule_id,
                 pattern: label,
                 category_name: cat_name,
                 category_color_token: cat_color,
                 due_day,
-                paid_day,
+                paid_date,
                 paid_amount,
                 paid_transaction_id: paid_tx_id,
+                manually_settled,
             });
         }
     }
@@ -1191,4 +1247,148 @@ mod tests {
         assert!(clean_patterns(&["   ".into()]).is_err());
     }
 
+    fn calendar_fixture() -> (Connection, i64) {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.pragma_update(None, "foreign_keys", "ON").unwrap();
+        migrations::apply(&conn).unwrap();
+        conn.execute(
+            "INSERT INTO categories (name, color_token, kind) VALUES ('Home', NULL, 'expense')",
+            [],
+        )
+        .unwrap();
+        let cat = conn.last_insert_rowid();
+        conn.execute("INSERT INTO accounts (name) VALUES ('checking')", [])
+            .unwrap();
+        (conn, cat)
+    }
+
+    fn bill_rule(conn: &Connection, cat: i64, pattern: &str, due_day: i32, lead: i32) -> i64 {
+        conn.execute(
+            "INSERT INTO rules (category_id, priority, due_day, pay_lead_months)
+             VALUES (?1, 0, ?2, ?3)",
+            params![cat, due_day, lead],
+        )
+        .unwrap();
+        let rule = conn.last_insert_rowid();
+        conn.execute(
+            "INSERT INTO rule_patterns (rule_id, pattern) VALUES (?1, ?2)",
+            params![rule, pattern],
+        )
+        .unwrap();
+        rule
+    }
+
+    fn payment(conn: &Connection, date: &str, description: &str) -> i64 {
+        let account: i64 = conn
+            .query_row("SELECT id FROM accounts LIMIT 1", [], |r| r.get(0))
+            .unwrap();
+        conn.execute(
+            "INSERT INTO transactions (account_id, date, amount, description)
+             VALUES (?1, ?2, '-182.40', ?3)",
+            params![account, date, description],
+        )
+        .unwrap();
+        conn.last_insert_rowid()
+    }
+
+    #[test]
+    fn month_shifted_walks_back_across_a_year() {
+        assert_eq!(super::month_shifted("2026-08", 1).unwrap(), "2026-07");
+        assert_eq!(super::month_shifted("2026-01", 1).unwrap(), "2025-12");
+        assert_eq!(super::month_shifted("2026-08", 0).unwrap(), "2026-08");
+    }
+
+    /// The reported bug: the bill due in August is paid in July, and August was
+    /// calling it overdue because it looked for the payment in August.
+    #[test]
+    fn a_lead_of_one_month_lets_july_pay_the_august_bill() {
+        let (conn, cat) = calendar_fixture();
+        bill_rule(&conn, cat, "ENERGIA", 6, 1);
+        payment(&conn, "2026-07-15", "ENERGIA ELETRICA");
+
+        let events = super::calendar_events_with_conn(&conn, "2026-08").unwrap();
+
+        assert_eq!(events.len(), 1);
+        assert_eq!(events[0].paid_date.as_deref(), Some("2026-07-15"));
+    }
+
+    /// The other half of the same bug: that July payment must NOT also settle
+    /// July's own occurrence, which is paid back in June.
+    #[test]
+    fn a_lead_of_one_month_leaves_july_unpaid_without_a_june_payment() {
+        let (conn, cat) = calendar_fixture();
+        bill_rule(&conn, cat, "ENERGIA", 6, 1);
+        payment(&conn, "2026-07-15", "ENERGIA ELETRICA");
+
+        let events = super::calendar_events_with_conn(&conn, "2026-07").unwrap();
+
+        assert_eq!(events.len(), 1);
+        assert_eq!(events[0].paid_date, None);
+    }
+
+    #[test]
+    fn without_a_lead_the_payment_settles_its_own_month() {
+        let (conn, cat) = calendar_fixture();
+        bill_rule(&conn, cat, "ENERGIA", 6, 0);
+        payment(&conn, "2026-08-04", "ENERGIA ELETRICA");
+
+        let events = super::calendar_events_with_conn(&conn, "2026-08").unwrap();
+
+        assert_eq!(events[0].paid_date.as_deref(), Some("2026-08-04"));
+    }
+
+    #[test]
+    fn a_manual_settlement_beats_the_derivation() {
+        let (conn, cat) = calendar_fixture();
+        let rule = bill_rule(&conn, cat, "ENERGIA", 6, 0);
+        conn.execute(
+            "INSERT INTO bill_settlements (rule_id, due_month) VALUES (?1, '2026-08')",
+            [rule],
+        )
+        .unwrap();
+
+        let events = super::calendar_events_with_conn(&conn, "2026-08").unwrap();
+
+        assert!(events[0].manually_settled);
+        assert_eq!(events[0].paid_date, None, "paid in cash has no date");
+        assert_eq!(events[0].paid_amount, None);
+    }
+
+    #[test]
+    fn a_manual_settlement_can_point_at_the_transaction_that_paid_it() {
+        let (conn, cat) = calendar_fixture();
+        let rule = bill_rule(&conn, cat, "ENERGIA", 6, 0);
+        let tx = payment(&conn, "2026-07-15", "ENERGIA ELETRICA");
+        conn.execute(
+            "INSERT INTO bill_settlements (rule_id, due_month, transaction_id)
+             VALUES (?1, '2026-08', ?2)",
+            params![rule, tx],
+        )
+        .unwrap();
+
+        let events = super::calendar_events_with_conn(&conn, "2026-08").unwrap();
+
+        assert!(events[0].manually_settled);
+        assert_eq!(events[0].paid_date.as_deref(), Some("2026-07-15"));
+        assert_eq!(events[0].paid_amount.as_deref(), Some("-182.40"));
+    }
+
+    /// A transaction the user has already assigned must not also settle another
+    /// occurrence by text similarity — that is the guessing this change removes.
+    #[test]
+    fn a_transaction_already_assigned_settles_nothing_else() {
+        let (conn, cat) = calendar_fixture();
+        let rule = bill_rule(&conn, cat, "ENERGIA", 6, 0);
+        let tx = payment(&conn, "2026-08-04", "ENERGIA ELETRICA");
+        conn.execute(
+            "INSERT INTO bill_settlements (rule_id, due_month, transaction_id)
+             VALUES (?1, '2026-09', ?2)",
+            params![rule, tx],
+        )
+        .unwrap();
+
+        let events = super::calendar_events_with_conn(&conn, "2026-08").unwrap();
+
+        assert_eq!(events[0].paid_date, None, "August must not claim September's payment");
+    }
 }
