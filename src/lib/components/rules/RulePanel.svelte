@@ -53,7 +53,7 @@
   let priority = $state(0);
   /** Svelte 5 coerces <input type="number"> to number | null. */
   let dueDayValue = $state<number | null>(null);
-  let payLeadMonths = $state(rule.pay_lead_months);
+  let payLeadMonths = $state(0);
   let busy = $state(false);
   let error = $state<string | null>(null);
 
