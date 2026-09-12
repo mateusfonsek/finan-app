@@ -25,6 +25,29 @@ export function billState(e: CalendarEvent, viewMonth: string, today: string): B
   return "pending";
 }
 
+/**
+ * How many bills the month still owes and how many it already missed.
+ *
+ * No amount, on purpose: an unpaid occurrence has no value anywhere — a rule
+ * carries snippets, a category, a priority and a due day, never a sum.
+ * Estimating from the last payment would be inventing a number.
+ */
+export function monthBillTotals(
+  events: CalendarEvent[],
+  viewMonth: string,
+  today: string,
+): { upcoming: number; overdue: number } {
+  let upcoming = 0;
+  let overdue = 0;
+  for (const e of events) {
+    if (e.due_day == null) continue;
+    const state = billState(e, viewMonth, today);
+    if (state === "pending") upcoming += 1;
+    else if (state === "overdue") overdue += 1;
+  }
+  return { upcoming, overdue };
+}
+
 /** Whole days from the due date to today. Both read as local midnight so a DST
  *  change cannot shift the count by one. */
 export function daysOverdue(dueDate: string, today: string): number {

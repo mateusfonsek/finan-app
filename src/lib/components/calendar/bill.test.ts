@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { billState, daysOverdue, dueDateOf } from "./bill";
+import { billState, daysOverdue, dueDateOf, monthBillTotals } from "./bill";
 import type { CalendarEvent } from "$lib/bindings";
 
 function bill(over: Partial<CalendarEvent> = {}): CalendarEvent {
@@ -53,6 +53,33 @@ describe("billState", () => {
 
   it("is pending in a month that has not arrived", () => {
     expect(billState(bill(), "2026-09", "2026-08-20")).toBe("pending");
+  });
+});
+
+describe("monthBillTotals", () => {
+  it("counts what is still to come and what is already late", () => {
+    const events = [
+      bill({ rule_id: 1, due_day: 6 }),
+      bill({ rule_id: 2, due_day: 25 }),
+      bill({ rule_id: 3, due_day: 10, paid_date: "2026-08-09" }),
+    ];
+
+    expect(monthBillTotals(events, "2026-08", "2026-08-20")).toEqual({
+      upcoming: 1,
+      overdue: 1,
+    });
+  });
+
+  it("is all zeros with no bill in the month", () => {
+    expect(monthBillTotals([], "2026-08", "2026-08-20")).toEqual({ upcoming: 0, overdue: 0 });
+  });
+
+  /** A rule with no due day only appears because it was paid; it is not a bill
+   *  anyone is waiting for. */
+  it("ignores an event with no due day", () => {
+    const events = [bill({ due_day: null, paid_date: "2026-08-09" })];
+
+    expect(monthBillTotals(events, "2026-08", "2026-08-20")).toEqual({ upcoming: 0, overdue: 0 });
   });
 });
 

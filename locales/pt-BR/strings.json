@@ -484,7 +484,14 @@
     "inflows": "Entradas",
     "outflows": "Saídas",
     "net": "Líquido",
-    "subtitle": "Entradas e saídas reais do mês, dia a dia (transferências e investimentos ficam de fora). Clique num dia pra ver tudo que aconteceu nele."
+    "subtitle": "Entradas e saídas reais do mês, dia a dia (transferências e investimentos ficam de fora). Clique num dia pra ver tudo que aconteceu nele.",
+    "bills": "Contas",
+    "no_due_one": "1 regra sem vencimento",
+    "no_due_many": "{n} regras sem vencimento",
+    "upcoming_one": "1 a vencer",
+    "upcoming_many": "{n} a vencer",
+    "overdue_one": "· 1 vencida",
+    "overdue_many": "· {n} vencidas"
   },
   "onboarding": {
     "title": "Suas finanças, no seu Mac.",
