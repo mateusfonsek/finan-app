@@ -126,7 +126,8 @@
     "paid_outside": "Paid outside the statement",
     "overdue_one": "1 day overdue",
     "overdue_days": "{n} days overdue",
-    "pending": "Pending"
+    "pending": "Pending",
+    "mark_due": "Set a bill due on day {day}"
   },
   "about": {
     "tagline": "The money is yours. So is the data.",
