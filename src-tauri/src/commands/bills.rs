@@ -52,6 +52,54 @@ pub fn unsettle(conn: &Connection, rule_id: i64, due_month: &str) -> AppResult<(
     Ok(())
 }
 
+/// One transaction already spoken for, and by which occurrence.
+///
+/// The search dialog needs this to stop the same payment settling two bills:
+/// with a broad search over every transaction, picking one twice is easy to do
+/// by accident, and the derivation exclusion is global — that money would leave
+/// every rule's calculation.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, specta::Type)]
+pub struct BillLink {
+    pub transaction_id: i64,
+    /// What to call the bill in "already pays X of <month>": the rule's display
+    /// name when it has one, otherwise its first snippet.
+    pub rule_label: String,
+    pub due_month: String,
+}
+
+pub fn links(conn: &Connection) -> AppResult<Vec<BillLink>> {
+    let mut stmt = conn.prepare(
+        "SELECT s.transaction_id,
+                COALESCE(r.display_name,
+                         (SELECT p.pattern FROM rule_patterns p
+                           WHERE p.rule_id = r.id ORDER BY p.id LIMIT 1),
+                         ''),
+                s.due_month
+           FROM bill_settlements s
+           JOIN rules r ON r.id = s.rule_id
+          WHERE s.transaction_id IS NOT NULL
+          ORDER BY s.due_month DESC",
+    )?;
+    let rows = stmt.query_map([], |row| {
+        Ok(BillLink {
+            transaction_id: row.get(0)?,
+            rule_label: row.get(1)?,
+            due_month: row.get(2)?,
+        })
+    })?;
+    rows.collect::<rusqlite::Result<Vec<_>>>()
+        .map_err(AppError::from)
+}
+
+/// Every settlement that points at a transaction. One row per bill per month,
+/// so the whole set is small enough to hand over unpaginated.
+#[tauri::command]
+#[specta::specta]
+pub fn bill_links(db: State<'_, Db>) -> AppResult<Vec<BillLink>> {
+    let conn = db.conn.lock().expect("db mutex poisoned");
+    links(&conn)
+}
+
 #[tauri::command]
 #[specta::specta]
 pub fn settle_bill(
@@ -160,6 +208,77 @@ mod tests {
         let rule = a_rule(&conn);
 
         assert!(unsettle(&conn, rule, "2026-08").is_ok());
+    }
+
+    fn account_and_payment(conn: &Connection, date: &str) -> i64 {
+        conn.execute("INSERT OR IGNORE INTO accounts (id, name) VALUES (1, 'c')", [])
+            .unwrap();
+        conn.execute(
+            "INSERT INTO transactions (account_id, date, amount, description)
+             VALUES (1, ?1, '-182.40', 'ENERGIA')",
+            params![date],
+        )
+        .unwrap();
+        conn.last_insert_rowid()
+    }
+
+    #[test]
+    fn links_are_empty_when_nothing_is_settled() {
+        let conn = fresh_conn();
+        a_rule(&conn);
+
+        assert!(links(&conn).unwrap().is_empty());
+    }
+
+    /// A cash settlement points at no transaction, so it cannot block one.
+    #[test]
+    fn a_settlement_without_a_transaction_is_not_a_link() {
+        let conn = fresh_conn();
+        let rule = a_rule(&conn);
+        settle(&conn, rule, "2026-08", None).unwrap();
+
+        assert!(links(&conn).unwrap().is_empty());
+    }
+
+    #[test]
+    fn a_linked_transaction_reports_its_occurrence() {
+        let conn = fresh_conn();
+        let rule = a_rule(&conn);
+        let tx = account_and_payment(&conn, "2026-07-15");
+        conn.execute(
+            "INSERT INTO rule_patterns (rule_id, pattern) VALUES (?1, 'ENERGIA')",
+            [rule],
+        )
+        .unwrap();
+        settle(&conn, rule, "2026-08", Some(tx)).unwrap();
+
+        let found = links(&conn).unwrap();
+
+        assert_eq!(found.len(), 1);
+        assert_eq!(found[0].transaction_id, tx);
+        assert_eq!(found[0].due_month, "2026-08");
+        assert_eq!(found[0].rule_label, "ENERGIA", "falls back to the first snippet");
+    }
+
+    /// The label is what the user named the bill, when they named it.
+    #[test]
+    fn a_display_name_wins_over_the_snippet() {
+        let conn = fresh_conn();
+        let rule = a_rule(&conn);
+        let tx = account_and_payment(&conn, "2026-07-15");
+        conn.execute(
+            "INSERT INTO rule_patterns (rule_id, pattern) VALUES (?1, 'ENERGIA')",
+            [rule],
+        )
+        .unwrap();
+        conn.execute(
+            "UPDATE rules SET display_name = 'Conta de luz' WHERE id = ?1",
+            [rule],
+        )
+        .unwrap();
+        settle(&conn, rule, "2026-08", Some(tx)).unwrap();
+
+        assert_eq!(links(&conn).unwrap()[0].rule_label, "Conta de luz");
     }
 
     #[test]

@@ -107,7 +107,8 @@
     "no_candidates": "No transaction matches this rule's snippets.",
     "open_rule": "Open rule",
     "settle": "Settle bill",
-    "settling": "Settling…"
+    "settling": "Settling…",
+    "search_other": "Find another transaction…"
   },
   "day_details": {
     "selected_day": "Selected day",
@@ -405,6 +406,17 @@
     "create_apply": "Create and apply",
     "notes": "Notes",
     "notes_placeholder": "Notes about this transaction…"
+  },
+  "tx_search": {
+    "title": "Which transaction paid this bill?",
+    "desc": "{bill} · due in {month}. The search looks at every transaction, not only the ones the rule matches.",
+    "search": "Search description or notes…",
+    "by_rule": "Suggested by the rule",
+    "others": "Other transactions",
+    "already_pays": "already pays {bill} of {month}",
+    "use": "Use this one",
+    "empty": "No transaction found",
+    "empty_desc": "Try another term, or settle the bill outside the statement."
   },
   "transactions_page": {
     "count_one": "{n} transaction",

@@ -1,4 +1,5 @@
 import { commands } from "../bindings";
+import type { BillLink } from "../bindings";
 
 function unwrap<T>(result: { status: "ok"; data: T } | { status: "error"; error: string }): T {
   if (result.status === "error") throw new Error(result.error);
@@ -18,4 +19,10 @@ export async function settleBill(
 
 export async function unsettleBill(ruleId: number, dueMonth: string): Promise<void> {
   unwrap(await commands.unsettleBill(ruleId, dueMonth));
+}
+
+/** Which transactions are already spoken for, and by which occurrence. The
+ *  search dialog needs this to stop one payment settling two bills. */
+export async function billLinks(): Promise<BillLink[]> {
+  return unwrap(await commands.billLinks());
 }
