@@ -1094,7 +1094,7 @@ mod tests {
         apply_rules_internal(&mut conn, None).unwrap();
 
         let rows = preview(&conn);
-        assert_eq!(rows.len(), 1, "a sem-categoria foi resolvida");
+        assert_eq!(rows.len(), 1, "the uncategorized transaction was resolved");
         assert_eq!(rows[0].0, manual);
         assert_eq!(rows[0].1, Some(mercado));
         assert_eq!(rows[0].2, transporte);

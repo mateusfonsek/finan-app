@@ -9,13 +9,13 @@ import { loadOfxFromPath } from "./load";
 describe("loadOfxFromPath", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it("classifica falha de disco como OfxReadError", async () => {
+  it("a disk failure is an OfxReadError", async () => {
     readFileBytes.mockRejectedValue(new Error("No such file or directory (os error 2)"));
 
     await expect(loadOfxFromPath("/tmp/sumiu.ofx")).rejects.toBeInstanceOf(OfxReadError);
   });
 
-  it("falha de conteúdo NÃO é OfxReadError", async () => {
+  it("a content failure is NOT an OfxReadError", async () => {
     // Whatever decides to mark a file `invalid` (permanent) relies on exactly
     // this distinction: if parse threw OfxReadError, junk would stay pending
     // forever; if a read threw a plain error, a good statement would be buried.

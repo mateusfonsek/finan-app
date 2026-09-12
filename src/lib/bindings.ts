@@ -289,9 +289,9 @@ async calendarEvents(month: string) : Promise<Result<CalendarEvent[], string>> {
     else return { status: "error", error: e  as any };
 }
 },
-async resolveCnpj(cnpj: string) : Promise<Result<CnpjResolution, string>> {
+async resolveTaxId(taxId: string) : Promise<Result<TaxIdResolution, string>> {
     try {
-    return { status: "ok", data: await TAURI_INVOKE("resolve_cnpj", { cnpj }) };
+    return { status: "ok", data: await TAURI_INVOKE("resolve_tax_id", { taxId }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -341,9 +341,9 @@ async setEnrichmentEnabled(enabled: boolean) : Promise<Result<null, string>> {
  * It is still a synchronous `fn`, and that is correct: the body does not
  * block, it only spawns.
  */
-async startCnpjEnrichment(accountId: number | null, onEvent: TAURI_CHANNEL<EnrichEvent>) : Promise<Result<null, string>> {
+async startTaxIdEnrichment(accountId: number | null, onEvent: TAURI_CHANNEL<EnrichEvent>) : Promise<Result<null, string>> {
     try {
-    return { status: "ok", data: await TAURI_INVOKE("start_cnpj_enrichment", { accountId, onEvent }) };
+    return { status: "ok", data: await TAURI_INVOKE("start_tax_id_enrichment", { accountId, onEvent }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -353,8 +353,8 @@ async startCnpjEnrichment(accountId: number | null, onEvent: TAURI_CHANNEL<Enric
  * Requests a stop. What was already created stays — cancelling is stopping
  * work, not undoing the work done.
  */
-async cancelCnpjEnrichment() : Promise<void> {
-    await TAURI_INVOKE("cancel_cnpj_enrichment");
+async cancelTaxIdEnrichment() : Promise<void> {
+    await TAURI_INVOKE("cancel_tax_id_enrichment");
 },
 async summaryKpis(month: string | null) : Promise<Result<KpiSummary, string>> {
     try {
@@ -616,7 +616,7 @@ name: string;
  * failed must not pass for data.
  */
 latest_date: string | null }
-export type AutoClassifyReport = { created_rules: Rule[]; txs_classified: number; unresolved: CnpjResolution[] }
+export type AutoClassifyReport = { created_rules: Rule[]; txs_classified: number; unresolved: TaxIdResolution[] }
 /**
  * A calendar event: a rule plus an optional due day plus an optional matching
  * transaction.
@@ -630,10 +630,6 @@ pattern: string; category_name: string; category_color_token: string | null; due
 export type Category = { id: number; name: string; color_token: string | null; kind: string; is_investment: boolean; created_at: string }
 export type CategorySpend = { category_id: number | null; name: string; color_token: string | null; total: string; percent: number }
 export type CategoryWithCount = { id: number; name: string; color_token: string | null; kind: string; created_at: string; transaction_count: number }
-/**
- * Brazilian field names on purpose: this is the UI contract, not the core.
- */
-export type CnpjResolution = { cnpj: string; razao_social: string | null; nome_fantasia: string | null; cnae_fiscal: string | null; cnae_fiscal_descricao: string | null; suggested_category_id: number | null }
 export type DiscoveredFile = { id: number; content_hash: string; path: string; file_name: string; size: number; status: string; seen_at: string }
 /**
  * What the background thread tells the interface, in order.
@@ -646,7 +642,7 @@ export type DiscoveredFile = { id: number; content_hash: string; path: string; f
  * needs to tell them apart: a lookup that went wrong inside a loop that keeps
  * going is not the work having died.
  */
-export type EnrichEvent = { kind: "Started"; total: number } | { kind: "Resolved"; done: number; label: string; rule: Rule } | { kind: "Unresolved"; done: number; resolution: CnpjResolution } | { kind: "Failed"; done: number; tax_id: string } | { kind: "Finished"; report: AutoClassifyReport } | { kind: "Cancelled"; report: AutoClassifyReport } | { kind: "Aborted"; message: string }
+export type EnrichEvent = { kind: "Started"; total: number } | { kind: "Resolved"; done: number; label: string; rule: Rule } | { kind: "Unresolved"; done: number; resolution: TaxIdResolution } | { kind: "Failed"; done: number; tax_id: string } | { kind: "Finished"; report: AutoClassifyReport } | { kind: "Cancelled"; report: AutoClassifyReport } | { kind: "Aborted"; message: string }
 export type EnrichmentStatus = { 
 /**
  * Active locale has a tax-id format and a known provider. When `false`
@@ -797,6 +793,7 @@ export type RuleWithCount = { id: number; patterns: string[]; category_id: numbe
  */
 transaction_count: number }
 export type TAURI_CHANNEL<TSend> = null
+export type TaxIdResolution = { tax_id: string; legal_name: string | null; trade_name: string | null; activity_code: string | null; activity_label: string | null; suggested_category_id: number | null }
 export type Transaction = { id: number; account_id: number; date: string; 
 /**
  * Decimal serialized as string (e.g. "-123.45"). Never f64.

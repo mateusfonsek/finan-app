@@ -64,15 +64,11 @@
   },
   "common": {
     "cancel": "Cancelar",
-    "save": "Salvar",
     "delete": "Excluir",
-    "edit": "Editar",
     "close": "Fechar",
-    "language": "Idioma",
     "loading": "Carregando…",
     "actions": "Ações",
-    "create": "Criar",
-    "retry": "Tentar de novo"
+    "create": "Criar"
   },
   "month_stepper": {
     "prev_year": "Ano anterior",
@@ -157,7 +153,6 @@
     "empty": "Nenhuma transação ainda",
     "import_link": "Importar um OFX",
     "empty_desc": "Importe o extrato .ofx do seu banco e as transações aparecem aqui, já categorizadas pelas suas regras.",
-    "sort_by": "Ordenar por {col}",
     "sort_asc": "{col} — do menor pro maior",
     "sort_desc": "{col} — do maior pro menor",
     "sort_date_asc": "Data — da mais antiga pra mais recente",
@@ -212,7 +207,6 @@
     "empty_title": "Nenhuma regra ainda"
   },
   "rule_form": {
-    "form_edit": "Editar regra",
     "form_new": "Nova regra",
     "pattern_label": "Trecho da descrição",
     "patterns_label": "Trechos da descrição",
@@ -226,7 +220,6 @@
     "due_day": "Vence dia",
     "due_day_title": "Dia do mês em que a obrigação vence. Deixe vazio se a regra não tem prazo fixo.",
     "saving": "Salvando…",
-    "save": "Salvar",
     "add": "Adicionar",
     "pattern_required": "Pattern não pode ser vazio.",
     "category_required": "Selecione uma categoria.",
@@ -414,7 +407,6 @@
     "or": "ou",
     "then_use": "usar a categoria",
     "no_category": "— nenhuma —",
-    "pattern_hint": "Procurado dentro da descrição, em qualquer posição. Não diferencia maiúsculas de minúsculas.",
     "patterns_hint": "A regra vale quando QUALQUER uma destas aparecer na descrição. Use trechos curtos e estáveis — colar a linha inteira do extrato quebra se o banco mudar um número.",
     "due_day_hint": "Dia do mês em que a conta vence — é o que coloca a regra no calendário. Vazio = sem prazo fixo.",
     "priority_hint": "Quando duas regras batem na mesma transação, vale a de maior prioridade.",
@@ -426,7 +418,6 @@
     "count_one": "1 transação",
     "count_many": "{n} transações",
     "total": "{value} no total",
-    "loading": "Carregando…",
     "empty_title": "Nenhuma transação casa esta regra",
     "empty_desc": "Nenhuma descrição do seu extrato contém os trechos desta regra. Confira se estão escritos como o banco escreve.",
     "no_category": "Sem categoria",
@@ -444,32 +435,23 @@
     "by_rule": "regra “{rule}”",
     "apply_one": "Aplicar 1 alteração",
     "apply_many": "Aplicar {n} alterações",
-    "apply_none": "Aplicar",
     "selected_count": "{n} de {total} selecionadas",
     "selected_none": "Nenhuma selecionada",
     "applying": "Aplicando…",
     "nothing_to_do": "As regras já estão aplicadas — nenhuma transação mudaria de categoria.",
     "applied_one": "1 transação recategorizada.",
-    "applied_many": "{n} transações recategorizadas.",
-    "checking": "Verificando…"
+    "applied_many": "{n} transações recategorizadas."
   },
   "rules_page": {
     "desc": "Regras \"se descrição contém X, categoria Y\" são aplicadas automaticamente em cada import. Categorização manual nunca é sobrescrita.",
     "applying": "Verificando…",
     "apply": "Revisar e aplicar",
     "save_changes": "Salvar alterações",
-    "delete_confirm": "Apagar regra \"{pattern}\"?",
-    "applied_none": "Nenhuma transação foi categorizada (nenhum pattern bateu).",
-    "applied_one": "{n} transação categorizada automaticamente.",
-    "applied_many": "{n} transações categorizadas automaticamente."
+    "delete_confirm": "Apagar regra \"{pattern}\"?"
   },
   "calendar_page": {
-    "desc_1": "Heatmap de entradas/saídas",
-    "desc_strong": "reais",
-    "desc_2": "(sem transferências e investimentos). Clique em um dia pra ver tudo que aconteceu nele, agrupado por tipo.",
     "inflows": "Entradas",
     "outflows": "Saídas",
-    "loading": "carregando…",
     "net": "Líquido",
     "subtitle": "Entradas e saídas reais do mês, dia a dia (transferências e investimentos ficam de fora). Clique num dia pra ver tudo que aconteceu nele."
   },

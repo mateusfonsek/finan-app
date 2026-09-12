@@ -3,7 +3,8 @@ use specta::Type;
 use std::collections::HashMap;
 use tauri::State;
 
-use crate::commands::cnpj::{extract_cnpj, CnpjResolution};
+use crate::commands::tax_id::TaxIdResolution;
+use crate::enrich::extract_tax_id;
 use crate::db::Db;
 use crate::domain::rule::Rule;
 use crate::error::AppResult;
@@ -26,7 +27,7 @@ pub fn normalize(description: &str, pack: &LocalePack) -> (String, String, Strin
     };
 
     // 1. A tax id wins: the label is the text after the first separator.
-    if let Some(cnpj) = extract_cnpj(pack, description) {
+    if let Some(tax_id) = extract_tax_id(pack, description) {
         let label = description
             .split_once(sep)
             .map(|(_, after)| after.trim())
@@ -38,7 +39,7 @@ pub fn normalize(description: &str, pack: &LocalePack) -> (String, String, Strin
         } else {
             norm.cnpj_key_prefix.as_str()
         };
-        return (format!("{kp}:{cnpj}"), label, cnpj);
+        return (format!("{kp}:{tax_id}"), label, tax_id);
     }
 
     // 2. Ordered rules from the pack (strip / masked / system).
@@ -191,7 +192,7 @@ pub fn suggest_pattern_for(locale: State<'_, LocaleState>, description: String) 
 pub struct AutoClassifyReport {
     pub created_rules: Vec<Rule>,
     pub txs_classified: u32,
-    pub unresolved: Vec<CnpjResolution>,
+    pub unresolved: Vec<TaxIdResolution>,
 }
 
 #[cfg(test)]

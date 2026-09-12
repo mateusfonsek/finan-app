@@ -256,30 +256,30 @@
     return r.patterns.length > 1 ? `${first}  +${r.patterns.length - 1}` : first;
   }
 
-  async function onCreateRuleForCnpj(cnpj: string) {
+  async function onCreateRuleForTaxId(taxId: string) {
     if (!autoReport) return;
-    const categoryId = chosen[cnpj];
+    const categoryId = chosen[taxId];
     if (categoryId == null) {
       error = t("import.choose_category_first");
       return;
     }
-    const u = autoReport.unresolved.find((x) => x.cnpj === cnpj);
-    busyKey = `cnpj:${cnpj}`;
+    const u = autoReport.unresolved.find((x) => x.tax_id === taxId);
+    busyKey = `taxId:${taxId}`;
     error = null;
     try {
       const rule = await createRule({
-        patterns: [cnpj],
+        patterns: [taxId],
         category_id: categoryId,
         priority: 10,
         due_day: null,
-        display_name: u?.razao_social ?? u?.nome_fantasia ?? null,
+        display_name: u?.legal_name ?? u?.trade_name ?? null,
       });
       activity.patchReport({
         ...autoReport,
         created_rules: [...autoReport.created_rules, rule],
-        unresolved: autoReport.unresolved.filter((x) => x.cnpj !== cnpj),
+        unresolved: autoReport.unresolved.filter((x) => x.tax_id !== taxId),
       });
-      delete chosen[cnpj];
+      delete chosen[taxId];
     } catch (e) {
       error = e instanceof Error ? e.message : String(e);
     } finally {
@@ -478,20 +478,20 @@
             >
               <div class="flex flex-col min-w-0">
                 <div class="text-callout text-fg font-medium truncate">
-                  {u.razao_social ?? u.nome_fantasia ?? u.cnpj}
+                  {u.legal_name ?? u.trade_name ?? u.tax_id}
                 </div>
                 <div class="text-cap text-fg-subtle tabular truncate">
-                  {u.cnpj}
-                  {#if u.cnae_fiscal_descricao}
-                    {t("import.cnae_label", { code: u.cnae_fiscal ?? "—", desc: u.cnae_fiscal_descricao })}
+                  {u.tax_id}
+                  {#if u.activity_label}
+                    {t("import.cnae_label", { code: u.activity_code ?? "—", desc: u.activity_label })}
                   {/if}
                 </div>
               </div>
               <select
-                value={chosen[u.cnpj] == null ? "" : String(chosen[u.cnpj])}
+                value={chosen[u.tax_id] == null ? "" : String(chosen[u.tax_id])}
                 onchange={(e) => {
                   const v = (e.currentTarget as HTMLSelectElement).value;
-                  chosen[u.cnpj] = v === "" ? null : Number(v);
+                  chosen[u.tax_id] = v === "" ? null : Number(v);
                 }}
                 aria-label={t("import.category_placeholder")}
                 class="field"
@@ -502,10 +502,10 @@
                 {/each}
               </select>
               <Button
-                onclick={() => onCreateRuleForCnpj(u.cnpj)}
-                disabled={busyKey === `cnpj:${u.cnpj}` || chosen[u.cnpj] == null}
+                onclick={() => onCreateRuleForTaxId(u.tax_id)}
+                disabled={busyKey === `cnpj:${u.tax_id}` || chosen[u.tax_id] == null}
               >
-                {busyKey === `cnpj:${u.cnpj}` ? t("import.creating") : t("import.create_rule")}
+                {busyKey === `cnpj:${u.tax_id}` ? t("import.creating") : t("import.create_rule")}
               </Button>
             </div>
           {/each}

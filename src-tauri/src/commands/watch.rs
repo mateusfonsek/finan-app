@@ -546,7 +546,7 @@ mod tests {
 
         let folders = list_folders(&conn).unwrap();
         assert_eq!(folders.len(), 1);
-        assert!(!folders[0].exists, "pasta removida deve reportar exists=false");
+        assert!(!folders[0].exists, "a folder that is gone must report exists=false");
     }
 
     #[test]

@@ -56,6 +56,11 @@ pub struct Manifest {
     pub currency: Currency,
     #[serde(rename = "dateLocale")]
     pub date_locale: String,
+    /// Weekday the calendar grid starts on, as a `Date.getDay()` value
+    /// (0 = Sunday). Omitted means Sunday, so a pack written before this field
+    /// existed keeps rendering as it did.
+    #[serde(rename = "firstDayOfWeek", default)]
+    pub first_day_of_week: u8,
     #[serde(rename = "taxId")]
     pub tax_id: TaxId,
 }

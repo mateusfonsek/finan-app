@@ -177,7 +177,7 @@ mod tests {
         assert!(rows.iter().any(|(n, k)| n == "Investimentos" && k == "transfer"));
         assert!(
             !rows.iter().any(|(n, _)| n == "Renda"),
-            "Renda foi removida pela migration 0008"
+            "migration 0008 removed Renda"
         );
     }
 

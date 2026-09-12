@@ -14,7 +14,7 @@ use rusqlite::params;
 use serde::Serialize;
 use specta::Type;
 
-use crate::commands::cnpj::CnpjResolution;
+use crate::commands::tax_id::TaxIdResolution;
 use crate::commands::rules::apply_rules_internal;
 use crate::commands::suggestions::AutoClassifyReport;
 use crate::domain::rule::Rule;
@@ -37,7 +37,7 @@ use crate::locale::LocalePack;
 pub enum EnrichEvent {
     Started { total: u32 },
     Resolved { done: u32, label: String, rule: Rule },
-    Unresolved { done: u32, resolution: CnpjResolution },
+    Unresolved { done: u32, resolution: TaxIdResolution },
     Failed { done: u32, tax_id: String },
     Finished { report: AutoClassifyReport },
     Cancelled { report: AutoClassifyReport },
@@ -113,7 +113,7 @@ pub fn run_enrichment(
     });
 
     let mut created_rules: Vec<Rule> = Vec::new();
-    let mut unresolved: Vec<CnpjResolution> = Vec::new();
+    let mut unresolved: Vec<TaxIdResolution> = Vec::new();
     let mut done: u32 = 0;
     let mut cancelled = false;
     let mut consulted = 0usize;
@@ -166,12 +166,12 @@ pub fn run_enrichment(
             }
         };
 
-        let resolution = CnpjResolution {
-            cnpj: tax_id.clone(),
-            razao_social: enrichment.company.legal_name.clone(),
-            nome_fantasia: enrichment.company.trade_name.clone(),
-            cnae_fiscal: enrichment.company.activity_code.clone(),
-            cnae_fiscal_descricao: enrichment.company.activity_label.clone(),
+        let resolution = TaxIdResolution {
+            tax_id: tax_id.clone(),
+            legal_name: enrichment.company.legal_name.clone(),
+            trade_name: enrichment.company.trade_name.clone(),
+            activity_code: enrichment.company.activity_code.clone(),
+            activity_label: enrichment.company.activity_label.clone(),
             suggested_category_id: enrichment.suggested_category_id,
         };
 
@@ -216,13 +216,13 @@ fn insert_rule(
     conn: &Mutex<rusqlite::Connection>,
     tax_id: &str,
     category_id: i64,
-    resolution: &CnpjResolution,
+    resolution: &TaxIdResolution,
 ) -> AppResult<Rule> {
     let c = conn.lock().expect("db mutex poisoned");
     let display = resolution
-        .razao_social
+        .legal_name
         .clone()
-        .or_else(|| resolution.nome_fantasia.clone());
+        .or_else(|| resolution.trade_name.clone());
     c.execute(
         "INSERT INTO rules (category_id, priority, due_day, display_name)
          VALUES (?1, 10, NULL, ?2)",

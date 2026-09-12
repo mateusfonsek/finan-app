@@ -6,7 +6,7 @@
  * own the progress AND the final report — and it cannot be the component, which
  * unmounts as soon as the user navigates to another screen.
  */
-import { cancelCnpjEnrichment, startCnpjEnrichment } from "$lib/api/enrichJob";
+import { cancelTaxIdEnrichment, startTaxIdEnrichment } from "$lib/api/enrichJob";
 import type { AutoClassifyReport } from "$lib/bindings";
 import {
   initialEnrichState,
@@ -48,7 +48,7 @@ export function createActivityStore() {
       // `Started`. Anticipating would show a bar for a job the backend may
       // refuse (one already running) or never start (enrichment off).
       try {
-        await startCnpjEnrichment(accountId, (event) => {
+        await startTaxIdEnrichment(accountId, (event) => {
           enrich = reduceEnrich(enrich, event);
         });
       } catch (e) {
@@ -61,7 +61,7 @@ export function createActivityStore() {
     },
 
     async cancel() {
-      await cancelCnpjEnrichment();
+      await cancelTaxIdEnrichment();
     },
 
     /** Called when a new import starts, so the screen does not inherit the previous one. */

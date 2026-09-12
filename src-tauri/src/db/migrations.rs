@@ -340,7 +340,7 @@ mod tests {
              VALUES ('abc', '/tmp/b.ofx', 'b.ofx', 10, 'pending')",
             [],
         );
-        assert!(result.is_err(), "hash duplicado deveria ser barrado");
+        assert!(result.is_err(), "the same content under another name must collide");
     }
 
     #[test]

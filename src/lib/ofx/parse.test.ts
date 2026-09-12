@@ -126,17 +126,17 @@ NEWFILEUID:NONE
 
   const r = parseOfx(ofx);
 
-  it("preserva todas as N transações com FITID duplicado", () => {
+  it("keeps every transaction sharing a duplicated FITID", () => {
     expect(r.transactions).toHaveLength(3);
   });
 
-  it("primeira ocorrência mantém o FITID original; seguintes recebem sufixo #N", () => {
+  it("the first occurrence keeps the original FITID; the rest get a #N suffix", () => {
     expect(r.transactions[0].fitid).toBe("SHARED-FITID");
     expect(r.transactions[1].fitid).toBe("SHARED-FITID#2");
     expect(r.transactions[2].fitid).toBe("UNIQUE-FITID");
   });
 
-  it("após dedup, todos os FITIDs são únicos (requisito do {#each} keyed e do UNIQUE no DB)", () => {
+  it("every FITID ends up unique, which the keyed {#each} and the DB UNIQUE both require", () => {
     const ids = r.transactions.map((t) => t.fitid);
     expect(new Set(ids).size).toBe(ids.length);
   });

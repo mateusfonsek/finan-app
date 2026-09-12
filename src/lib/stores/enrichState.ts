@@ -52,7 +52,7 @@ export function reduceEnrich(state: EnrichState, event: EnrichEvent): EnrichStat
       return {
         ...state,
         done: event.done,
-        label: event.resolution.razao_social ?? event.resolution.nome_fantasia ?? state.label,
+        label: event.resolution.legal_name ?? event.resolution.trade_name ?? state.label,
       };
 
     case "Failed":
