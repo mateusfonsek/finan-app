@@ -153,7 +153,11 @@
             onclick={() => handleClick(cell.day!)}
             aria-pressed={cell.day === selectedDay}
             aria-label={flow
-              ? t("calendar.day_aria_flow", { day: cell.day, inflow: flow.inflow, outflow: flow.outflow })
+              ? t("calendar.day_aria_flow", {
+                  day: cell.day,
+                  inflow: formatMoney(String(flow.inflow)),
+                  outflow: formatMoney(String(flow.outflow)),
+                })
               : t("calendar.day_aria", { day: cell.day })}
             class="absolute inset-0 transition-colors duration-[var(--dur-fast)] ease-[var(--ease-snap)]
                    {cell.day === selectedDay
@@ -174,18 +178,10 @@
               </span>
               <div class="flex items-center gap-1">
                 {#if outPct > 0}
-                  <span
-                    class="w-2 h-2 rounded-full"
-                    style={dotStyle("var(--color-neg)", outPct)}
-                    title={t("calendar.outflows_title", { value: formatMoney(String(flow?.outflow ?? 0)) })}
-                  ></span>
+                  <span class="w-2 h-2 rounded-full" style={dotStyle("var(--color-neg)", outPct)}></span>
                 {/if}
                 {#if inPct > 0}
-                  <span
-                    class="w-2 h-2 rounded-full"
-                    style={dotStyle("var(--color-pos)", inPct)}
-                    title={t("calendar.inflows_title", { value: formatMoney(String(flow?.inflow ?? 0)) })}
-                  ></span>
+                  <span class="w-2 h-2 rounded-full" style={dotStyle("var(--color-pos)", inPct)}></span>
                 {/if}
               </div>
             </div>
@@ -194,6 +190,7 @@
             {#each cell.due.slice(0, 2) as e (e.rule_id)}
               {@const state = billState(e, month, today)}
               {@const due = dueDateOf(e, month)}
+              {@const overdueDays = due != null ? daysOverdue(due, today) : 0}
               <button
                 type="button"
                 onclick={(ev) => onSelectBill?.(e, ev.currentTarget)}
@@ -208,9 +205,9 @@
                   {state === "paid"
                     ? t("calendar.bill_state_paid")
                     : state === "overdue"
-                      ? daysOverdue(due!, today) === 1
+                      ? overdueDays === 1
                         ? t("calendar.bill_state_overdue_one")
-                        : t("calendar.bill_state_overdue_days", { n: daysOverdue(due!, today) })
+                        : t("calendar.bill_state_overdue_days", { n: overdueDays })
                       : t("calendar.bill_state_pending")}
                 </span>
               </button>

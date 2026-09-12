@@ -89,8 +89,6 @@
     "more": "+{n} more",
     "day_aria": "Day {day}",
     "day_aria_flow": "Day {day} — inflows {inflow}, outflows {outflow}",
-    "outflows_title": "Outflows: {value}",
-    "inflows_title": "Inflows: {value}",
     "bill_state_paid": "paid",
     "bill_state_pending": "upcoming",
     "bill_state_overdue_days": "{n} days overdue",

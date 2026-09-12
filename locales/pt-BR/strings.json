@@ -89,8 +89,6 @@
     "more": "+{n} mais",
     "day_aria": "Dia {day}",
     "day_aria_flow": "Dia {day} — entradas {inflow}, saídas {outflow}",
-    "outflows_title": "Saídas: {value}",
-    "inflows_title": "Entradas: {value}",
     "bill_state_paid": "paga",
     "bill_state_pending": "a vencer",
     "bill_state_overdue_days": "vencida há {n} dias",
