@@ -60,13 +60,23 @@
   });
 
   onMount(() => {
+    // With the search dialog up, this popover is no longer the top layer, and a
+    // layer must not dismiss itself over something happening above it. The
+    // dialog renders as a SIBLING of `panelEl`, so without this every listener
+    // below reads a scroll, a click or an Escape inside the dialog as "outside
+    // the popover" and tears both down. Widening the `contains` checks to know
+    // about the dialog's DOM would only defer the problem to a third layer.
+    const covered = () => searching;
+
     const onKey = (e: KeyboardEvent) => {
+      if (covered()) return;
       if (e.key === "Escape") {
         e.stopPropagation();
         close();
       }
     };
     const onDown = (e: MouseEvent) => {
+      if (covered()) return;
       const target = e.target as Node;
       if (!panelEl?.contains(target) && !anchor.contains(target)) close();
     };
@@ -78,6 +88,7 @@
     // leaving the popover. Only a scroll of what lies behind detaches it from
     // its chip, and only that should close it.
     const onScroll = (e: Event) => {
+      if (covered()) return;
       if (panelEl?.contains(e.target as Node)) return;
       close();
     };
