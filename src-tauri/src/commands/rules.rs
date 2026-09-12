@@ -1,6 +1,7 @@
 use rusqlite::{params, OptionalExtension};
 use tauri::State;
 
+use crate::commands::bills::validate_month;
 use crate::db::Db;
 use rust_decimal::Decimal;
 use std::str::FromStr;
@@ -535,12 +536,10 @@ fn fetch_rule(conn: &rusqlite::Connection, id: i64) -> AppResult<Rule> {
 /// `month` (`YYYY-MM`) moved `back` whole months. Arithmetic on a month index
 /// rather than on a date, so December does not need a special case.
 fn month_shifted(month: &str, back: i64) -> AppResult<String> {
-    let bad = || AppError::Invalid(format!("month must be 'YYYY-MM' (got: '{month}')"));
-    if month.len() != 7 {
-        return Err(bad());
-    }
-    let year: i64 = month.get(0..4).ok_or_else(bad)?.parse().map_err(|_| bad())?;
-    let m: i64 = month.get(5..7).ok_or_else(bad)?.parse().map_err(|_| bad())?;
+    validate_month(month)?;
+    // Four digits, '-', two digits: guaranteed above, so neither parse can fail.
+    let year: i64 = month[0..4].parse().expect("validated month");
+    let m: i64 = month[5..7].parse().expect("validated month");
     let index = year * 12 + (m - 1) - back;
     Ok(format!(
         "{:04}-{:02}",
@@ -569,11 +568,7 @@ fn calendar_events_with_conn(
     conn: &rusqlite::Connection,
     month: &str,
 ) -> AppResult<Vec<CalendarEvent>> {
-    if month.len() != 7 || !month.contains('-') {
-        return Err(AppError::Invalid(format!(
-            "month must be 'YYYY-MM' (got: '{month}')"
-        )));
-    }
+    validate_month(month)?;
 
     type RuleRow = (i64, Vec<String>, Option<i32>, String, Option<String>, i64);
     let rule_rows: Vec<RuleRow> = {
@@ -1320,6 +1315,15 @@ mod tests {
         )
         .unwrap();
         conn.last_insert_rowid()
+    }
+
+    /// The month becomes a SQL `LIKE` prefix, so anything that reaches it must
+    /// pass the strict check and not a looser one alongside it.
+    #[test]
+    fn the_calendar_rejects_a_month_that_merely_looks_like_one() {
+        let (conn, _) = calendar_fixture();
+        assert!(super::calendar_events_with_conn(&conn, "20-26-8").is_err());
+        assert!(super::calendar_events_with_conn(&conn, "202%-08").is_err());
     }
 
     #[test]

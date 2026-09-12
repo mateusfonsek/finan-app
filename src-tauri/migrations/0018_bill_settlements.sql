@@ -24,5 +24,3 @@ CREATE TABLE bill_settlements (
   settled_at     TEXT NOT NULL DEFAULT (datetime('now')),
   UNIQUE(rule_id, due_month)
 );
-
-CREATE INDEX idx_bill_settlements_month ON bill_settlements(due_month);

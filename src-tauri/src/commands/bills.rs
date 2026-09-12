@@ -11,6 +11,9 @@ use tauri::State;
 use crate::db::Db;
 use crate::error::{AppError, AppResult};
 
+/// The one check for a `YYYY-MM` month, used by everything that takes one. It
+/// is strict on purpose: the month reaches SQL as a `LIKE` prefix, so a looser
+/// check elsewhere would decide what that pattern matches.
 pub fn validate_month(month: &str) -> AppResult<()> {
     let ok = month.len() == 7
         && month.as_bytes()[4] == b'-'
@@ -18,7 +21,7 @@ pub fn validate_month(month: &str) -> AppResult<()> {
         && month[5..7].bytes().all(|b| b.is_ascii_digit());
     if !ok {
         return Err(AppError::Invalid(format!(
-            "due_month must be 'YYYY-MM' (got: '{month}')"
+            "month must be 'YYYY-MM' (got: '{month}')"
         )));
     }
     Ok(())

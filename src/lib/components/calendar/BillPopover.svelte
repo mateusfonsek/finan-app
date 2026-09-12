@@ -136,10 +136,12 @@
     <span class="text-callout font-semibold text-fg truncate">{event.pattern}</span>
     <span class="text-foot text-fg-subtle">
       {#if billStatus === "paid"}
+        <!-- Date and amount come from the same transaction row: either both
+             are there, or the payment never passed through the statement. -->
         {event.paid_date
           ? t("bill_popover.paid_on", {
               date: shortDate(event.paid_date),
-              amount: event.paid_amount ? formatMoney(event.paid_amount) : "",
+              amount: formatMoney(event.paid_amount!),
             })
           : t("bill_popover.paid_outside")}
       {:else if billStatus === "overdue" && due}
