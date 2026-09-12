@@ -24,7 +24,10 @@ fn validate_due_day(d: Option<i32>) -> AppResult<()> {
 }
 
 /// The column takes any integer; this takes what the form offers. Widening the
-/// form later is a UI change, not a migration.
+/// form later is a UI change, not a migration — but `calendar_events_with_conn`
+/// only ever reads `month` and the one month before it, so a lead beyond 1 must
+/// widen that read too, or its transactions are never loaded and the bill never
+/// settles.
 fn validate_pay_lead_months(v: i32) -> AppResult<()> {
     if !(0..=1).contains(&v) {
         return Err(AppError::Invalid(format!(
@@ -509,8 +512,8 @@ fn month_shifted(month: &str, back: i64) -> AppResult<String> {
     if month.len() != 7 {
         return Err(bad());
     }
-    let year: i64 = month[0..4].parse().map_err(|_| bad())?;
-    let m: i64 = month[5..7].parse().map_err(|_| bad())?;
+    let year: i64 = month.get(0..4).ok_or_else(bad)?.parse().map_err(|_| bad())?;
+    let m: i64 = month.get(5..7).ok_or_else(bad)?.parse().map_err(|_| bad())?;
     let index = year * 12 + (m - 1) - back;
     Ok(format!(
         "{:04}-{:02}",
@@ -1341,6 +1344,9 @@ mod tests {
     fn a_manual_settlement_beats_the_derivation() {
         let (conn, cat) = calendar_fixture();
         let rule = bill_rule(&conn, cat, "ENERGIA", 6, 0);
+        // A transaction that WOULD derive-match the rule's own pay month — the
+        // manual settlement must win over it, not merely exist alongside it.
+        payment(&conn, "2026-08-04", "ENERGIA ELETRICA");
         conn.execute(
             "INSERT INTO bill_settlements (rule_id, due_month) VALUES (?1, '2026-08')",
             [rule],
