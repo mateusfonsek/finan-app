@@ -12,6 +12,10 @@ pub struct Rule {
     /// Day of month (1-31) the bill is due. NULL means no due date — the rule
     /// only shows on the calendar when it matches a transaction.
     pub due_day: Option<i32>,
+    /// Which month this bill's payment lands in, relative to the due date.
+    /// `0` = the month it falls due; `1` = the month before. Anything the user
+    /// has not set stays `0`, which is how the calendar always behaved.
+    pub pay_lead_months: i32,
     /// Friendly label (e.g. legal name from a CNPJ lookup). NULL means none,
     /// and the UI falls back to the first pattern.
     pub display_name: Option<String>,
@@ -27,6 +31,10 @@ pub struct RuleWithCount {
     pub category_id: i64,
     pub priority: i32,
     pub due_day: Option<i32>,
+    /// Which month this bill's payment lands in, relative to the due date.
+    /// `0` = the month it falls due; `1` = the month before. Anything the user
+    /// has not set stays `0`, which is how the calendar always behaved.
+    pub pay_lead_months: i32,
     pub display_name: Option<String>,
     pub created_at: String,
     /// Transactions whose description matches ANY of the rule's snippets,
@@ -88,6 +96,11 @@ pub struct NewRule {
     pub category_id: i64,
     pub priority: i32,
     pub due_day: Option<i32>,
+    /// Which month this bill's payment lands in, relative to the due date.
+    /// `0` = the month it falls due; `1` = the month before. Anything the user
+    /// has not set stays `0`, which is how the calendar always behaved.
+    #[serde(default)]
+    pub pay_lead_months: i32,
     #[serde(default)]
     pub display_name: Option<String>,
 }
@@ -98,6 +111,11 @@ pub struct UpdateRule {
     pub category_id: i64,
     pub priority: i32,
     pub due_day: Option<i32>,
+    /// Which month this bill's payment lands in, relative to the due date.
+    /// `0` = the month it falls due; `1` = the month before. Anything the user
+    /// has not set stays `0`, which is how the calendar always behaved.
+    #[serde(default)]
+    pub pay_lead_months: i32,
     #[serde(default)]
     pub display_name: Option<String>,
 }
@@ -113,7 +131,13 @@ pub struct CalendarEvent {
     pub category_name: String,
     pub category_color_token: Option<String>,
     pub due_day: Option<i32>,
-    pub paid_day: Option<i32>,
+    /// Full payment date (`YYYY-MM-DD`), not a day of the month: with
+    /// `pay_lead_months` the payment lives in another month, and 1..31 does not
+    /// say which.
+    pub paid_date: Option<String>,
     pub paid_amount: Option<String>,
     pub paid_transaction_id: Option<i64>,
+    /// Came from `bill_settlements` rather than from the derivation, so the UI
+    /// can offer to undo it.
+    pub manually_settled: bool,
 }

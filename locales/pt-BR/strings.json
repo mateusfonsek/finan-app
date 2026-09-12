@@ -89,12 +89,26 @@
     "more": "+{n} mais",
     "day_aria": "Dia {day}",
     "day_aria_flow": "Dia {day} — entradas {inflow}, saídas {outflow}",
-    "outflows_title": "Saídas: {value}",
-    "inflows_title": "Entradas: {value}",
-    "bill_paid": " — pago dia {day}",
-    "bill_paid_amount": " — pago dia {day} · {amount}",
-    "bill_overdue": " — vencida (dia {day})",
-    "bill_due": " — vence dia {day}"
+    "bill_state_paid": "paga",
+    "bill_state_pending": "a vencer",
+    "bill_state_overdue_days": "vencida há {n} dias",
+    "bill_state_overdue_one": "vencida há 1 dia"
+  },
+  "bill_popover": {
+    "due_on": "Vence {date}",
+    "paid_on": "Paga em {date} · {amount}",
+    "paid_outside": "Paga fora do extrato",
+    "from_statement": "Reconhecida pelo extrato",
+    "settled_by_you": "Você marcou como paga",
+    "undo": "Desfazer",
+    "outside_title": "Paguei por fora do extrato",
+    "outside_desc": "Dinheiro, ou alguém pagou por mim. Nenhum valor entra nos números.",
+    "pick_transaction": "Ou aponte a transação que pagou esta conta (opcional)",
+    "no_candidates": "Nenhuma transação casa com os padrões desta regra.",
+    "open_rule": "Ver regra",
+    "settle": "Quitar conta",
+    "settling": "Quitando…",
+    "search_other": "Procurar outra transação…"
   },
   "day_details": {
     "selected_day": "Dia selecionado",
@@ -108,10 +122,13 @@
     "transfers": "Transferências",
     "investments": "Investimentos",
     "no_category": "Sem categoria",
-    "paid": "Paga dia {day}",
-    "paid_amount": "Paga dia {day} · {amount}",
-    "overdue": "Vencida",
-    "pending": "Pendente"
+    "paid": "Paga em {date}",
+    "paid_amount": "Paga em {date} · {amount}",
+    "paid_outside": "Paga fora do extrato",
+    "overdue_one": "Vencida há 1 dia",
+    "overdue_days": "Vencida há {n} dias",
+    "pending": "Pendente",
+    "mark_due": "Marcar vencimento no dia {day}"
   },
   "about": {
     "tagline": "O dinheiro é seu. Os dados também.",
@@ -219,11 +236,26 @@
     "priority": "Prioridade",
     "due_day": "Vence dia",
     "due_day_title": "Dia do mês em que a obrigação vence. Deixe vazio se a regra não tem prazo fixo.",
+    "pay_lead_label": "Quando pago",
+    "pay_lead_same": "No mês do vencimento",
+    "pay_lead_previous": "No mês anterior",
     "saving": "Salvando…",
     "add": "Adicionar",
     "pattern_required": "Pattern não pode ser vazio.",
     "category_required": "Selecione uma categoria.",
     "due_day_invalid": "Dia do vencimento deve estar entre 1 e 31 (ou vazio)."
+  },
+  "rule_due_picker": {
+    "title": "Vencimento no dia {day}",
+    "title_any": "Marcar vencimento",
+    "desc": "A conta escolhida passa a vencer todo dia {day}, não só neste mês.",
+    "desc_any": "Escolha o dia do mês e a conta que passa a vencer nele, todo mês.",
+    "day_label": "Dia",
+    "search": "Buscar conta…",
+    "currently": "hoje dia {day}",
+    "assign": "Usar dia {day}",
+    "already": "Já é o dia {day}",
+    "empty": "Nenhuma regra encontrada"
   },
   "dashboard": {
     "expenses": "Gastos",
@@ -283,8 +315,8 @@
   "freshness": {
     "up_to": "Dados até {date}",
     "current": "em dia",
-    "behind_one": "falta 1 dia",
-    "behind_many": "faltam {n} dias",
+    "behind_one": "1 dia não importado",
+    "behind_many": "{n} dias não importados",
     "review_one": "Rever 1 extrato",
     "review_many": "Rever {n} extratos",
     "enable_watch": "Ligar pasta observada",
@@ -375,6 +407,17 @@
     "notes": "Anotações",
     "notes_placeholder": "Anotações sobre essa transação…"
   },
+  "tx_search": {
+    "title": "Qual transação pagou esta conta?",
+    "desc": "{bill} · vencimento de {month}. A busca olha todas as suas transações, não só as que casam com a regra.",
+    "search": "Buscar por descrição ou anotação…",
+    "by_rule": "Sugeridas pela regra",
+    "others": "Outras transações",
+    "already_pays": "já paga {bill} de {month}",
+    "use": "Usar esta",
+    "empty": "Nenhuma transação encontrada",
+    "empty_desc": "Tente outro termo, ou quite a conta por fora do extrato."
+  },
   "transactions_page": {
     "count_one": "{n} transação",
     "count_many": "{n} transações"
@@ -453,7 +496,14 @@
     "inflows": "Entradas",
     "outflows": "Saídas",
     "net": "Líquido",
-    "subtitle": "Entradas e saídas reais do mês, dia a dia (transferências e investimentos ficam de fora). Clique num dia pra ver tudo que aconteceu nele."
+    "subtitle": "Entradas e saídas reais do mês, dia a dia (transferências e investimentos ficam de fora). Clique num dia pra ver tudo que aconteceu nele.",
+    "bills": "Contas",
+    "no_due_one": "1 regra sem vencimento",
+    "no_due_many": "{n} regras sem vencimento",
+    "upcoming_one": "1 a vencer",
+    "upcoming_many": "{n} a vencer",
+    "overdue_one": "· 1 vencida",
+    "overdue_many": "· {n} vencidas"
   },
   "onboarding": {
     "title": "Suas finanças, no seu Mac.",

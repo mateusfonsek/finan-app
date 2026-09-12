@@ -2,6 +2,8 @@
   import { formatMoney } from "$lib/format/money";
   import { locale } from "$lib/i18n/locale.svelte";
   import EmptyState from "$lib/components/ui/EmptyState.svelte";
+  import Icon from "$lib/components/ui/Icon.svelte";
+  import { BILL_ICON, billState, daysOverdue, dueDateOf, type BillState } from "./bill";
   import type { CalendarEvent, Category, Transaction } from "$lib/bindings";
 
   const t = locale.t;
@@ -14,25 +16,34 @@
     events?: CalendarEvent[];
     /** Today as YYYY-MM-DD, to decide overdue vs pending. */
     today?: string;
+    /** Opens the picker that gives a rule this day as its due day. */
+    onMarkDue?: (day: number) => void;
+    /** Opens the settle popover on a bill. The grid only reaches the first two
+     *  bills of a day; this list is the way to every one of them. */
+    onSelectBill?: (event: CalendarEvent, anchor: HTMLElement) => void;
   };
 
-  let { selectedDate, transactions, categories, events = [], today = "" }: Props = $props();
+  let {
+    selectedDate,
+    transactions,
+    categories,
+    events = [],
+    today = "",
+    onMarkDue,
+    onSelectBill,
+  }: Props = $props();
 
-  /** Eventos com vencimento no dia selecionado. */
+  let selectedDay = $derived(selectedDate == null ? null : Number(selectedDate.slice(8, 10)));
+
+  /** Bills falling due on the selected day, compared through `dueDateOf` so a
+   *  day-31 bill lands on the last day of a short month — the grid clamps the
+   *  same way, and a raw `due_day` comparison made the two disagree: the chip
+   *  showed on 28 February and clicking it listed nothing. */
   let dueOnSelectedDay = $derived.by<CalendarEvent[]>(() => {
     if (!selectedDate) return [];
-    const day = Number(selectedDate.slice(8, 10));
-    return events.filter((e) => e.due_day === day);
+    const month = selectedDate.slice(0, 7);
+    return events.filter((e) => dueDateOf(e, month) === selectedDate);
   });
-
-  type BillState = "paid" | "overdue" | "pending";
-
-  function billState(e: CalendarEvent): BillState {
-    if (e.paid_day != null) return "paid";
-    if (!selectedDate || !today) return "pending";
-    // Overdue when the selected day is before today AND it is unpaid.
-    return selectedDate < today.slice(0, 10) ? "overdue" : "pending";
-  }
 
   function billColor(state: BillState): string {
     return state === "paid"
@@ -44,11 +55,24 @@
 
   function billStatusText(e: CalendarEvent, state: BillState): string {
     if (state === "paid") {
+      if (e.paid_date == null) return t("day_details.paid_outside");
+      const shown = formatShort(e.paid_date);
       return e.paid_amount
-        ? t("day_details.paid_amount", { day: e.paid_day ?? "", amount: formatMoney(e.paid_amount) })
-        : t("day_details.paid", { day: e.paid_day ?? "" });
+        ? t("day_details.paid_amount", { date: shown, amount: formatMoney(e.paid_amount) })
+        : t("day_details.paid", { date: shown });
     }
-    return state === "overdue" ? t("day_details.overdue") : t("day_details.pending");
+    if (state !== "overdue") return t("day_details.pending");
+    const due = dueDateOf(e, selectedDate!.slice(0, 7));
+    const n = due ? daysOverdue(due, today.slice(0, 10)) : 0;
+    return n === 1 ? t("day_details.overdue_one") : t("day_details.overdue_days", { n });
+  }
+
+  function formatShort(iso: string): string {
+    const [y, m, d] = iso.split("-").map(Number);
+    return new Date(y, m - 1, d).toLocaleDateString(locale.dateLocale, {
+      day: "numeric",
+      month: "short",
+    });
   }
 
   type Bucket = "gastos" | "renda" | "transfer" | "investimento";
@@ -134,48 +158,70 @@
     {/if}
   </header>
 
+  {#snippet markDueAction()}
+    {#if onMarkDue && selectedDay != null}
+      <button
+        type="button"
+        onclick={() => onMarkDue(selectedDay)}
+        class="press-sm w-full px-4 py-2 flex items-center gap-2 text-sub text-fg-muted
+               hover:text-fg hover:bg-hover border-t border-border-subtle
+               transition-colors duration-[var(--dur-fast)]"
+      >
+        <Icon name="plus" size={12} stroke={2.2} />
+        {t("day_details.mark_due", { day: selectedDay })}
+      </button>
+    {/if}
+  {/snippet}
+
   {#if !selectedDate}
     <EmptyState icon="calendar" title={t("day_details.select_day")} description={t("day_details.empty_select")} compact />
   {:else if !hasAny}
     <EmptyState icon="inbox" title={t("day_details.empty_none")} compact />
   {:else}
     {#if dueOnSelectedDay.length > 0}
-      <!-- Contas com vencimento neste dia, com estado visual claro -->
+      <!-- Bills falling due on the selected day. -->
       <section class="border-b border-border-subtle">
         <div class="px-4 py-1.5 bg-surface-2/60 text-cap font-semibold text-fg-subtle">
           {t("day_details.due_bills")}
         </div>
         <ul>
           {#each dueOnSelectedDay as e (e.rule_id)}
-            {@const state = billState(e)}
+            {@const state = billState(e, selectedDate.slice(0, 7), today.slice(0, 10))}
             {@const color = billColor(state)}
             <li
-              class="px-4 py-2 border-t border-border-subtle first:border-t-0 flex items-start gap-2.5 min-w-0"
+              class="border-t border-border-subtle first:border-t-0"
               style={state === "paid"
                 ? "background: color-mix(in oklch, var(--color-pos) 6%, transparent);"
                 : state === "overdue"
                   ? "background: color-mix(in oklch, var(--color-neg) 6%, transparent);"
                   : ""}
             >
-              <span
-                class="w-[17px] h-[17px] mt-px rounded-full grid place-items-center text-cap2 font-bold shrink-0"
-                style="color: {color}; background: color-mix(in oklch, {color} 18%, transparent);"
+              <button
+                type="button"
+                onclick={(ev) => onSelectBill?.(e, ev.currentTarget)}
+                class="press-sm w-full px-4 py-2 flex items-start gap-2.5 min-w-0 text-left
+                       hover:bg-hover transition-colors duration-[var(--dur-fast)]"
               >
-                {state === "paid" ? "✓" : state === "overdue" ? "!" : "•"}
-              </span>
-              <div class="flex-1 min-w-0 flex flex-col gap-0.5">
-                <span class="text-sub text-fg font-medium truncate" title={e.pattern}>
-                  {e.pattern}
+                <span
+                  class="w-[17px] h-[17px] mt-px rounded-full grid place-items-center shrink-0"
+                  style="color: {color}; background: color-mix(in oklch, {color} 18%, transparent);"
+                >
+                  <Icon name={BILL_ICON[state]} size={10} stroke={2.2} />
                 </span>
-                <span class="text-cap" style="color: {color};">
-                  {billStatusText(e, state)}
-                </span>
-              </div>
-              {#if state === "paid" && e.paid_amount}
-                <span class="text-sub tabular shrink-0 font-medium" style="color: {color};">
-                  {formatMoney(e.paid_amount)}
-                </span>
-              {/if}
+                <div class="flex-1 min-w-0 flex flex-col gap-0.5">
+                  <span class="text-sub text-fg font-medium truncate" title={e.pattern}>
+                    {e.pattern}
+                  </span>
+                  <span class="text-cap" style="color: {color};">
+                    {billStatusText(e, state)}
+                  </span>
+                </div>
+                {#if state === "paid" && e.paid_amount}
+                  <span class="text-sub tabular shrink-0 font-medium" style="color: {color};">
+                    {formatMoney(e.paid_amount)}
+                  </span>
+                {/if}
+              </button>
             </li>
           {/each}
         </ul>
@@ -247,4 +293,6 @@
       </div>
     {/if}
   {/if}
+
+  {@render markDueAction()}
 </div>

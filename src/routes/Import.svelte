@@ -195,6 +195,7 @@
         priority: rule.priority,
         due_day: rule.due_day,
         display_name: rule.display_name,
+        pay_lead_months: rule.pay_lead_months,
       });
       replaceRule(updated);
     } catch (e) {
@@ -216,6 +217,7 @@
         priority: rule.priority,
         due_day: rule.due_day,
         display_name: next,
+        pay_lead_months: rule.pay_lead_months,
       });
       replaceRule(updated);
     } catch (e) {

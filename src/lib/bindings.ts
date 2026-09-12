@@ -270,20 +270,47 @@ async applyRuleChoices(choices: RuleChoice[]) : Promise<Result<number, string>> 
 }
 },
 /**
- * Crosses rules with the month's transactions to build calendar events.
+ * Crosses rules with transactions to build the month's calendar events.
  * 
- * Per rule:
- * - `due_day` set: emits an event with the due date, even with no match
- * - a matching transaction in the month: enriches it with paid_day,
- * paid_amount and paid_transaction_id
- * - `due_day` NULL and no match: the rule does NOT appear ("only shows when
- * paid", which is the user's mental model)
+ * Resolution order per rule, stopping at the first hit:
+ * 1. a row in `bill_settlements` for this occurrence — the user's word wins;
+ * 2. a transaction matching any snippet in `month - pay_lead_months`;
+ * 3. otherwise the state follows `due_day` alone.
  * 
- * With several matches in the same month, the earliest one wins.
+ * A rule with no `due_day` and no payment does not appear, which is the user's
+ * mental model: it only shows up once it costs something.
  */
 async calendarEvents(month: string) : Promise<Result<CalendarEvent[], string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("calendar_events", { month }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async settleBill(ruleId: number, dueMonth: string, transactionId: number | null) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("settle_bill", { ruleId, dueMonth, transactionId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async unsettleBill(ruleId: number, dueMonth: string) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("unsettle_bill", { ruleId, dueMonth }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Every settlement that points at a transaction. One row per bill per month,
+ * so the whole set is small enough to hand over unpaginated.
+ */
+async billLinks() : Promise<Result<BillLink[], string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("bill_links") };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -618,6 +645,20 @@ name: string;
 latest_date: string | null }
 export type AutoClassifyReport = { created_rules: Rule[]; txs_classified: number; unresolved: TaxIdResolution[] }
 /**
+ * One transaction already spoken for, and by which occurrence.
+ * 
+ * The search dialog needs this to stop the same payment settling two bills:
+ * with a broad search over every transaction, picking one twice is easy to do
+ * by accident, and the derivation exclusion is global — that money would leave
+ * every rule's calculation.
+ */
+export type BillLink = { transaction_id: number; 
+/**
+ * What to call the bill in "already pays X of <month>": the rule's display
+ * name when it has one, otherwise its first snippet.
+ */
+rule_label: string; due_month: string }
+/**
  * A calendar event: a rule plus an optional due day plus an optional matching
  * transaction.
  */
@@ -626,7 +667,18 @@ export type CalendarEvent = { rule_id: number;
  * The snippet that actually matched — or the rule's first one, when the
  * event exists only because of `due_day` and nothing matched yet.
  */
-pattern: string; category_name: string; category_color_token: string | null; due_day: number | null; paid_day: number | null; paid_amount: string | null; paid_transaction_id: number | null }
+pattern: string; category_name: string; category_color_token: string | null; due_day: number | null; 
+/**
+ * Full payment date (`YYYY-MM-DD`), not a day of the month: with
+ * `pay_lead_months` the payment lives in another month, and 1..31 does not
+ * say which.
+ */
+paid_date: string | null; paid_amount: string | null; paid_transaction_id: number | null; 
+/**
+ * Came from `bill_settlements` rather than from the derivation, so the UI
+ * can offer to undo it.
+ */
+manually_settled: boolean }
 export type Category = { id: number; name: string; color_token: string | null; kind: string; is_investment: boolean; created_at: string }
 export type CategorySpend = { category_id: number | null; name: string; color_token: string | null; total: string; percent: number }
 export type CategoryWithCount = { id: number; name: string; color_token: string | null; kind: string; created_at: string; transaction_count: number }
@@ -714,7 +766,13 @@ export type NewAccount = { name: string; bank: string | null; ofx_acctid: string
  */
 kind?: string }
 export type NewCategory = { name: string; color_token: string | null; kind: string }
-export type NewRule = { patterns: string[]; category_id: number; priority: number; due_day: number | null; display_name?: string | null }
+export type NewRule = { patterns: string[]; category_id: number; priority: number; due_day: number | null; 
+/**
+ * Which month this bill's payment lands in, relative to the due date.
+ * `0` = the month it falls due; `1` = the month before. Anything the user
+ * has not set stays `0`, which is how the calendar always behaved.
+ */
+pay_lead_months?: number; display_name?: string | null }
 export type NewTransaction = { date: string; 
 /**
  * Decimal as string. Backend converts via rust_decimal.
@@ -731,6 +789,12 @@ patterns: string[]; category_id: number; priority: number;
  * only shows on the calendar when it matches a transaction.
  */
 due_day: number | null; 
+/**
+ * Which month this bill's payment lands in, relative to the due date.
+ * `0` = the month it falls due; `1` = the month before. Anything the user
+ * has not set stays `0`, which is how the calendar always behaved.
+ */
+pay_lead_months: number; 
 /**
  * Friendly label (e.g. legal name from a CNPJ lookup). NULL means none,
  * and the UI falls back to the first pattern.
@@ -784,7 +848,13 @@ export type RuleSuggestion = { key: string; label: string; suggested_pattern: st
  * A rule plus how many transactions it reaches — for the Rules screen, where
  * the question is "is this rule catching anything?".
  */
-export type RuleWithCount = { id: number; patterns: string[]; category_id: number; priority: number; due_day: number | null; display_name: string | null; created_at: string; 
+export type RuleWithCount = { id: number; patterns: string[]; category_id: number; priority: number; due_day: number | null; 
+/**
+ * Which month this bill's payment lands in, relative to the due date.
+ * `0` = the month it falls due; `1` = the month before. Anything the user
+ * has not set stays `0`, which is how the calendar always behaved.
+ */
+pay_lead_months: number; display_name: string | null; created_at: string; 
 /**
  * Transactions whose description matches ANY of the rule's snippets,
  * regardless of their current category. This is reach, not authorship: a
@@ -812,7 +882,13 @@ export type TransferSummary = { total_out: string; total_in: string; count: numb
  */
 export type TxKey = { ofx_fitid: string; date: string; amount: string }
 export type UpdateCategory = { name: string; color_token: string | null; kind: string }
-export type UpdateRule = { patterns: string[]; category_id: number; priority: number; due_day: number | null; display_name?: string | null }
+export type UpdateRule = { patterns: string[]; category_id: number; priority: number; due_day: number | null; 
+/**
+ * Which month this bill's payment lands in, relative to the due date.
+ * `0` = the month it falls due; `1` = the month before. Anything the user
+ * has not set stays `0`, which is how the calendar always behaved.
+ */
+pay_lead_months?: number; display_name?: string | null }
 export type WatchedFolder = { id: number; path: string; 
 /**
  * Short display name ("finan", "Downloads"), derived from the last path

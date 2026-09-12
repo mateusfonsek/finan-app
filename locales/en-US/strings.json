@@ -89,12 +89,26 @@
     "more": "+{n} more",
     "day_aria": "Day {day}",
     "day_aria_flow": "Day {day} — inflows {inflow}, outflows {outflow}",
-    "outflows_title": "Outflows: {value}",
-    "inflows_title": "Inflows: {value}",
-    "bill_paid": " — paid on day {day}",
-    "bill_paid_amount": " — paid on day {day} · {amount}",
-    "bill_overdue": " — overdue (day {day})",
-    "bill_due": " — due on day {day}"
+    "bill_state_paid": "paid",
+    "bill_state_pending": "upcoming",
+    "bill_state_overdue_days": "{n} days overdue",
+    "bill_state_overdue_one": "1 day overdue"
+  },
+  "bill_popover": {
+    "due_on": "Due {date}",
+    "paid_on": "Paid {date} · {amount}",
+    "paid_outside": "Paid outside the statement",
+    "from_statement": "Recognized from the statement",
+    "settled_by_you": "You marked this paid",
+    "undo": "Undo",
+    "outside_title": "I paid outside the statement",
+    "outside_desc": "Cash, or someone paid for me. No amount enters the numbers.",
+    "pick_transaction": "Or point at the transaction that paid it (optional)",
+    "no_candidates": "No transaction matches this rule's snippets.",
+    "open_rule": "Open rule",
+    "settle": "Settle bill",
+    "settling": "Settling…",
+    "search_other": "Find another transaction…"
   },
   "day_details": {
     "selected_day": "Selected day",
@@ -108,10 +122,13 @@
     "transfers": "Transfers",
     "investments": "Investments",
     "no_category": "No category",
-    "paid": "Paid on day {day}",
-    "paid_amount": "Paid on day {day} · {amount}",
-    "overdue": "Overdue",
-    "pending": "Pending"
+    "paid": "Paid {date}",
+    "paid_amount": "Paid {date} · {amount}",
+    "paid_outside": "Paid outside the statement",
+    "overdue_one": "1 day overdue",
+    "overdue_days": "{n} days overdue",
+    "pending": "Pending",
+    "mark_due": "Set a bill due on day {day}"
   },
   "about": {
     "tagline": "The money is yours. So is the data.",
@@ -219,11 +236,26 @@
     "priority": "Priority",
     "due_day": "Due on day",
     "due_day_title": "Day of the month the bill is due. Leave empty if the rule has no fixed due date.",
+    "pay_lead_label": "Paid when",
+    "pay_lead_same": "In the month it falls due",
+    "pay_lead_previous": "The month before",
     "saving": "Saving…",
     "add": "Add",
     "pattern_required": "Pattern can't be empty.",
     "category_required": "Select a category.",
     "due_day_invalid": "Due day must be between 1 and 31 (or empty)."
+  },
+  "rule_due_picker": {
+    "title": "Due on day {day}",
+    "title_any": "Set a due day",
+    "desc": "The bill you pick falls due on day {day} every month, not just this one.",
+    "desc_any": "Pick the day of the month, and the bill that falls due on it every month.",
+    "day_label": "Day",
+    "search": "Search bills…",
+    "currently": "now day {day}",
+    "assign": "Use day {day}",
+    "already": "Already day {day}",
+    "empty": "No rule found"
   },
   "dashboard": {
     "expenses": "Expenses",
@@ -283,8 +315,8 @@
   "freshness": {
     "up_to": "Data through {date}",
     "current": "up to date",
-    "behind_one": "1 day missing",
-    "behind_many": "{n} days missing",
+    "behind_one": "1 day not imported",
+    "behind_many": "{n} days not imported",
     "review_one": "Review 1 statement",
     "review_many": "Review {n} statements",
     "enable_watch": "Turn on watched folder",
@@ -375,6 +407,17 @@
     "notes": "Notes",
     "notes_placeholder": "Notes about this transaction…"
   },
+  "tx_search": {
+    "title": "Which transaction paid this bill?",
+    "desc": "{bill} · due in {month}. The search looks at every transaction, not only the ones the rule matches.",
+    "search": "Search description or notes…",
+    "by_rule": "Suggested by the rule",
+    "others": "Other transactions",
+    "already_pays": "already pays {bill} of {month}",
+    "use": "Use this one",
+    "empty": "No transaction found",
+    "empty_desc": "Try another term, or settle the bill outside the statement."
+  },
   "transactions_page": {
     "count_one": "{n} transaction",
     "count_many": "{n} transactions"
@@ -453,7 +496,14 @@
     "inflows": "Inflows",
     "outflows": "Outflows",
     "net": "Net",
-    "subtitle": "Real inflows and outflows for the month, day by day (transfers and investments excluded). Click a day to see everything that happened."
+    "subtitle": "Real inflows and outflows for the month, day by day (transfers and investments excluded). Click a day to see everything that happened.",
+    "bills": "Bills",
+    "no_due_one": "1 rule with no due day",
+    "no_due_many": "{n} rules with no due day",
+    "upcoming_one": "1 upcoming",
+    "upcoming_many": "{n} upcoming",
+    "overdue_one": "· 1 overdue",
+    "overdue_many": "· {n} overdue"
   },
   "onboarding": {
     "title": "Your finances, on your Mac.",

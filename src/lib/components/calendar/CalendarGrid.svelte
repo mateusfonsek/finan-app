@@ -2,6 +2,8 @@
   import { formatMoney } from "$lib/format/money";
   import { locale } from "$lib/i18n/locale.svelte";
   import { leadingBlanks, weekdayOrder } from "./week";
+  import Icon from "$lib/components/ui/Icon.svelte";
+  import { BILL_ICON, billState, daysOverdue, dueDateOf, type BillState } from "./bill";
   import type { CalendarEvent } from "$lib/bindings";
 
   const t = locale.t;
@@ -18,10 +20,13 @@
     dayFlows?: Map<number, DayFlow>;
     maxOut?: number;
     maxIn?: number;
-    /** Rule events with a due_day or paid_day, used to render bills. */
+    /** Rule events with a due_day or a payment, used to render bills. */
     events?: CalendarEvent[];
     selectedDay?: number | null;
     onSelectDay?: (day: number | null) => void;
+    /** Opening a bill's popover. The anchor is the chip, so the popover can
+     *  grow from where it was clicked. */
+    onSelectBill?: (event: CalendarEvent, anchor: HTMLElement) => void;
   };
 
   let {
@@ -33,6 +38,7 @@
     events = [],
     selectedDay = null,
     onSelectDay,
+    onSelectBill,
   }: Props = $props();
 
   type DayCell = {
@@ -41,10 +47,6 @@
     /** Rules falling due on this day (due_day == d). */
     due: CalendarEvent[];
   };
-
-  let todayDayInMonth = $derived(
-    today.slice(0, 7) === month ? Number(today.slice(8, 10)) : -1,
-  );
 
   let cells = $derived(buildGrid(month, today, events, locale.firstDayOfWeek));
 
@@ -93,28 +95,10 @@
     return out;
   }
 
-  /** Visual state of a bill: paid / overdue / pending (future). */
-  type BillState = "paid" | "overdue" | "pending";
-
-  function billState(e: CalendarEvent, todayDay: number): BillState {
-    if (e.paid_day != null) return "paid";
-    if (e.due_day != null && todayDay > 0 && e.due_day < todayDay) return "overdue";
-    return "pending";
-  }
-
   function billStyle(state: BillState): string {
-    switch (state) {
-      case "paid":
-        return "background: color-mix(in oklch, var(--color-pos) 16%, transparent); color: var(--color-pos);";
-      case "overdue":
-        return "background: color-mix(in oklch, var(--color-neg) 16%, transparent); color: var(--color-neg);";
-      case "pending":
-        return "background: color-mix(in oklch, var(--color-cat-amarelo) 15%, transparent); color: var(--color-cat-amarelo);";
-    }
-  }
-
-  function billIcon(state: BillState): string {
-    return state === "paid" ? "✓" : state === "overdue" ? "!" : "•";
+    const token =
+      state === "paid" ? "--color-pos" : state === "overdue" ? "--color-neg" : "--color-cat-amarelo";
+    return `background: color-mix(in oklch, var(${token}) 16%, transparent); color: var(${token});`;
   }
 
   /** Maps intensity [0,1] to visible opacity [20%, 100%]. */
@@ -148,79 +132,87 @@
       {@const flow = cell.day !== null ? dayFlows.get(cell.day) : undefined}
       {@const outPct = flow ? intensityPct(flow.outflow, maxOut) : 0}
       {@const inPct = flow ? intensityPct(flow.inflow, maxIn) : 0}
-      {@const isSelected = cell.day !== null && cell.day === selectedDay}
-      <button
-        type="button"
-        disabled={cell.day === null}
-        onclick={() => cell.day !== null && handleClick(cell.day)}
-        class="text-left min-h-[86px] border-r border-b border-border-subtle p-1.5 flex flex-col gap-1 relative
-               transition-colors duration-[var(--dur-fast)] ease-[var(--ease-snap)]
-               {cell.day === null ? 'bg-surface-2/35' : 'hover:bg-hover'}
-               {isSelected ? 'bg-accent-soft hover:bg-accent-soft ring-[1.5px] ring-accent ring-inset z-10' : ''}
+      <div
+        class="min-h-[86px] border-r border-b border-border-subtle relative
+               {cell.day === null ? 'bg-surface-2/35' : ''}
                {i % 7 === 6 ? 'border-r-0' : ''}"
-        aria-pressed={isSelected}
-        aria-label={cell.day === null
-          ? undefined
-          : flow
-            ? t("calendar.day_aria_flow", { day: cell.day, inflow: flow.inflow, outflow: flow.outflow })
-            : t("calendar.day_aria", { day: cell.day })}
       >
         {#if cell.day !== null}
-          <div class="flex items-center justify-between gap-1 w-full">
-            <!-- Today gets the accent disc, as in the macOS Calendar. -->
-            <span
-              class="grid place-items-center min-w-[19px] h-[19px] px-1 rounded-full text-foot tabular
-                     {cell.isToday
-                ? 'bg-accent text-accent-on font-semibold'
-                : 'text-fg font-medium'}"
-            >
-              {cell.day}
-            </span>
-            <div class="flex items-center gap-1">
-              {#if outPct > 0}
-                <span
-                  class="w-2 h-2 rounded-full"
-                  style={dotStyle("var(--color-neg)", outPct)}
-                  title={t("calendar.outflows_title", { value: formatMoney(String(flow?.outflow ?? 0)) })}
-                ></span>
-              {/if}
-              {#if inPct > 0}
-                <span
-                  class="w-2 h-2 rounded-full"
-                  style={dotStyle("var(--color-pos)", inPct)}
-                  title={t("calendar.inflows_title", { value: formatMoney(String(flow?.inflow ?? 0)) })}
-                ></span>
-              {/if}
-            </div>
-          </div>
+          <!-- Behind the content so the bill chips above it stay clickable: a
+               <button> cannot contain another one, and the cell used to be the
+               button. -->
+          <button
+            type="button"
+            onclick={() => handleClick(cell.day!)}
+            aria-pressed={cell.day === selectedDay}
+            aria-label={flow
+              ? t("calendar.day_aria_flow", {
+                  day: cell.day,
+                  inflow: formatMoney(String(flow.inflow)),
+                  outflow: formatMoney(String(flow.outflow)),
+                })
+              : t("calendar.day_aria", { day: cell.day })}
+            class="absolute inset-0 transition-colors duration-[var(--dur-fast)] ease-[var(--ease-snap)]
+                   {cell.day === selectedDay
+              ? 'bg-accent-soft ring-[1.5px] ring-accent ring-inset'
+              : 'hover:bg-hover'}"
+          ></button>
 
-          <!-- Bills due this day (up to 2 visible, "+N" beyond). -->
-          {#each cell.due.slice(0, 2) as e (e.rule_id)}
-            {@const state = billState(e, todayDayInMonth)}
-            <div
-              class="text-cap2 rounded-[4px] px-1 py-0.5 truncate flex items-center gap-1 font-medium w-full"
-              style={billStyle(state)}
-              title={`${e.pattern}${
-                state === "paid"
-                  ? e.paid_amount
-                    ? t("calendar.bill_paid_amount", { day: e.paid_day ?? "", amount: formatMoney(e.paid_amount) })
-                    : t("calendar.bill_paid", { day: e.paid_day ?? "" })
-                  : state === "overdue"
-                    ? t("calendar.bill_overdue", { day: e.due_day ?? "" })
-                    : t("calendar.bill_due", { day: e.due_day ?? "" })
-              }`}
-            >
-              <span class="shrink-0 font-bold">{billIcon(state)}</span>
-              <span class="truncate">{e.pattern}</span>
+          <div class="relative z-10 p-1.5 flex flex-col gap-1 pointer-events-none">
+            <div class="flex items-center justify-between gap-1 w-full">
+              <!-- Today gets the accent disc, as in the macOS Calendar. -->
+              <span
+                class="grid place-items-center min-w-[19px] h-[19px] px-1 rounded-full text-foot tabular
+                       {cell.isToday
+                  ? 'bg-accent text-accent-on font-semibold'
+                  : 'text-fg font-medium'}"
+              >
+                {cell.day}
+              </span>
+              <div class="flex items-center gap-1">
+                {#if outPct > 0}
+                  <span class="w-2 h-2 rounded-full" style={dotStyle("var(--color-neg)", outPct)}></span>
+                {/if}
+                {#if inPct > 0}
+                  <span class="w-2 h-2 rounded-full" style={dotStyle("var(--color-pos)", inPct)}></span>
+                {/if}
+              </div>
             </div>
-          {/each}
-          {#if cell.due.length > 2}
-            <div class="text-cap2 text-fg-subtle px-1">
-              {t("calendar.more", { n: cell.due.length - 2 })}
-            </div>
-          {/if}
+
+            <!-- Bills due this day (up to 2 visible, "+N" beyond). -->
+            {#each cell.due.slice(0, 2) as e (e.rule_id)}
+              {@const state = billState(e, month, today)}
+              {@const due = dueDateOf(e, month)}
+              {@const overdueDays = due != null ? daysOverdue(due, today) : 0}
+              <button
+                type="button"
+                onclick={(ev) => onSelectBill?.(e, ev.currentTarget)}
+                aria-haspopup="dialog"
+                class="press-sm pointer-events-auto text-cap rounded-[4px] px-1 min-h-[18px] truncate
+                       flex items-center gap-1 font-medium w-full text-left"
+                style={billStyle(state)}
+              >
+                <Icon name={BILL_ICON[state]} size={10} stroke={2.2} />
+                <span class="truncate">{e.pattern}</span>
+                <span class="sr-only">
+                  {state === "paid"
+                    ? t("calendar.bill_state_paid")
+                    : state === "overdue"
+                      ? overdueDays === 1
+                        ? t("calendar.bill_state_overdue_one")
+                        : t("calendar.bill_state_overdue_days", { n: overdueDays })
+                      : t("calendar.bill_state_pending")}
+                </span>
+              </button>
+            {/each}
+            {#if cell.due.length > 2}
+              <div class="text-cap2 text-fg-subtle px-1">
+                {t("calendar.more", { n: cell.due.length - 2 })}
+              </div>
+            {/if}
+          </div>
         {/if}
-      </button>
+      </div>
     {/each}
   </div>
 
@@ -251,12 +243,12 @@
       {#if events.some((e) => e.due_day != null)}
         <div class="flex items-center gap-2 ml-auto">
           {#each [["pending", "--color-cat-amarelo", "calendar.legend_pending"], ["overdue", "--color-neg", "calendar.legend_overdue"], ["paid", "--color-pos", "calendar.legend_paid"]] as [key, token, label]}
-            <span
-              class="inline-flex items-center gap-1 rounded-full px-1.5 py-px font-medium"
-              style="color: var({token}); background: color-mix(in oklch, var({token}) 14%, transparent);"
-            >
-              <span class="font-bold">
-                {key === "paid" ? "✓" : key === "overdue" ? "!" : "•"}
+            <span class="flex items-center gap-1.5">
+              <span
+                class="w-[14px] h-[14px] rounded-[4px] grid place-items-center"
+                style="color: var({token}); background: color-mix(in oklch, var({token}) 16%, transparent);"
+              >
+                <Icon name={BILL_ICON[key as BillState]} size={9} stroke={2.4} />
               </span>
               {t(label)}
             </span>
