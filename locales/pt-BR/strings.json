@@ -91,10 +91,10 @@
     "day_aria_flow": "Dia {day} — entradas {inflow}, saídas {outflow}",
     "outflows_title": "Saídas: {value}",
     "inflows_title": "Entradas: {value}",
-    "bill_paid": " — pago dia {day}",
-    "bill_paid_amount": " — pago dia {day} · {amount}",
-    "bill_overdue": " — vencida (dia {day})",
-    "bill_due": " — vence dia {day}"
+    "bill_state_paid": "paga",
+    "bill_state_pending": "a vencer",
+    "bill_state_overdue_days": "vencida há {n} dias",
+    "bill_state_overdue_one": "vencida há 1 dia"
   },
   "day_details": {
     "selected_day": "Dia selecionado",
