@@ -121,9 +121,11 @@
     "transfers": "Transferências",
     "investments": "Investimentos",
     "no_category": "Sem categoria",
-    "paid": "Paga dia {day}",
-    "paid_amount": "Paga dia {day} · {amount}",
-    "overdue": "Vencida",
+    "paid": "Paga em {date}",
+    "paid_amount": "Paga em {date} · {amount}",
+    "paid_outside": "Paga fora do extrato",
+    "overdue_one": "Vencida há 1 dia",
+    "overdue_days": "Vencida há {n} dias",
     "pending": "Pendente"
   },
   "about": {

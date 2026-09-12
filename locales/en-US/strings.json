@@ -121,9 +121,11 @@
     "transfers": "Transfers",
     "investments": "Investments",
     "no_category": "No category",
-    "paid": "Paid on day {day}",
-    "paid_amount": "Paid on day {day} · {amount}",
-    "overdue": "Overdue",
+    "paid": "Paid {date}",
+    "paid_amount": "Paid {date} · {amount}",
+    "paid_outside": "Paid outside the statement",
+    "overdue_one": "1 day overdue",
+    "overdue_days": "{n} days overdue",
     "pending": "Pending"
   },
   "about": {
