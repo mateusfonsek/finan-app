@@ -304,6 +304,30 @@ async unsettleBill(ruleId: number, dueMonth: string) : Promise<Result<null, stri
     else return { status: "error", error: e  as any };
 }
 },
+/**
+ * Every settlement that points at a transaction. One row per bill per month,
+ * so the whole set is small enough to hand over unpaginated.
+ */
+async billLinks() : Promise<Result<BillLink[], string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("bill_links") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Every settlement that points at a transaction. One row per bill per month,
+ * so the whole set is small enough to hand over unpaginated.
+ */
+async billLinks() : Promise<Result<BillLink[], string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("bill_links") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async resolveTaxId(taxId: string) : Promise<Result<TaxIdResolution, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("resolve_tax_id", { taxId }) };
@@ -633,9 +657,37 @@ name: string;
 latest_date: string | null }
 export type AutoClassifyReport = { created_rules: Rule[]; txs_classified: number; unresolved: TaxIdResolution[] }
 /**
+ * One transaction already spoken for, and by which occurrence.
+ * 
+ * The search dialog needs this to stop the same payment settling two bills:
+ * with a broad search over every transaction, picking one twice is easy to do
+ * by accident, and the derivation exclusion is global — that money would leave
+ * every rule's calculation.
+ */
+export type BillLink = { transaction_id: number; 
+/**
+ * What to call the bill in "already pays X of <month>": the rule's display
+ * name when it has one, otherwise its first snippet.
+ */
+rule_label: string; due_month: string }
+/**
  * A calendar event: a rule plus an optional due day plus an optional matching
  * transaction.
  */
+/**
+ * One transaction already spoken for, and by which occurrence.
+ *
+ * The search dialog needs this to stop the same payment settling two bills:
+ * with a broad search over every transaction, picking one twice is easy to do
+ * by accident, and the derivation exclusion is global — that money would leave
+ * every rule's calculation.
+ */
+export type BillLink = { transaction_id: number; 
+/**
+ * What to call the bill in "already pays X of <month>": the rule's display
+ * name when it has one, otherwise its first snippet.
+ */
+rule_label: string; due_month: string }
 export type CalendarEvent = { rule_id: number; 
 /**
  * The snippet that actually matched — or the rule's first one, when the

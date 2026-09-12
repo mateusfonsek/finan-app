@@ -107,7 +107,8 @@
     "no_candidates": "Nenhuma transação casa com os padrões desta regra.",
     "open_rule": "Ver regra",
     "settle": "Quitar conta",
-    "settling": "Quitando…"
+    "settling": "Quitando…",
+    "search_other": "Procurar outra transação…"
   },
   "day_details": {
     "selected_day": "Dia selecionado",
@@ -405,6 +406,17 @@
     "create_apply": "Criar e aplicar",
     "notes": "Anotações",
     "notes_placeholder": "Anotações sobre essa transação…"
+  },
+  "tx_search": {
+    "title": "Qual transação pagou esta conta?",
+    "desc": "{bill} · vencimento de {month}. A busca olha todas as suas transações, não só as que casam com a regra.",
+    "search": "Buscar por descrição ou anotação…",
+    "by_rule": "Sugeridas pela regra",
+    "others": "Outras transações",
+    "already_pays": "já paga {bill} de {month}",
+    "use": "Usar esta",
+    "empty": "Nenhuma transação encontrada",
+    "empty_desc": "Tente outro termo, ou quite a conta por fora do extrato."
   },
   "transactions_page": {
     "count_one": "{n} transação",

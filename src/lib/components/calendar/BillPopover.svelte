@@ -9,6 +9,7 @@
   import { portal } from "$lib/actions/portal";
   import { transactionsMatchingRule } from "$lib/api/rules";
   import { settleBill, unsettleBill } from "$lib/api/bills";
+  import TransactionSearchDialog from "./TransactionSearchDialog.svelte";
   import { billState, daysOverdue, dueDateOf } from "./bill";
   import type { CalendarEvent, Transaction } from "$lib/bindings";
 
@@ -35,6 +36,11 @@
   let chosen = $state<number | null>(null);
   let busy = $state(false);
   let error = $state<string | null>(null);
+  let searching = $state(false);
+  /** A transaction chosen through the search dialog, which by definition is not
+   *  in `candidates` — without holding it here the user would pick something and
+   *  then not see what they picked. */
+  let picked = $state<Transaction | null>(null);
 
   let billStatus = $derived(billState(event, dueMonth, today));
   let due = $derived(dueDateOf(event, dueMonth));
@@ -209,6 +215,27 @@
         </ul>
       {/if}
 
+      {#if picked}
+        <!-- Outside the candidate list because it is not in it: the search
+             exists for payments this rule's snippets never match. -->
+        <label class="flex items-center gap-2 px-2 py-1.5 card-inset cursor-default">
+          <input type="radio" name="settle" checked={chosen === picked.id}
+                 onchange={() => (chosen = picked!.id)} />
+          <span class="text-foot tabular text-fg-subtle shrink-0">{shortDate(picked.date)}</span>
+          <span class="text-foot text-fg truncate flex-1">{picked.description}</span>
+          <span class="text-foot tabular shrink-0">{formatMoney(picked.amount)}</span>
+        </label>
+      {/if}
+
+      <button
+        type="button"
+        onclick={() => (searching = true)}
+        class="text-foot text-fg-subtle hover:text-fg self-start
+               transition-colors duration-[var(--dur-fast)]"
+      >
+        {t("bill_popover.search_other")}
+      </button>
+
     </div>
 
     <div class="flex items-center justify-end gap-2 pt-0.5">
@@ -231,3 +258,16 @@
   {/if}
 </div>
 
+{#if searching}
+  <TransactionSearchDialog
+    ruleId={event.rule_id}
+    billLabel={event.pattern}
+    {dueMonth}
+    onPick={(tx) => {
+      picked = tx;
+      chosen = tx.id;
+      searching = false;
+    }}
+    onClose={() => (searching = false)}
+  />
+{/if}

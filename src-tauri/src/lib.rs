@@ -39,6 +39,7 @@ pub fn run() {
         commands::rules::calendar_events,
         commands::bills::settle_bill,
         commands::bills::unsettle_bill,
+        commands::bills::bill_links,
         commands::tax_id::resolve_tax_id,
         commands::suggestions::suggest_rules,
         commands::suggestions::suggest_pattern_for,
