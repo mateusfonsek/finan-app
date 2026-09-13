@@ -79,7 +79,7 @@ E é **leve**: ~13 MB que baixam num instante, abrem rápido e quase não ocupam
 
 Não há conta, login, telemetria ou anúncios. Tudo fica em `~/Library/Application Support/app.finan/finan.db`, no seu Mac.
 
-A **única** requisição de rede que o **próprio finan app** faz acontece **durante a importação**: ele consulta a [BrasilAPI](https://brasilapi.com.br) para descobrir o nome de empresas a partir do **CNPJ** que aparece nas transações e sugerir categorias automaticamente. (O servidor MCP, logo abaixo, é a exceção deliberada.) Sai apenas o **número do CNPJ** (informação pública) — nunca valores, descrições nem dados pessoais. Se as transações importadas não tiverem CNPJ, nenhuma requisição é feita.
+A **única** requisição de rede que o **próprio finan app** faz acontece **durante a importação**: ele consulta a [BrasilAPI](https://brasilapi.com.br) para descobrir o nome de empresas a partir do **CNPJ** que aparece nas transações e sugerir categorias automaticamente. (O servidor MCP, logo abaixo, não faz requisição nenhuma — ele só aceita uma conexão, e o que sai depois disso é o agente conectado que envia, não o finan app.) Sai apenas o **número do CNPJ** (informação pública) — nunca valores, descrições nem dados pessoais. Se as transações importadas não tiverem CNPJ, nenhuma requisição é feita.
 
 ### O servidor MCP
 
