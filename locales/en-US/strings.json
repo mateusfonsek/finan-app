@@ -53,7 +53,8 @@
     "categories": "Categories",
     "rules": "Rules",
     "suggestions": "Suggestions",
-    "settings": "Settings"
+    "settings": "Settings",
+    "mcp": "MCP"
   },
   "sidebar": {
     "overview": "Overview",
@@ -614,5 +615,34 @@
     "error_create_icloud": "Couldn't create the folder in iCloud Drive.",
     "error_reveal": "Couldn't open that folder in Finder.",
     "error_scan": "Couldn't scan the folders right now."
+  },
+  "mcp": {
+    "title": "MCP server",
+    "subtitle": "Let an AI agent on this Mac read — and, if you allow it, change — your finances.",
+    "connection": "Connection",
+    "connection_desc": "Turns on a server on this Mac. Nothing is published to the internet.",
+    "on": "On",
+    "off": "Off",
+    "listening": "Listening on port {port}",
+    "only_while_open": "Answers only while finan app is open.",
+    "copy": "Copy",
+    "copied": "Copied",
+    "url_label": "Paste this URL into your agent",
+    "tools": "Tools",
+    "tools_read": "Reading",
+    "tools_read_desc": "What the agent can consult.",
+    "tools_write": "Writing",
+    "tools_write_desc": "The agent changes your data. Every one starts off.",
+    "window": "Data window",
+    "window_desc": "How far back the agent can reach — for reading and for changing.",
+    "window_months": "{n} months",
+    "window_none": "No limit",
+    "window_cutoff": "The agent sees nothing before {month}.",
+    "window_cutoff_none": "The agent sees your whole history.",
+    "activity": "Activity",
+    "activity_desc": "The last {n} calls. Kept in memory only — gone when you quit.",
+    "activity_empty": "No calls yet",
+    "activity_empty_desc": "What your agent asks for shows up here.",
+    "activity_failed": "Failed"
   }
 }

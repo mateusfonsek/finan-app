@@ -53,7 +53,8 @@
     "categories": "Categorias",
     "rules": "Regras",
     "suggestions": "Sugestões",
-    "settings": "Configurações"
+    "settings": "Configurações",
+    "mcp": "MCP"
   },
   "sidebar": {
     "overview": "Visão geral",
@@ -614,5 +615,34 @@
     "error_create_icloud": "Não consegui criar a pasta no iCloud Drive.",
     "error_reveal": "Não consegui abrir essa pasta no Finder.",
     "error_scan": "Não consegui verificar as pastas agora."
+  },
+  "mcp": {
+    "title": "Servidor MCP",
+    "subtitle": "Deixe um agente de IA neste Mac ler — e, se você permitir, alterar — suas finanças.",
+    "connection": "Conexão",
+    "connection_desc": "Liga um servidor neste Mac. Nada é publicado na internet.",
+    "on": "Ligado",
+    "off": "Desligado",
+    "listening": "Escutando na porta {port}",
+    "only_while_open": "Só responde enquanto o finan app estiver aberto.",
+    "copy": "Copiar",
+    "copied": "Copiado",
+    "url_label": "Cole esta URL no seu agente",
+    "tools": "Tools",
+    "tools_read": "Leitura",
+    "tools_read_desc": "O que o agente pode consultar.",
+    "tools_write": "Escrita",
+    "tools_write_desc": "O agente altera seus dados. Cada uma começa desligada.",
+    "window": "Janela de dados",
+    "window_desc": "Até onde o agente alcança — para ler e para alterar.",
+    "window_months": "{n} meses",
+    "window_none": "Sem limite",
+    "window_cutoff": "O agente não vê nada antes de {month}.",
+    "window_cutoff_none": "O agente vê seu histórico inteiro.",
+    "activity": "Atividade",
+    "activity_desc": "As últimas {n} chamadas. Só na memória — somem ao fechar o app.",
+    "activity_empty": "Nenhuma chamada ainda",
+    "activity_empty_desc": "O que seu agente pedir aparece aqui.",
+    "activity_failed": "Falhou"
   }
 }
