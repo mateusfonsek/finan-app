@@ -698,7 +698,6 @@ export type BillLink = { transaction_id: number;
  * name when it has one, otherwise its first snippet.
  */
 rule_label: string; due_month: string }
-export type CallEntry = { at: string; tool: string; args: string; ok: boolean; error: string | null }
 /**
  * A calendar event: a rule plus an optional due day plus an optional matching
  * transaction.
@@ -720,6 +719,7 @@ paid_date: string | null; paid_amount: string | null; paid_transaction_id: numbe
  * can offer to undo it.
  */
 manually_settled: boolean }
+export type CallEntry = { at: string; tool: string; args: string; ok: boolean; error: string | null }
 export type Category = { id: number; name: string; color_token: string | null; kind: string; is_investment: boolean; created_at: string }
 export type CategorySpend = { category_id: number | null; name: string; color_token: string | null; total: string; percent: number }
 export type CategoryWithCount = { id: number; name: string; color_token: string | null; kind: string; created_at: string; transaction_count: number }
