@@ -18,7 +18,15 @@ export function splitTools(tools: McpToolState[]): {
 
 /** The oldest month inside the window, as `YYYY-MM`. The current month counts
  *  as one of them — "3 months" reaching back four would be a lie. */
-export function cutoffLabel(months: number, today = new Date()): string | null {
+export function cutoffLabel(
+  months: number,
+  /** Must be local-time (e.g. `new Date()`), read via `getFullYear`/`getMonth`
+   *  below. A date-only ISO string (`"2026-09-13"`) parses as UTC midnight,
+   *  which reads back a month early west of Greenwich — the same class of bug
+   *  `Calendar.svelte` documents for `toISOString()`. No current caller passes
+   *  one, so this is a constraint to preserve, not a bug to fix here. */
+  today = new Date(),
+): string | null {
   if (months === 0) return null;
   const total = today.getFullYear() * 12 + today.getMonth() - (months - 1);
   const year = Math.floor(total / 12);

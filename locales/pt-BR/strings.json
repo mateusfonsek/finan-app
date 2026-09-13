@@ -621,8 +621,6 @@
     "subtitle": "Deixe um agente de IA neste Mac ler — e, se você permitir, alterar — suas finanças.",
     "connection": "Conexão",
     "connection_desc": "Liga um servidor neste Mac. Nada é publicado na internet.",
-    "on": "Ligado",
-    "off": "Desligado",
     "listening": "Escutando na porta {port}",
     "only_while_open": "Só responde enquanto o finan app estiver aberto.",
     "copy": "Copiar",

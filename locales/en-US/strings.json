@@ -621,8 +621,6 @@
     "subtitle": "Let an AI agent on this Mac read — and, if you allow it, change — your finances.",
     "connection": "Connection",
     "connection_desc": "Turns on a server on this Mac. Nothing is published to the internet.",
-    "on": "On",
-    "off": "Off",
     "listening": "Listening on port {port}",
     "only_while_open": "Answers only while finan app is open.",
     "copy": "Copy",
