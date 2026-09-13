@@ -18,6 +18,7 @@
   void locale.init();
 
   const GITHUB_URL = "https://github.com/MateusFonseK/finan-app";
+  const MCP_DATA_CHANGED = "mcp:data-changed";
 
   let aboutOpen = $state(false);
 
@@ -82,6 +83,7 @@
     "5": () => push("/categories"),
     "6": () => push("/rules"),
     "7": () => push("/suggestions"),
+    "8": () => push("/mcp"),
   };
 
   function onKeydown(e: KeyboardEvent) {
@@ -140,6 +142,9 @@
     listen("open-ofx", () => localeChosen && void handleOpenedOfx()).then((u) =>
       unlisten.push(u),
     );
+    // A tool wrote through the MCP server: every open screen is now showing a
+    // number the agent already changed.
+    listen(MCP_DATA_CHANGED, () => window.location.reload()).then((u) => unlisten.push(u));
 
     // Focus is what makes a filesystem watcher unnecessary — the user sends
     // the file from their phone and then comes to look at the Mac.
