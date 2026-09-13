@@ -55,6 +55,7 @@ And it's **light**: ~13 MB that download in an instant, open fast and barely tak
 - 📊 **Dashboard** — the month's income, spending and balance, spending by category, income sources (with recurring ones flagged), investments and the trend over the last 12 months.
 - 📅 **Calendar** — due dates and payments derived from your rules.
 - 💾 **Backup** — export and restore your database at any time.
+- 🔌 **MCP server** — optional and local: connect an AI agent running on your Mac and ask it about your finances. You choose each tool and how far back it can see.
 - 🌍 **Multi-language** — the UI, the default categories and the auto-classification rules all live in [locale packs](locales/README.md). Adding a language is copying a folder and translating JSON. Ships with Portuguese (Brazil) and English (US).
 - 🪶 **Light and fast** — ~13 MB to download, ~18 MB installed. Opens in a blink and barely weighs on your Mac.
 - 🖥️ **Native to macOS** — native menu, keyboard shortcuts, light/dark theme, universal (Apple Silicon + Intel).
@@ -80,6 +81,25 @@ And it's **light**: ~13 MB that download in an instant, open fast and barely tak
 There is no account, login, telemetry or ads. Everything lives in `~/Library/Application Support/app.finan/finan.db`, on your Mac.
 
 The **only** network request the app can ever make happens **during import**, and only when two things are both true: the active [locale pack](locales/README.md) declares a tax-id format and a lookup provider, **and** you've turned the lookup on in Settings — it's opt-in and off by default. Today that's the **pt-BR** pack, which queries [BrasilAPI](https://brasilapi.com.br) to resolve a company name from the **CNPJ** found in a transaction description and suggest a category. Only the **CNPJ digits** (public information) ever leave your Mac — never amounts, descriptions or personal data. The **en-US** pack ships with no tax-id format and no provider at all, so with it active the app makes **no network request, ever**.
+
+### The MCP server
+
+There is one more way data can move, and it only exists if you switch it on.
+The **MCP server** (under **MCP** in the sidebar) opens a port on `127.0.0.1`
+so an AI agent running **on this same Mac** can query your finances. It ships
+off, and a cloud-hosted agent cannot reach it at all — the port is not on the
+network.
+
+Two things are worth being plain about:
+
+- **The server itself sends nothing anywhere.** It listens; it never dials out.
+- **The agent you connect does.** Whatever it reads, it sends to its own
+  provider. That is the trade, and it is yours to make.
+
+You choose each tool the agent may call — reading is on, writing starts off —
+and how far back it can reach. Every call is listed on the screen while the app
+is open. There is no token: the server refuses any request carrying a web
+`Origin`, which is what keeps a page open in your browser from reaching it.
 
 ## 🛠️ Building from source
 
