@@ -64,7 +64,7 @@ pub fn categorize(conn: &Connection, cfg: &McpConfig, args: &Value) -> AppResult
     Ok(json!({ "updated": targets.len() }))
 }
 
-pub fn create_rule(conn: &mut Connection, _cfg: &McpConfig, args: &Value) -> AppResult<Value> {
+pub fn create_rule(conn: &mut Connection, cfg: &McpConfig, args: &Value) -> AppResult<Value> {
     let patterns: Vec<String> = args
         .get("patterns")
         .and_then(Value::as_array)
@@ -83,12 +83,15 @@ pub fn create_rule(conn: &mut Connection, _cfg: &McpConfig, args: &Value) -> App
         display_name: args.get("display_name").and_then(Value::as_str).map(str::to_string),
     };
 
-    // `rules::create` already rejects an empty pattern list and an impossible
-    // due day — the tool does not re-validate what the shared function owns.
-    Ok(serde_json::to_value(rules::create(conn, input)?)?)
+    // `rules::create_with_scope` already rejects an empty pattern list and an
+    // impossible due day — the tool does not re-validate what the shared
+    // function owns. The backfill it triggers is bounded by the window: the
+    // agent's rule categorizes only what it could already see, while the
+    // user's own "new rule" form (`rules::create`) still reaches all of it.
+    Ok(serde_json::to_value(rules::create_with_scope(conn, input, cfg.cutoff().as_deref())?)?)
 }
 
-pub fn settle_bill(conn: &Connection, _cfg: &McpConfig, args: &Value) -> AppResult<Value> {
+pub fn settle_bill(conn: &Connection, cfg: &McpConfig, args: &Value) -> AppResult<Value> {
     let rule_id = args
         .get("rule_id")
         .and_then(Value::as_i64)
@@ -100,6 +103,9 @@ pub fn settle_bill(conn: &Connection, _cfg: &McpConfig, args: &Value) -> AppResu
     bills::validate_month(due_month)?;
 
     let transaction_id = args.get("transaction_id").and_then(Value::as_i64);
+    if let Some(id) = transaction_id {
+        assert_within_window(conn, cfg, &[id])?;
+    }
     bills::settle(conn, rule_id, due_month, transaction_id)?;
     Ok(json!({ "settled": true }))
 }
@@ -210,6 +216,58 @@ mod tests {
         assert!(categorize(&conn, &cfg(0), &json!({ "transaction_ids": [] })).is_err());
     }
 
+    /// A missing id and one merely outside the window are different failures:
+    /// only one of them could plausibly move inside the window some day, so
+    /// collapsing them into one message would hide that from the caller.
+    #[test]
+    fn categorize_reports_a_missing_id_differently_from_one_outside_the_window() {
+        let conn = seeded();
+        let old = tx(&conn, "2019-01-05");
+
+        let missing_err =
+            categorize(&conn, &cfg(12), &json!({ "transaction_ids": [999], "category_id": 1 }))
+                .unwrap_err()
+                .to_string();
+        let old_err =
+            categorize(&conn, &cfg(12), &json!({ "transaction_ids": [old], "category_id": 1 }))
+                .unwrap_err()
+                .to_string();
+
+        assert!(missing_err.contains("not found"), "{missing_err}");
+        assert!(old_err.contains("window"), "{old_err}");
+        assert_ne!(missing_err, old_err);
+        assert_eq!(category_of(&conn, old), None, "nothing is written either way");
+    }
+
+    /// The agent's rule creation is bounded by the same window as everything
+    /// else it can touch: an old transaction that matches the new pattern must
+    /// stay exactly as it was.
+    #[test]
+    fn a_rule_created_through_mcp_does_not_recategorize_a_transaction_older_than_the_window() {
+        let mut conn = seeded();
+        let old = tx(&conn, "2019-01-05");
+        let recent = tx(&conn, "2026-09-01");
+
+        create_rule(&mut conn, &cfg(12), &json!({ "patterns": ["MERCADO"], "category_id": 1 }))
+            .unwrap();
+
+        assert_eq!(category_of(&conn, old), None, "outside the window: left alone");
+        assert_eq!(category_of(&conn, recent), Some(1), "inside the window: backfilled");
+    }
+
+    /// The escape hatch survives here too: no window configured means the
+    /// agent's rule reaches the whole history, same as the user's own rule form.
+    #[test]
+    fn with_no_window_configured_a_rule_created_through_mcp_still_backfills_the_whole_history() {
+        let mut conn = seeded();
+        let old = tx(&conn, "2019-01-05");
+
+        create_rule(&mut conn, &cfg(0), &json!({ "patterns": ["MERCADO"], "category_id": 1 }))
+            .unwrap();
+
+        assert_eq!(category_of(&conn, old), Some(1));
+    }
+
     #[test]
     fn create_rule_persists_and_returns_it() {
         let mut conn = seeded();
@@ -241,6 +299,51 @@ mod tests {
         let rule: i64 = conn.query_row("SELECT id FROM rules", [], |r| r.get(0)).unwrap();
 
         settle_bill(&conn, &cfg(0), &json!({ "rule_id": rule, "due_month": "2026-09" })).unwrap();
+
+        let count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM bill_settlements", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(count, 1);
+    }
+
+    /// `settle_bill` is the one write path that takes a transaction id
+    /// directly: without this check it would be the back door every other
+    /// write closes.
+    #[test]
+    fn settling_a_bill_with_a_transaction_outside_the_window_is_refused() {
+        let mut conn = seeded();
+        create_rule(&mut conn, &cfg(0), &json!({ "patterns": ["MERCADO"], "category_id": 1 }))
+            .unwrap();
+        let rule: i64 = conn.query_row("SELECT id FROM rules", [], |r| r.get(0)).unwrap();
+        let old = tx(&conn, "2019-01-05");
+
+        let out = settle_bill(
+            &conn,
+            &cfg(12),
+            &json!({ "rule_id": rule, "due_month": "2026-09", "transaction_id": old }),
+        );
+
+        assert!(out.is_err());
+        let count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM bill_settlements", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(count, 0, "nothing may be written when the transaction is refused");
+    }
+
+    #[test]
+    fn settling_with_a_transaction_inside_the_window_still_works() {
+        let mut conn = seeded();
+        create_rule(&mut conn, &cfg(0), &json!({ "patterns": ["MERCADO"], "category_id": 1 }))
+            .unwrap();
+        let rule: i64 = conn.query_row("SELECT id FROM rules", [], |r| r.get(0)).unwrap();
+        let recent = tx(&conn, "2026-09-01");
+
+        settle_bill(
+            &conn,
+            &cfg(12),
+            &json!({ "rule_id": rule, "due_month": "2026-09", "transaction_id": recent }),
+        )
+        .unwrap();
 
         let count: i64 = conn
             .query_row("SELECT COUNT(*) FROM bill_settlements", [], |r| r.get(0))

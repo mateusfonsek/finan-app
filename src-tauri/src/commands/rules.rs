@@ -146,6 +146,19 @@ pub fn list_rules_with_count(db: State<'_, Db>) -> AppResult<Vec<RuleWithCount>>
 }
 
 pub fn create(conn: &mut rusqlite::Connection, input: NewRule) -> AppResult<Rule> {
+    create_with_scope(conn, input, None)
+}
+
+/// Same as `create`, but the backfill it triggers only reaches transactions on
+/// or after `apply_since` (`YYYY-MM-DD`) when given. The user's own "new rule"
+/// form has no such limit and always calls `create`; an MCP agent bounded by a
+/// data window may only backfill inside it — its write must not reach further
+/// back than its read is allowed to see.
+pub fn create_with_scope(
+    conn: &mut rusqlite::Connection,
+    input: NewRule,
+    apply_since: Option<&str>,
+) -> AppResult<Rule> {
     let patterns = clean_patterns(&input.patterns)?;
     validate_due_day(input.due_day)?;
     validate_pay_lead_months(input.pay_lead_months)?;
@@ -169,7 +182,7 @@ pub fn create(conn: &mut rusqlite::Connection, input: NewRule) -> AppResult<Rule
         id
     };
 
-    apply_rules_internal(conn, None)?;
+    apply_rules_since(conn, None, apply_since)?;
     fetch_rule(conn, id)
 }
 
@@ -486,10 +499,29 @@ pub fn apply_rules_internal(
     conn: &mut rusqlite::Connection,
     account_id: Option<i64>,
 ) -> AppResult<u32> {
-    let scope_filter = match account_id {
-        Some(_) => "AND account_id = ?1",
-        None => "",
-    };
+    apply_rules_since(conn, account_id, None)
+}
+
+/// Same engine as `apply_rules_internal`, additionally scoped to transactions
+/// dated on or after `since` (`YYYY-MM-DD`) when given. `None` backfills the
+/// whole history, same as before this filter existed.
+pub fn apply_rules_since(
+    conn: &mut rusqlite::Connection,
+    account_id: Option<i64>,
+    since: Option<&str>,
+) -> AppResult<u32> {
+    let mut scope_filter = String::new();
+    let mut bound: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
+
+    if let Some(id) = account_id {
+        scope_filter.push_str(&format!(" AND account_id = ?{}", bound.len() + 1));
+        bound.push(Box::new(id));
+    }
+    if let Some(date) = since {
+        scope_filter.push_str(&format!(" AND date >= ?{}", bound.len() + 1));
+        bound.push(Box::new(date.to_string()));
+    }
+
     // A rule matches when ANY of its snippets appears in the description.
     let sql = format!(
         "UPDATE transactions
@@ -511,11 +543,8 @@ pub fn apply_rules_internal(
            )
            {scope_filter}",
     );
-    let changed = if let Some(id) = account_id {
-        conn.execute(&sql, params![id])?
-    } else {
-        conn.execute(&sql, [])?
-    };
+    let params_refs: Vec<&dyn rusqlite::ToSql> = bound.iter().map(|b| b.as_ref()).collect();
+    let changed = conn.execute(&sql, params_refs.as_slice())?;
     Ok(changed as u32)
 }
 
@@ -766,6 +795,27 @@ mod tests {
             .unwrap();
         }
         id
+    }
+
+    /// `apply_rules_internal` became a delegate to `apply_rules_since(.., None)`
+    /// — this pins that the UI and import paths still reach transactions of
+    /// any age, since neither of them ever wants a window.
+    #[test]
+    fn apply_rules_internal_still_backfills_a_transaction_from_any_date() {
+        let mut conn = fresh_conn();
+        let acc = insert_account(&conn);
+        let transporte = category_id(&conn, "Transporte");
+        insert_rule(&conn, "testmerchant", transporte, 0);
+        conn.execute(
+            "INSERT INTO transactions (account_id, date, amount, description, category_id, ofx_fitid)
+             VALUES (?1, '2019-01-05', '10.00', 'TESTMERCHANT ancient', NULL, NULL)",
+            params![acc],
+        )
+        .unwrap();
+
+        let n = apply_rules_internal(&mut conn, None).unwrap();
+
+        assert_eq!(n, 1, "the delegate must still reach transactions from any date");
     }
 
     #[test]
