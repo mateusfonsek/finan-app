@@ -6,17 +6,22 @@
 //!
 //! `tiny_http` 0.12 gives a request's reader no read timeout. A client that
 //! declares a `Content-Length` and then sends less than it promised — or
-//! nothing at all — stalls the serving thread forever: every refusal path
-//! answers and drops the `Request` without reading its body, and dropping it
-//! drains the undeclared remainder off the raw socket with a blocking read
-//! that never times out. Because of that, `stop` never joins the serving
-//! thread — it only `unblock`s the listener and lets a stalled thread go,
-//! leaked rather than joined, rather than risk freezing the app at quit
-//! (`stop` runs on the main thread). The visible fallout: a stalled thread
-//! keeps holding the port, so the next `start` lands on the fallback port
-//! instead of `PREFERRED_PORT`, and a URL an agent already has stops
-//! working. That is a visible failure — the settings screen always shows
-//! the port actually bound — never a silent one.
+//! nothing at all — can stall the serving thread forever. Most refusals (a
+//! foreign origin, the wrong method, a non-JSON content type, an over-cap
+//! `Content-Length`) never read the body at all, so the stall then happens
+//! when the dropped `Request` drains the undeclared remainder off the raw
+//! socket — a blocking read with no timeout. A body that lies about its
+//! length (absent, chunked, or under-reported) is instead caught by reading
+//! up to the cap before answering, and that read can stall on the very same
+//! kind of client, one call earlier. Either way, the stall is on a thread
+//! nobody joins: `McpState::stop_server` only `unblock`s the listener and
+//! lets a stalled thread go, leaked rather than joined, rather than risk
+//! freezing the app at quit (`stop` runs on the main thread). The visible
+//! fallout: a stalled thread keeps holding the port, so the next `start`
+//! lands on the fallback port instead of `PREFERRED_PORT`, and a URL an
+//! agent already has stops working. That is a visible failure — the
+//! settings screen always shows the port actually bound — never a silent
+//! one.
 
 pub mod config;
 pub mod log;
@@ -48,7 +53,6 @@ fn body_too_large(len: usize) -> bool {
 struct Running {
     server: Arc<Server>,
     port: u16,
-    thread: Option<std::thread::JoinHandle<()>>,
 }
 
 pub struct McpState {
@@ -63,6 +67,17 @@ impl McpState {
 
     pub fn port(&self) -> Option<u16> {
         self.running.lock().expect("mcp state mutex poisoned").as_ref().map(|r| r.port)
+    }
+
+    /// Unblocks the listener and lets the serving thread go rather than
+    /// joining it. See the module doc: that thread can be stuck forever
+    /// inside a stalled client's body read, and joining it here — `stop`
+    /// runs on the main thread — could freeze the app at quit.
+    pub fn stop_server(&self) {
+        let mut running = self.running.lock().expect("mcp state mutex poisoned");
+        if let Some(r) = running.take() {
+            r.server.unblock();
+        }
     }
 }
 
@@ -172,7 +187,7 @@ pub fn start(app: &AppHandle) -> AppResult<u16> {
         .ok_or_else(|| AppError::Invalid("server bound to a non-IP address".into()))?
         .port();
 
-    let thread = {
+    {
         let server = server.clone();
         let app = app.clone();
         let log = state.log.clone();
@@ -180,10 +195,10 @@ pub fn start(app: &AppHandle) -> AppResult<u16> {
             for request in server.incoming_requests() {
                 serve(&app, &log, request);
             }
-        })
-    };
+        });
+    }
 
-    *running = Some(Running { server, port, thread: Some(thread) });
+    *running = Some(Running { server, port });
     Ok(port)
 }
 
@@ -255,15 +270,7 @@ fn serve(app: &AppHandle, log: &CallLog, mut request: Request) {
 }
 
 pub fn stop(app: &AppHandle) {
-    let state = app.state::<McpState>();
-    let mut running = state.running.lock().expect("mcp state mutex poisoned");
-    if let Some(r) = running.take() {
-        r.server.unblock();
-        // See the module doc: the serving thread can be wedged forever
-        // inside a dropped `Request`'s blocking body drain, so joining it
-        // here could freeze the app at quit. Letting `r` (and its
-        // `JoinHandle`) drop detaches the thread instead of waiting for it.
-    }
+    app.state::<McpState>().stop_server();
 }
 
 #[cfg(test)]
@@ -425,19 +432,21 @@ mod tests {
         assert!(response.starts_with("HTTP/1.1 413"), "got: {response}");
     }
 
-    /// Pins Finding 1: a client that declares a body and never sends it must
-    /// not be able to hang shutdown. This reproduces the wedge directly —
-    /// confirming the join really would hang, so removing it from `stop` is
-    /// not cosmetic — and confirms `unblock` alone lets the caller return.
+    /// A client that declares a `Content-Length` and never sends the body
+    /// wedges the serving thread forever: dropping the `Request` drains the
+    /// undeclared remainder off the raw socket with a blocking read that
+    /// `tiny_http` gives no timeout.
     #[test]
-    fn a_client_that_never_sends_its_declared_body_cannot_hang_shutdown() {
+    fn a_client_that_never_sends_its_declared_body_wedges_the_serving_thread() {
         let server = std::sync::Arc::new(tiny_http::Server::http("127.0.0.1:0").unwrap());
         let port = server.server_addr().to_ip().unwrap().port();
 
+        let (accepted_tx, accepted_rx) = std::sync::mpsc::channel();
         let thread = {
             let server = server.clone();
             std::thread::spawn(move || {
                 if let Some(request) = server.incoming_requests().next() {
+                    let _ = accepted_tx.send(());
                     if let Some((status, body)) = refusal(&request) {
                         respond(request, body.to_string(), status);
                     }
@@ -461,19 +470,76 @@ mod tests {
         // waiting on its *next* accept, which this single-request test does
         // not exercise.)
 
+        // Wait for the request to actually reach the serving thread before
+        // timing the join: otherwise a slow scheduler could pass this test
+        // for the wrong reason — the request never having been accepted.
+        accepted_rx
+            .recv_timeout(std::time::Duration::from_secs(2))
+            .expect("the request was never accepted");
+
         let (tx, rx) = std::sync::mpsc::channel();
         std::thread::spawn(move || {
             let _ = tx.send(thread.join());
         });
         assert!(
             rx.recv_timeout(std::time::Duration::from_millis(500)).is_err(),
-            "the serving thread returned on its own — tiny_http's Drop behaviour \
-             changed, so stop()'s no-join contract and the module doc need a look"
+            "the serving thread returned on its own — this client no longer wedges it"
         );
 
         // Keep `stream` alive for the whole assertion above: dropping it
         // early would close the connection and let the drain finish, which
         // would defeat the point of this test.
+        drop(stream);
+    }
+
+    /// `stop_server` must return even while the serving thread is
+    /// permanently wedged inside a stalled client's body read — the
+    /// alternative is a quit that never completes, since `stop` runs on the
+    /// main thread.
+    #[test]
+    fn stop_server_returns_while_the_serving_thread_is_wedged() {
+        let server = std::sync::Arc::new(tiny_http::Server::http("127.0.0.1:0").unwrap());
+        let port = server.server_addr().to_ip().unwrap().port();
+
+        let (accepted_tx, accepted_rx) = std::sync::mpsc::channel();
+        {
+            let server = server.clone();
+            std::thread::spawn(move || {
+                if let Some(request) = server.incoming_requests().next() {
+                    let _ = accepted_tx.send(());
+                    if let Some((status, body)) = refusal(&request) {
+                        respond(request, body.to_string(), status);
+                    }
+                }
+            });
+        }
+
+        let mut stream = TcpStream::connect(("127.0.0.1", port)).unwrap();
+        write!(
+            stream,
+            "POST /mcp HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n",
+            MAX_BODY_BYTES + 1
+        )
+        .unwrap();
+        // See the sibling test above for why `accepted_rx` is awaited before
+        // any timing starts, and why `server.unblock()` is not called here.
+        accepted_rx
+            .recv_timeout(std::time::Duration::from_secs(2))
+            .expect("the request was never accepted");
+
+        let state =
+            McpState { running: Mutex::new(Some(Running { server, port })), log: Arc::new(CallLog::new()) };
+
+        let (tx, rx) = std::sync::mpsc::channel();
+        std::thread::spawn(move || {
+            state.stop_server();
+            let _ = tx.send(());
+        });
+        assert!(
+            rx.recv_timeout(std::time::Duration::from_millis(500)).is_ok(),
+            "stop_server() did not return while the serving thread was wedged"
+        );
+
         drop(stream);
     }
 }
