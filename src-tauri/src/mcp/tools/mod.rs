@@ -49,7 +49,8 @@ pub fn specs() -> Vec<ToolSpec> {
             name: "get_month_summary",
             description: "Everything about one month in a single answer: income, expense and \
                           balance, spending per category, who paid the money in, and how much \
-                          went to investments. Omit `month` for all time.",
+                          went to investments. `month` is required unless the user has allowed \
+                          unlimited history — only then does omitting it mean all time.",
             schema: || obj(json!({ "month": { "type": "string", "description": "YYYY-MM" } }), json!([])),
         },
         ToolSpec {

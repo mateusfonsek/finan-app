@@ -37,12 +37,13 @@ fn checked_month(args: &Value) -> AppResult<Option<String>> {
 
 pub fn list_transactions(conn: &Connection, cfg: &McpConfig, args: &Value) -> AppResult<Value> {
     let month = checked_month(args)?;
+    let limit = opt_u32(args, "limit");
     let filters = TransactionFilters {
         account_id: None,
         month,
         category_id: args.get("category_id").and_then(Value::as_i64),
         q: opt_str(args, "q"),
-        limit: opt_u32(args, "limit"),
+        limit: None,
     };
     let mut rows = transactions::list(conn, &filters)?;
 
@@ -52,17 +53,51 @@ pub fn list_transactions(conn: &Connection, cfg: &McpConfig, args: &Value) -> Ap
     if args.get("uncategorized_only").and_then(Value::as_bool) == Some(true) {
         rows.retain(|t| t.category_id.is_none());
     }
+    // `limit` must be the last thing applied: this is a local single-user
+    // SQLite database, so fetching a few extra rows to filter in Rust is
+    // cheap — but asking SQL to LIMIT before the window/category filters run
+    // would silently hand back fewer rows than requested (or than exist).
+    if let Some(n) = limit {
+        rows.truncate(n as usize);
+    }
 
     Ok(serde_json::to_value(rows)?)
+}
+
+/// Oldest month the window still allows, as `YYYY-MM` — the first seven
+/// characters of `cutoff()`'s `YYYY-MM-01`. `None` when there is no window.
+fn oldest_allowed_month(cfg: &McpConfig) -> Option<String> {
+    cfg.cutoff().map(|c| c[..7].to_string())
 }
 
 pub fn get_month_summary(
     conn: &Connection,
     pack: &LocalePack,
-    _cfg: &McpConfig,
+    cfg: &McpConfig,
     args: &Value,
 ) -> AppResult<Value> {
     let month = checked_month(args)?;
+
+    // `income_sources` returns a label per counterparty — who pays the user —
+    // which is exactly the kind of detail the window promises to hide. The
+    // other three aggregations would silently go all-time too, so a missing
+    // or too-old `month` is refused rather than quietly ignoring the window.
+    if let Some(oldest) = oldest_allowed_month(cfg) {
+        match month.as_deref() {
+            None => {
+                return Err(AppError::Invalid(format!(
+                    "month is required: history before {oldest} is outside the allowed window"
+                )));
+            }
+            Some(m) if m < oldest.as_str() => {
+                return Err(AppError::Invalid(format!(
+                    "month {m} is older than the allowed window (oldest: {oldest})"
+                )));
+            }
+            _ => {}
+        }
+    }
+
     let m = month.as_deref();
     Ok(json!({
         "kpis": summary::kpis(conn, m)?,
@@ -193,6 +228,61 @@ mod tests {
         assert_eq!(out.as_array().unwrap().len(), 2);
     }
 
+    /// The window filter must run before the limit is applied, or a window
+    /// that happens to trim the SQL-ordered result could hand back fewer rows
+    /// than requested even though enough recent ones exist.
+    #[test]
+    fn a_limit_is_applied_after_the_window_filter_not_before() {
+        let conn = seeded();
+        tx(&conn, "2019-01-05", "-1.00", "ANCIENT1");
+        tx(&conn, "2019-01-06", "-1.00", "ANCIENT2");
+        for i in 1..=4 {
+            tx(&conn, &format!("2026-09-0{i}"), "-1.00", "RECENT");
+        }
+
+        let out = list_transactions(&conn, &cfg(12), &json!({ "limit": 2 })).unwrap();
+
+        let rows = out.as_array().unwrap();
+        assert_eq!(rows.len(), 2, "there are enough recent rows to fill the limit");
+        assert!(
+            rows.iter().all(|r| r["description"] == "RECENT"),
+            "the window must exclude ancient rows, not just shrink the count"
+        );
+    }
+
+    /// The bug this guards against: `uncategorized_only` is a Rust-side filter
+    /// with no correlation to the SQL `ORDER BY date`, so a SQL-side `LIMIT`
+    /// can fill its quota with already-categorized rows before the filter
+    /// ever runs, undercounting the answer.
+    #[test]
+    fn a_limit_is_applied_after_uncategorized_only_not_before() {
+        let conn = seeded();
+        let mercado: i64 = conn
+            .query_row("SELECT id FROM categories WHERE name = 'Mercado'", [], |r| r.get(0))
+            .unwrap();
+        tx(&conn, "2026-09-05", "-1.00", "CAT1");
+        tx(&conn, "2026-09-04", "-1.00", "UNCAT1");
+        tx(&conn, "2026-09-03", "-1.00", "CAT2");
+        tx(&conn, "2026-09-02", "-1.00", "UNCAT2");
+        tx(&conn, "2026-09-01", "-1.00", "CAT3");
+        conn.execute(
+            "UPDATE transactions SET category_id = ?1 WHERE description IN ('CAT1', 'CAT2', 'CAT3')",
+            rusqlite::params![mercado],
+        )
+        .unwrap();
+
+        let out = list_transactions(
+            &conn,
+            &cfg(0),
+            &json!({ "uncategorized_only": true, "limit": 2 }),
+        )
+        .unwrap();
+
+        let rows = out.as_array().unwrap();
+        assert_eq!(rows.len(), 2, "both uncategorized rows must survive the limit");
+        assert!(rows.iter().all(|r| r["category_id"].is_null()));
+    }
+
     /// One call instead of four: the shape is the reason these tools exist.
     #[test]
     fn get_month_summary_answers_in_one_payload() {
@@ -218,6 +308,55 @@ mod tests {
         let out = get_month_summary(&conn, &pack, &cfg(0), &json!({ "month": "setembro" }));
 
         assert!(out.is_err(), "a malformed month must not reach SQL as a LIKE prefix");
+    }
+
+    /// `income_sources` scans full history to detect recurrence and returns a
+    /// label per counterparty — an all-time summary would leak exactly what
+    /// the window promises to hide.
+    #[test]
+    fn get_month_summary_without_a_month_is_refused_when_a_window_is_set() {
+        let conn = seeded();
+        let pack = crate::locale::LocalePack::embedded_pt_br();
+
+        let err = get_month_summary(&conn, &pack, &cfg(12), &json!({})).unwrap_err();
+
+        assert!(
+            err.to_string().contains("window"),
+            "the error must name the window as the reason: {err}"
+        );
+    }
+
+    #[test]
+    fn get_month_summary_for_a_month_older_than_the_window_is_refused() {
+        let conn = seeded();
+        let pack = crate::locale::LocalePack::embedded_pt_br();
+
+        let out = get_month_summary(&conn, &pack, &cfg(12), &json!({ "month": "2019-01" }));
+
+        assert!(out.is_err(), "2019-01 is far outside any realistic 12-month window");
+    }
+
+    #[test]
+    fn get_month_summary_for_a_month_inside_the_window_still_works() {
+        let conn = seeded();
+        let pack = crate::locale::LocalePack::embedded_pt_br();
+        let this_month = chrono::Local::now().format("%Y-%m").to_string();
+
+        let out = get_month_summary(&conn, &pack, &cfg(12), &json!({ "month": this_month })).unwrap();
+
+        assert!(out.get("kpis").is_some());
+    }
+
+    /// The escape hatch survives: a window of `0` means no limit, so `month`
+    /// stays optional and omitting it means all time, same as before this fix.
+    #[test]
+    fn get_month_summary_with_no_window_still_allows_no_month() {
+        let conn = seeded();
+        let pack = crate::locale::LocalePack::embedded_pt_br();
+
+        let out = get_month_summary(&conn, &pack, &cfg(0), &json!({}));
+
+        assert!(out.is_ok(), "no window configured means all-time stays available");
     }
 
     #[test]
