@@ -1,4 +1,5 @@
 use rusqlite::params;
+use rusqlite::Connection;
 use tauri::State;
 
 use crate::db::Db;
@@ -14,15 +15,7 @@ pub struct TransactionFilters {
     pub limit: Option<u32>,
 }
 
-#[tauri::command]
-#[specta::specta]
-pub fn list_transactions(
-    db: State<'_, Db>,
-    filters: Option<TransactionFilters>,
-) -> AppResult<Vec<Transaction>> {
-    let f = filters.unwrap_or_default();
-    let conn = db.conn.lock().expect("db mutex poisoned");
-
+pub fn list(conn: &Connection, f: &TransactionFilters) -> AppResult<Vec<Transaction>> {
     let mut where_clauses: Vec<String> = Vec::new();
     let mut bound: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
 
@@ -80,6 +73,17 @@ pub fn list_transactions(
     })?;
     rows.collect::<rusqlite::Result<Vec<_>>>()
         .map_err(AppError::from)
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn list_transactions(
+    db: State<'_, Db>,
+    filters: Option<TransactionFilters>,
+) -> AppResult<Vec<Transaction>> {
+    let f = filters.unwrap_or_default();
+    let conn = db.conn.lock().expect("db mutex poisoned");
+    list(&conn, &f)
 }
 
 /// Insert a batch of new transactions. Returns counts of inserted vs skipped (duplicates).
@@ -218,14 +222,11 @@ pub fn check_existing_tx_keys(
     Ok(existing)
 }
 
-#[tauri::command]
-#[specta::specta]
-pub fn update_transaction_category(
-    db: State<'_, Db>,
+pub fn set_category(
+    conn: &Connection,
     transaction_id: i64,
     category_id: Option<i64>,
 ) -> AppResult<()> {
-    let conn = db.conn.lock().expect("db mutex poisoned");
     let changed = conn.execute(
         "UPDATE transactions SET category_id = ?1 WHERE id = ?2",
         params![category_id, transaction_id],
@@ -236,6 +237,17 @@ pub fn update_transaction_category(
         )));
     }
     Ok(())
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn update_transaction_category(
+    db: State<'_, Db>,
+    transaction_id: i64,
+    category_id: Option<i64>,
+) -> AppResult<()> {
+    let conn = db.conn.lock().expect("db mutex poisoned");
+    set_category(&conn, transaction_id, category_id)
 }
 
 #[tauri::command]

@@ -78,10 +78,7 @@ fn patterns_of(conn: &rusqlite::Connection, rule_id: i64) -> rusqlite::Result<Ve
     rows.collect()
 }
 
-#[tauri::command]
-#[specta::specta]
-pub fn list_rules(db: State<'_, Db>) -> AppResult<Vec<Rule>> {
-    let conn = db.conn.lock().expect("db mutex poisoned");
+pub fn all(conn: &rusqlite::Connection) -> AppResult<Vec<Rule>> {
     let mut stmt = conn.prepare(
         "SELECT id, category_id, priority, due_day, display_name, created_at, pay_lead_months
          FROM rules
@@ -91,7 +88,7 @@ pub fn list_rules(db: State<'_, Db>) -> AppResult<Vec<Rule>> {
         let id: i64 = row.get(0)?;
         Ok(Rule {
             id,
-            patterns: patterns_of(&conn, id)?,
+            patterns: patterns_of(conn, id)?,
             category_id: row.get(1)?,
             priority: row.get(2)?,
             due_day: row.get(3)?,
@@ -102,6 +99,13 @@ pub fn list_rules(db: State<'_, Db>) -> AppResult<Vec<Rule>> {
     })?;
     rows.collect::<rusqlite::Result<Vec<_>>>()
         .map_err(AppError::from)
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn list_rules(db: State<'_, Db>) -> AppResult<Vec<Rule>> {
+    let conn = db.conn.lock().expect("db mutex poisoned");
+    all(&conn)
 }
 
 /// Like `list_rules` but with each rule's reach. A separate command because
@@ -141,13 +145,10 @@ pub fn list_rules_with_count(db: State<'_, Db>) -> AppResult<Vec<RuleWithCount>>
         .map_err(AppError::from)
 }
 
-#[tauri::command]
-#[specta::specta]
-pub fn create_rule(db: State<'_, Db>, input: NewRule) -> AppResult<Rule> {
+pub fn create(conn: &mut rusqlite::Connection, input: NewRule) -> AppResult<Rule> {
     let patterns = clean_patterns(&input.patterns)?;
     validate_due_day(input.due_day)?;
     validate_pay_lead_months(input.pay_lead_months)?;
-    let mut conn = db.conn.lock().expect("db mutex poisoned");
 
     let id = {
         let tx = conn.transaction()?;
@@ -168,8 +169,15 @@ pub fn create_rule(db: State<'_, Db>, input: NewRule) -> AppResult<Rule> {
         id
     };
 
-    apply_rules_internal(&mut conn, None)?;
-    fetch_rule(&conn, id)
+    apply_rules_internal(conn, None)?;
+    fetch_rule(conn, id)
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn create_rule(db: State<'_, Db>, input: NewRule) -> AppResult<Rule> {
+    let mut conn = db.conn.lock().expect("db mutex poisoned");
+    create(&mut conn, input)
 }
 
 #[tauri::command]
@@ -564,7 +572,7 @@ pub fn calendar_events(db: State<'_, Db>, month: String) -> AppResult<Vec<Calend
     calendar_events_with_conn(&conn, &month)
 }
 
-fn calendar_events_with_conn(
+pub fn calendar_events_with_conn(
     conn: &rusqlite::Connection,
     month: &str,
 ) -> AppResult<Vec<CalendarEvent>> {

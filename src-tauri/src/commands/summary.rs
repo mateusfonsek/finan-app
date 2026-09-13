@@ -1,4 +1,5 @@
 use rusqlite::params;
+use rusqlite::Connection;
 use rust_decimal::Decimal;
 use std::collections::{HashMap, HashSet};
 use std::str::FromStr;
@@ -11,11 +12,8 @@ use crate::domain::summary::{
 };
 use crate::error::{AppError, AppResult};
 
-#[tauri::command]
-#[specta::specta]
-pub fn summary_kpis(db: State<'_, Db>, month: Option<String>) -> AppResult<KpiSummary> {
-    let conn = db.conn.lock().expect("db mutex poisoned");
-    let pattern: Option<String> = month.as_ref().map(|m| format!("{m}-%"));
+pub fn kpis(conn: &Connection, month: Option<&str>) -> AppResult<KpiSummary> {
+    let pattern: Option<String> = month.map(|m| format!("{m}-%"));
 
     // Excludes tx whose category.kind = 'transfer' (internal moves like paying
     // a card bill or moving money to savings). A NULL category counts normally.
@@ -55,12 +53,13 @@ pub fn summary_kpis(db: State<'_, Db>, month: Option<String>) -> AppResult<KpiSu
 
 #[tauri::command]
 #[specta::specta]
-pub fn summary_by_category(
-    db: State<'_, Db>,
-    month: Option<String>,
-) -> AppResult<Vec<CategorySpend>> {
+pub fn summary_kpis(db: State<'_, Db>, month: Option<String>) -> AppResult<KpiSummary> {
     let conn = db.conn.lock().expect("db mutex poisoned");
-    let pattern = month.as_ref().map(|m| format!("{m}-%"));
+    kpis(&conn, month.as_deref())
+}
+
+pub fn by_category(conn: &Connection, month: Option<&str>) -> AppResult<Vec<CategorySpend>> {
+    let pattern = month.map(|m| format!("{m}-%"));
 
     let mut stmt = conn.prepare(
         "SELECT t.amount, t.category_id, c.name, c.color_token
@@ -126,8 +125,15 @@ pub fn summary_by_category(
 
 #[tauri::command]
 #[specta::specta]
-pub fn summary_by_month(db: State<'_, Db>, months_back: u32) -> AppResult<Vec<MonthSummary>> {
+pub fn summary_by_category(
+    db: State<'_, Db>,
+    month: Option<String>,
+) -> AppResult<Vec<CategorySpend>> {
     let conn = db.conn.lock().expect("db mutex poisoned");
+    by_category(&conn, month.as_deref())
+}
+
+pub fn by_month(conn: &Connection, months_back: u32) -> AppResult<Vec<MonthSummary>> {
     let cutoff = compute_cutoff(months_back);
 
     let mut stmt = conn.prepare(
@@ -168,12 +174,13 @@ pub fn summary_by_month(db: State<'_, Db>, months_back: u32) -> AppResult<Vec<Mo
 
 #[tauri::command]
 #[specta::specta]
-pub fn investment_summary(
-    db: State<'_, Db>,
-    month: Option<String>,
-) -> AppResult<InvestmentSummary> {
+pub fn summary_by_month(db: State<'_, Db>, months_back: u32) -> AppResult<Vec<MonthSummary>> {
     let conn = db.conn.lock().expect("db mutex poisoned");
-    let pattern: Option<String> = month.as_ref().map(|m| format!("{m}-%"));
+    by_month(&conn, months_back)
+}
+
+pub fn investments(conn: &Connection, month: Option<&str>) -> AppResult<InvestmentSummary> {
+    let pattern: Option<String> = month.map(|m| format!("{m}-%"));
 
     // Month aggregation.
     let mut stmt = conn.prepare(
@@ -237,6 +244,16 @@ pub fn investment_summary(
 
 #[tauri::command]
 #[specta::specta]
+pub fn investment_summary(
+    db: State<'_, Db>,
+    month: Option<String>,
+) -> AppResult<InvestmentSummary> {
+    let conn = db.conn.lock().expect("db mutex poisoned");
+    investments(&conn, month.as_deref())
+}
+
+#[tauri::command]
+#[specta::specta]
 pub fn transfer_summary(
     db: State<'_, Db>,
     month: Option<String>,
@@ -280,16 +297,11 @@ pub fn transfer_summary(
 /// Aggregates the month's inflows (`amount > 0`, kind != 'transfer') by
 /// counterparty. Marks a source recurring when it also appeared in BOTH months
 /// immediately before the displayed one (see `is_recurring`).
-#[tauri::command]
-#[specta::specta]
-pub fn income_sources(
-    db: State<'_, Db>,
-    locale: State<'_, crate::locale::LocaleState>,
-    month: Option<String>,
+pub fn income(
+    conn: &Connection,
+    pack: &crate::locale::LocalePack,
+    month: Option<&str>,
 ) -> AppResult<Vec<IncomeSource>> {
-    let conn = db.conn.lock().expect("db mutex poisoned");
-    let pack = locale.pack.lock().expect("locale mutex poisoned");
-
     // Loads ALL real inflows (positive, non-transfer) from the whole DB — the
     // full history is needed to detect recurrence.
     let mut stmt = conn.prepare(
@@ -304,7 +316,7 @@ pub fn income_sources(
         .query_map([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))?
         .collect::<rusqlite::Result<Vec<_>>>()?;
 
-    let target_prefix = month.as_deref().map(|m| format!("{m}-"));
+    let target_prefix = month.map(|m| format!("{m}-"));
 
     // Per normalized key, tracks the distinct months it appeared in (for
     // recurrence) and the filtered month's aggregate (total, count, label).
@@ -317,7 +329,7 @@ pub fn income_sources(
     let mut current: HashMap<String, Agg> = HashMap::new();
 
     for (date, amount_str, desc) in rows {
-        let (key, label, _pattern) = normalize(&desc, &pack);
+        let (key, label, _pattern) = normalize(&desc, pack);
         let month_key: &str = if date.len() >= 7 { &date[..7] } else { &date };
 
         months_seen
@@ -350,7 +362,7 @@ pub fn income_sources(
         .map(|(key, agg)| {
             let seen = months_seen.get(&key);
             let recurring_months = seen.map(|s| s.len()).unwrap_or(0) as u32;
-            let recurring = seen.is_some_and(|s| is_recurring(s, month.as_deref()));
+            let recurring = seen.is_some_and(|s| is_recurring(s, month));
             let percent = if total_income.is_zero() {
                 0.0
             } else {
@@ -374,6 +386,18 @@ pub fn income_sources(
         bd.cmp(&ad)
     });
     Ok(sources)
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn income_sources(
+    db: State<'_, Db>,
+    locale: State<'_, crate::locale::LocaleState>,
+    month: Option<String>,
+) -> AppResult<Vec<IncomeSource>> {
+    let conn = db.conn.lock().expect("db mutex poisoned");
+    let pack = locale.pack.lock().expect("locale mutex poisoned");
+    income(&conn, &pack, month.as_deref())
 }
 
 fn compute_cutoff(months_back: u32) -> String {
