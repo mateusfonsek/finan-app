@@ -3,6 +3,20 @@
 //! Bound to 127.0.0.1 and nothing else. There is no token — the deliberate
 //! trade is documented in the spec — so the Origin check in `protocol` carries
 //! the defense, and the bind address is what keeps the port off the network.
+//!
+//! `tiny_http` 0.12 gives a request's reader no read timeout. A client that
+//! declares a `Content-Length` and then sends less than it promised — or
+//! nothing at all — stalls the serving thread forever: every refusal path
+//! answers and drops the `Request` without reading its body, and dropping it
+//! drains the undeclared remainder off the raw socket with a blocking read
+//! that never times out. Because of that, `stop` never joins the serving
+//! thread — it only `unblock`s the listener and lets a stalled thread go,
+//! leaked rather than joined, rather than risk freezing the app at quit
+//! (`stop` runs on the main thread). The visible fallout: a stalled thread
+//! keeps holding the port, so the next `start` lands on the fallback port
+//! instead of `PREFERRED_PORT`, and a URL an agent already has stops
+//! working. That is a visible failure — the settings screen always shows
+//! the port actually bound — never a silent one.
 
 pub mod config;
 pub mod log;
@@ -84,6 +98,56 @@ fn header<'a>(request: &'a Request, name: &'static str) -> Option<&'a str> {
         .map(|h| h.value.as_str())
 }
 
+/// `Err` when `Origin` appears more than once. With no token, this header is
+/// the entire authentication story, so a repeat is refused outright rather
+/// than resolved by picking one twin over the other — stricter and cheaper
+/// than trying to decide which one to believe.
+fn origin_header(request: &Request) -> Result<Option<&str>, ()> {
+    let mut found = None;
+    for h in request.headers() {
+        if h.field.equiv("Origin") {
+            if found.is_some() {
+                return Err(());
+            }
+            found = Some(h.value.as_str());
+        }
+    }
+    Ok(found)
+}
+
+/// Every check that needs nothing but the request itself — no config, no
+/// lock, no database. Kept apart from `serve` so a real socket can drive
+/// every guard without a Tauri app behind it. `None` means the caller should
+/// go on to load config and dispatch.
+fn refusal(request: &Request) -> Option<(u16, &'static str)> {
+    match origin_header(request) {
+        Err(()) => return Some((403, r#"{"error":"origin not allowed"}"#)),
+        Ok(origin) if !protocol::origin_allowed(origin) => {
+            return Some((403, r#"{"error":"origin not allowed"}"#))
+        }
+        Ok(_) => {}
+    }
+    if request.method() != &tiny_http::Method::Post {
+        return Some((405, r#"{"error":"use POST"}"#));
+    }
+    // A form-encoded body is how a plain HTML form reaches a port without a
+    // preflight — requiring JSON closes that door. Media types compare
+    // case-insensitively per RFC 9110, and a trailing `; charset=...`
+    // parameter must not defeat the match.
+    let is_json = header(request, "Content-Type")
+        .map(|ct| {
+            ct.split(';').next().unwrap_or("").trim().eq_ignore_ascii_case("application/json")
+        })
+        .unwrap_or(false);
+    if !is_json {
+        return Some((415, r#"{"error":"expected application/json"}"#));
+    }
+    if body_too_large(request.body_length().unwrap_or(0)) {
+        return Some((413, r#"{"error":"body too large"}"#));
+    }
+    None
+}
+
 /// Binds the preferred port, falling back to whatever the OS hands out. A busy
 /// 7717 must not mean a broken feature — the screen shows the port that won.
 fn bind() -> AppResult<Server> {
@@ -126,35 +190,34 @@ pub fn start(app: &AppHandle) -> AppResult<u16> {
 /// Takes the request by value: `Request::respond` consumes it, so each guard
 /// simply answers and returns.
 fn serve(app: &AppHandle, log: &CallLog, mut request: Request) {
-    // Checked first, and on every request: without a token this is the only
-    // thing standing between a web page and the statement.
-    if !protocol::origin_allowed(header(&request, "Origin")) {
-        respond(request, r#"{"error":"origin not allowed"}"#.to_string(), 403);
-        return;
-    }
-    if request.method() != &tiny_http::Method::Post {
-        respond(request, r#"{"error":"use POST /mcp"}"#.to_string(), 405);
-        return;
-    }
-    // A form-encoded body is how a plain HTML form reaches a port without a
-    // preflight — requiring JSON closes that door.
-    match header(&request, "Content-Type") {
-        Some(ct) if ct.starts_with("application/json") => {}
-        _ => {
-            respond(request, r#"{"error":"expected application/json"}"#.to_string(), 415);
-            return;
-        }
-    }
-    if body_too_large(request.body_length().unwrap_or(0)) {
-        respond(request, r#"{"error":"body too large"}"#.to_string(), 413);
+    if let Some((status, body)) = refusal(&request) {
+        respond(request, body.to_string(), status);
         return;
     }
 
-    let mut body = String::new();
-    let _ = request
-        .as_reader()
-        .take(MAX_BODY_BYTES as u64)
-        .read_to_string(&mut body);
+    // `Content-Length` already bounded the size in `refusal`, but a chunked
+    // or absent length must not be trusted for that — reading one byte past
+    // the cap catches a body that lied about its length, without ever
+    // holding more than `MAX_BODY_BYTES + 1` bytes in memory.
+    let mut bytes = Vec::new();
+    let read = request.as_reader().take(MAX_BODY_BYTES as u64 + 1).read_to_end(&mut bytes);
+    match read {
+        Ok(n) if n <= MAX_BODY_BYTES => {}
+        _ => {
+            respond(request, r#"{"error":"body too large"}"#.to_string(), 413);
+            return;
+        }
+    }
+    // JSON is UTF-8 by definition — invalid bytes are a different failure
+    // than "too large", and worth telling apart from the `-32700` a
+    // malformed-but-well-encoded body gets from `protocol::handle`.
+    let body = match String::from_utf8(bytes) {
+        Ok(s) => s,
+        Err(_) => {
+            respond(request, r#"{"error":"body is not valid utf-8"}"#.to_string(), 400);
+            return;
+        }
+    };
 
     let out = {
         let db = app.state::<Db>();
@@ -194,11 +257,12 @@ fn serve(app: &AppHandle, log: &CallLog, mut request: Request) {
 pub fn stop(app: &AppHandle) {
     let state = app.state::<McpState>();
     let mut running = state.running.lock().expect("mcp state mutex poisoned");
-    if let Some(mut r) = running.take() {
+    if let Some(r) = running.take() {
         r.server.unblock();
-        if let Some(t) = r.thread.take() {
-            let _ = t.join();
-        }
+        // See the module doc: the serving thread can be wedged forever
+        // inside a dropped `Request`'s blocking body drain, so joining it
+        // here could freeze the app at quit. Letting `r` (and its
+        // `JoinHandle`) drop detaches the thread instead of waiting for it.
     }
 }
 
@@ -208,10 +272,42 @@ mod tests {
     use std::io::{Read, Write};
     use std::net::TcpStream;
 
-    /// Proves `mod.rs` wires the pieces together — the protocol itself is
-    /// covered without a socket in `protocol.rs`.
+    /// Sends a raw HTTP request to a fresh server whose only handler is
+    /// `refusal` (falling through to a bare 200 when it allows the request),
+    /// and returns the raw response text. Lets every guard in `refusal` be
+    /// driven over a real socket without a Tauri `AppHandle`.
+    fn round_trip(raw: &str) -> String {
+        let server = std::sync::Arc::new(tiny_http::Server::http("127.0.0.1:0").unwrap());
+        let port = server.server_addr().to_ip().unwrap().port();
+
+        let handle = {
+            let server = server.clone();
+            std::thread::spawn(move || {
+                if let Some(request) = server.incoming_requests().next() {
+                    match refusal(&request) {
+                        Some((status, body)) => respond(request, body.to_string(), status),
+                        None => respond(request, "{}".to_string(), 200),
+                    }
+                }
+            })
+        };
+
+        let mut stream = TcpStream::connect(("127.0.0.1", port)).unwrap();
+        stream.write_all(raw.as_bytes()).unwrap();
+
+        let mut response = String::new();
+        stream.read_to_string(&mut response).unwrap();
+        handle.join().unwrap();
+        response
+    }
+
+    /// `respond` must produce a real, complete HTTP response — status line,
+    /// headers and body — over an actual socket, not just a value that looks
+    /// right in isolation. This does not exercise `serve`, `start`, or
+    /// `protocol::handle`: those are covered separately (`refusal` above,
+    /// `protocol::handle` without a socket in `protocol.rs`).
     #[test]
-    fn the_server_answers_a_real_initialize_over_tcp() {
+    fn respond_writes_a_valid_http_response_over_a_real_socket() {
         let server = std::sync::Arc::new(tiny_http::Server::http("127.0.0.1:0").unwrap());
         let port = server.server_addr().to_ip().unwrap().port();
 
@@ -240,12 +336,6 @@ mod tests {
 
         assert!(response.starts_with("HTTP/1.1 200"), "got: {response}");
         assert!(response.contains("\"ok\":true"));
-    }
-
-    #[test]
-    fn a_body_over_the_cap_is_refused() {
-        assert!(body_too_large(MAX_BODY_BYTES + 1));
-        assert!(!body_too_large(MAX_BODY_BYTES));
     }
 
     /// The response must carry the negotiated version on the transport, not
@@ -279,5 +369,111 @@ mod tests {
             response.contains(crate::mcp::protocol::PROTOCOL_VERSION),
             "got: {response}"
         );
+    }
+
+    #[test]
+    fn a_foreign_origin_is_refused_with_403() {
+        let response = round_trip(
+            "POST /mcp HTTP/1.1\r\nHost: 127.0.0.1\r\nOrigin: https://evil.example\r\nContent-Type: application/json\r\nContent-Length: 2\r\nConnection: close\r\n\r\n{}",
+        );
+        assert!(response.starts_with("HTTP/1.1 403"), "got: {response}");
+    }
+
+    /// With no token, `Origin` is the entire authentication story — a repeat
+    /// is refused outright rather than resolved by picking one.
+    #[test]
+    fn a_repeated_origin_header_is_refused_outright() {
+        let response = round_trip(
+            "POST /mcp HTTP/1.1\r\nHost: 127.0.0.1\r\nOrigin: http://localhost\r\nOrigin: http://evil.example\r\nContent-Type: application/json\r\nContent-Length: 2\r\nConnection: close\r\n\r\n{}",
+        );
+        assert!(response.starts_with("HTTP/1.1 403"), "got: {response}");
+    }
+
+    #[test]
+    fn a_non_post_method_is_refused_with_405() {
+        let response =
+            round_trip("GET /mcp HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n");
+        assert!(response.starts_with("HTTP/1.1 405"), "got: {response}");
+    }
+
+    #[test]
+    fn a_non_json_content_type_is_refused_with_415() {
+        let response = round_trip(
+            "POST /mcp HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Type: application/x-www-form-urlencoded\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
+        );
+        assert!(response.starts_with("HTTP/1.1 415"), "got: {response}");
+    }
+
+    /// RFC 9110 media types compare case-insensitively — `Application/JSON`
+    /// is `application/json`.
+    #[test]
+    fn a_case_insensitive_json_content_type_is_accepted() {
+        let response = round_trip(
+            "POST /mcp HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Type: Application/JSON\r\nContent-Length: 2\r\nConnection: close\r\n\r\n{}",
+        );
+        assert!(response.starts_with("HTTP/1.1 200"), "got: {response}");
+    }
+
+    #[test]
+    fn a_body_over_the_cap_is_refused_with_413() {
+        let body = "x".repeat(MAX_BODY_BYTES + 1);
+        let response = round_trip(&format!(
+            "POST /mcp HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+            body.len(),
+            body
+        ));
+        assert!(response.starts_with("HTTP/1.1 413"), "got: {response}");
+    }
+
+    /// Pins Finding 1: a client that declares a body and never sends it must
+    /// not be able to hang shutdown. This reproduces the wedge directly —
+    /// confirming the join really would hang, so removing it from `stop` is
+    /// not cosmetic — and confirms `unblock` alone lets the caller return.
+    #[test]
+    fn a_client_that_never_sends_its_declared_body_cannot_hang_shutdown() {
+        let server = std::sync::Arc::new(tiny_http::Server::http("127.0.0.1:0").unwrap());
+        let port = server.server_addr().to_ip().unwrap().port();
+
+        let thread = {
+            let server = server.clone();
+            std::thread::spawn(move || {
+                if let Some(request) = server.incoming_requests().next() {
+                    if let Some((status, body)) = refusal(&request) {
+                        respond(request, body.to_string(), status);
+                    }
+                }
+            })
+        };
+
+        let mut stream = TcpStream::connect(("127.0.0.1", port)).unwrap();
+        write!(
+            stream,
+            "POST /mcp HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n",
+            MAX_BODY_BYTES + 1
+        )
+        .unwrap();
+        // The declared body is deliberately never sent: the thread is now
+        // inside `Request`'s drop, blocked draining the socket. (Calling
+        // `server.unblock()` here would race the header-parsing worker for
+        // this very request — winning that race makes `incoming_requests`
+        // yield `None` instead of the request, and the wedge is never
+        // reached at all. `stop`'s `unblock()` only matters for a listener
+        // waiting on its *next* accept, which this single-request test does
+        // not exercise.)
+
+        let (tx, rx) = std::sync::mpsc::channel();
+        std::thread::spawn(move || {
+            let _ = tx.send(thread.join());
+        });
+        assert!(
+            rx.recv_timeout(std::time::Duration::from_millis(500)).is_err(),
+            "the serving thread returned on its own — tiny_http's Drop behaviour \
+             changed, so stop()'s no-join contract and the module doc need a look"
+        );
+
+        // Keep `stream` alive for the whole assertion above: dropping it
+        // early would close the connection and let the drain finish, which
+        // would defeat the point of this test.
+        drop(stream);
     }
 }
