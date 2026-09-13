@@ -31,7 +31,7 @@
 
 <br>
 
-**finan app** organizes your personal finances without your data ever leaving your computer. You import your bank's `.ofx` statement, it categorizes with rules, suggests patterns and shows everything on a clear dashboard. Everything lives in a single file on your Mac and never goes anywhere else.
+**finan app** organizes your personal finances without your data ever leaving your computer. You import your bank's `.ofx` statement, it categorizes with rules, suggests patterns and shows everything on a clear dashboard. Everything lives in a single file on your Mac and never goes anywhere else — unless you turn on the optional MCP server, covered under Privacy.
 
 And it's **light**: ~13 MB that download in an instant, open fast and barely take up space on your Mac.
 
@@ -80,7 +80,7 @@ And it's **light**: ~13 MB that download in an instant, open fast and barely tak
 
 There is no account, login, telemetry or ads. Everything lives in `~/Library/Application Support/app.finan/finan.db`, on your Mac.
 
-The **only** network request the app can ever make happens **during import**, and only when two things are both true: the active [locale pack](locales/README.md) declares a tax-id format and a lookup provider, **and** you've turned the lookup on in Settings — it's opt-in and off by default. Today that's the **pt-BR** pack, which queries [BrasilAPI](https://brasilapi.com.br) to resolve a company name from the **CNPJ** found in a transaction description and suggest a category. Only the **CNPJ digits** (public information) ever leave your Mac — never amounts, descriptions or personal data. The **en-US** pack ships with no tax-id format and no provider at all, so with it active the app makes **no network request, ever**.
+The **only** network request **finan app itself** can ever make happens **during import**, and only when two things are both true: the active [locale pack](locales/README.md) declares a tax-id format and a lookup provider, **and** you've turned the lookup on in Settings — it's opt-in and off by default. (The optional MCP server, covered below, is the one exception.) Today that's the **pt-BR** pack, which queries [BrasilAPI](https://brasilapi.com.br) to resolve a company name from the **CNPJ** found in a transaction description and suggest a category. Only the **CNPJ digits** (public information) ever leave your Mac — never amounts, descriptions or personal data. The **en-US** pack ships with no tax-id format and no provider at all, so with it active the app makes **no network request, ever**.
 
 ### The MCP server
 

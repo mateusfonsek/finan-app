@@ -31,7 +31,7 @@ Finanças pessoais **100% locais** no seu Mac — sem nuvem, sem conta, sem rast
 
 <br>
 
-O **finan app** organiza suas finanças pessoais sem que seus dados saiam do seu computador. Você importa o extrato `.ofx` do banco, ele categoriza com regras, sugere padrões e mostra tudo num painel claro. Tudo fica num único arquivo no seu Mac e nunca vai pra lugar nenhum.
+O **finan app** organiza suas finanças pessoais sem que seus dados saiam do seu computador. Você importa o extrato `.ofx` do banco, ele categoriza com regras, sugere padrões e mostra tudo num painel claro. Tudo fica num único arquivo no seu Mac e nunca vai pra lugar nenhum — a menos que você ligue o servidor MCP opcional, coberto em Privacidade.
 
 E é **leve**: ~13 MB que baixam num instante, abrem rápido e quase não ocupam espaço no seu Mac.
 
@@ -79,7 +79,7 @@ E é **leve**: ~13 MB que baixam num instante, abrem rápido e quase não ocupam
 
 Não há conta, login, telemetria ou anúncios. Tudo fica em `~/Library/Application Support/app.finan/finan.db`, no seu Mac.
 
-A **única** requisição de rede acontece **durante a importação**: o app consulta a [BrasilAPI](https://brasilapi.com.br) para descobrir o nome de empresas a partir do **CNPJ** que aparece nas transações e sugerir categorias automaticamente. Sai apenas o **número do CNPJ** (informação pública) — nunca valores, descrições nem dados pessoais. Se as transações importadas não tiverem CNPJ, nenhuma requisição é feita.
+A **única** requisição de rede que o **próprio finan app** faz acontece **durante a importação**: ele consulta a [BrasilAPI](https://brasilapi.com.br) para descobrir o nome de empresas a partir do **CNPJ** que aparece nas transações e sugerir categorias automaticamente. (O servidor MCP, logo abaixo, é a exceção deliberada.) Sai apenas o **número do CNPJ** (informação pública) — nunca valores, descrições nem dados pessoais. Se as transações importadas não tiverem CNPJ, nenhuma requisição é feita.
 
 ### O servidor MCP
 
