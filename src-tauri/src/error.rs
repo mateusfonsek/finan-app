@@ -14,6 +14,9 @@ pub enum AppError {
 
     #[error("invalid data: {0}")]
     Invalid(String),
+
+    #[error("serialization error: {0}")]
+    Json(#[from] serde_json::Error),
 }
 
 impl Serialize for AppError {
