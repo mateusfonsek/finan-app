@@ -69,12 +69,20 @@ impl McpConfig {
     /// Oldest date the agent may see or touch. Month boundary rather than "N
     /// days ago" so the answer does not drift with the day it is asked.
     pub fn cutoff(&self) -> Option<String> {
+        self.cutoff_on(Local::now().date_naive())
+    }
+
+    /// Split out from `cutoff()` so the window arithmetic can be pinned by
+    /// tests against a known date, rather than by whatever day it happens to
+    /// run on.
+    pub fn cutoff_on(&self, today: NaiveDate) -> Option<String> {
         if self.window_months == 0 {
             return None;
         }
-        let today = Local::now().date_naive();
-        let total = today.year() * 12 + today.month0() as i32 - (self.window_months as i32 - 1);
+        let total =
+            today.year() as i64 * 12 + today.month0() as i64 - (self.window_months as i64 - 1);
         let (year, month0) = (total.div_euclid(12), total.rem_euclid(12));
+        let year = i32::try_from(year).ok()?;
         NaiveDate::from_ymd_opt(year, month0 as u32 + 1, 1).map(|d| d.to_string())
     }
 }
@@ -135,16 +143,36 @@ mod tests {
     }
 
     /// The cutoff is what makes the window real: every read and every write
-    /// compares against it.
+    /// compares against it. Pinned by value, not just shape, because a wrong
+    /// year would still look like a well-formed `YYYY-MM-01`.
     #[test]
-    fn the_cutoff_is_the_first_day_of_the_window() {
+    fn a_twelve_month_window_reaches_back_to_last_year() {
         let conn = fresh_conn();
         set_window(&conn, 12).unwrap();
         let cfg = McpConfig::load(&conn).unwrap();
+        let today = NaiveDate::from_ymd_opt(2026, 9, 13).unwrap();
 
-        let cutoff = cfg.cutoff().expect("12 months is a limit");
-        assert_eq!(cutoff.len(), 10, "cutoff is a full date: {cutoff}");
-        assert!(cutoff.ends_with("-01"), "windows start at a month boundary");
+        assert_eq!(cfg.cutoff_on(today).unwrap(), "2025-10-01");
+    }
+
+    #[test]
+    fn a_short_window_crosses_the_year_boundary() {
+        let conn = fresh_conn();
+        set_window(&conn, 3).unwrap();
+        let cfg = McpConfig::load(&conn).unwrap();
+        let today = NaiveDate::from_ymd_opt(2026, 1, 15).unwrap();
+
+        assert_eq!(cfg.cutoff_on(today).unwrap(), "2025-11-01");
+    }
+
+    #[test]
+    fn a_one_month_window_starts_at_the_current_month() {
+        let conn = fresh_conn();
+        set_window(&conn, 1).unwrap();
+        let cfg = McpConfig::load(&conn).unwrap();
+        let today = NaiveDate::from_ymd_opt(2026, 9, 13).unwrap();
+
+        assert_eq!(cfg.cutoff_on(today).unwrap(), "2026-09-01");
     }
 
     #[test]
