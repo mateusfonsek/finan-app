@@ -24,6 +24,19 @@ pub struct Response {
     pub wrote: bool,
 }
 
+/// Strips a trailing `:port`, but only outside an IPv6 literal's brackets: a
+/// colon inside `[::1]` is part of the address, not a port separator, and
+/// treating it as one turns `[::1]` into the unmatchable `[:`.
+fn strip_port(host: &str) -> &str {
+    match host.rfind(']') {
+        Some(close) => match host[close + 1..].strip_prefix(':') {
+            Some(_) => &host[..=close],
+            None => host,
+        },
+        None => host.rsplit_once(':').map(|(h, _)| h).unwrap_or(host),
+    }
+}
+
 /// A local agent sends no `Origin`; a browser always does. Refusing every
 /// non-local origin is therefore what keeps a web page from reaching the port
 /// — and without a token, it is the only thing that does.
@@ -37,8 +50,11 @@ pub fn origin_allowed(origin: Option<&str>) -> bool {
         .next()
         .unwrap_or("");
     // Compare the host itself, never a substring: `localhost.evil.example` is
-    // not localhost, and a `contains` check would wave it through.
-    let bare = host.rsplit_once(':').map(|(h, _)| h).unwrap_or(host);
+    // not localhost, and a `contains` check would wave it through. Anything
+    // that fails to spell one of these four names exactly — a numeric or
+    // octal disguise for a loopback address, a userinfo-prefixed host, an
+    // opaque "null" origin — is refused, not specially parsed.
+    let bare = strip_port(host);
     matches!(bare, "localhost" | "127.0.0.1" | "[::1]" | "::1")
 }
 
@@ -116,11 +132,19 @@ pub fn handle(
 
             log.push(CallEntry {
                 at: Local::now().format("%Y-%m-%dT%H:%M:%S").to_string(),
-                tool: name,
+                tool: truncate(&name),
                 args: truncate(&args.to_string()),
                 ok: outcome.is_ok(),
                 error: outcome.as_ref().err().map(|e| e.to_string()),
             });
+
+            // A write tool can commit its change and then fail a later step
+            // (e.g. a rule insert commits before the backfill that follows
+            // it runs) — so whether the webview is told to refresh follows
+            // from what kind of tool was called, not from whether the call
+            // returned `Ok`. A spurious refresh costs a repaint; a missed one
+            // leaves stale money on screen.
+            let wrote = tools::specs().iter().any(|s| s.name == name && s.write);
 
             match outcome {
                 // An MCP tool failure is a result with `isError`, not a
@@ -134,7 +158,7 @@ pub fn handle(
                             "isError": false
                         }),
                     ),
-                    wrote: out.wrote,
+                    wrote,
                 },
                 Err(e) => Response {
                     json: result(
@@ -144,7 +168,7 @@ pub fn handle(
                             "isError": true
                         }),
                     ),
-                    wrote: false,
+                    wrote,
                 },
             }
         }
@@ -193,37 +217,50 @@ mod tests {
         serde_json::from_str(&out.json).expect("a JSON-RPC response")
     }
 
-    // ---- Origin ---------------------------------------------------------
-    // Without a token this is the whole defense, so it gets the most tests.
-
-    /// A local agent sends no Origin; a browser always does. That asymmetry IS
-    /// the defense against a web page reaching the port.
+    /// With no token, `origin_allowed` is the entire authentication story.
+    /// The refused list is deliberately adversarial — decimal and octal
+    /// spellings of a loopback address, userinfo tricks, an opaque "null"
+    /// origin — so that a future "fix" (a `contains`, a lowercase-and-strip
+    /// helper) that would quietly rewiden the check gets caught here first.
     #[test]
-    fn a_request_with_no_origin_is_allowed() {
+    fn origin_allowed_refuses_every_disguised_or_foreign_host() {
+        let refused = [
+            "http://localhost.evil.example",
+            "http://127.0.0.1.evil.example",
+            "null",
+            "",
+            "http://0.0.0.0:7717",
+            "http://127.0.0.2:7717",
+            "http://2130706433:7717",
+            "http://0177.0.0.1:7717",
+            "http://127.1:7717",
+            "http://localhost@evil.example",
+            "http://evil.example@localhost",
+            "https://evil.example",
+            "http://evil.example",
+        ];
+        for origin in refused {
+            assert!(!origin_allowed(Some(origin)), "should refuse {origin}");
+        }
+    }
+
+    /// A local agent sends no Origin at all; a browser always sends one. That
+    /// asymmetry is the defense against a web page reaching the port.
+    #[test]
+    fn origin_allowed_allows_no_origin_and_every_real_local_host() {
         assert!(origin_allowed(None));
-    }
 
-    #[test]
-    fn a_web_origin_is_refused() {
-        assert!(!origin_allowed(Some("https://evil.example")));
-        assert!(!origin_allowed(Some("http://evil.example")));
+        let allowed = [
+            "http://localhost",
+            "http://localhost:7717",
+            "http://127.0.0.1:7717",
+            "http://[::1]:7717",
+            "http://[::1]",
+        ];
+        for origin in allowed {
+            assert!(origin_allowed(Some(origin)), "should allow {origin}");
+        }
     }
-
-    #[test]
-    fn a_localhost_origin_is_allowed() {
-        assert!(origin_allowed(Some("http://127.0.0.1:7717")));
-        assert!(origin_allowed(Some("http://localhost:7717")));
-    }
-
-    /// The check is on the host, not on a substring: a domain that merely
-    /// contains "localhost" is not localhost.
-    #[test]
-    fn an_origin_that_only_looks_local_is_refused() {
-        assert!(!origin_allowed(Some("http://localhost.evil.example")));
-        assert!(!origin_allowed(Some("http://127.0.0.1.evil.example")));
-    }
-
-    // ---- initialize -----------------------------------------------------
 
     #[test]
     fn initialize_announces_the_protocol_version_and_tools() {
@@ -254,8 +291,6 @@ mod tests {
         assert!(out.json.is_empty());
     }
 
-    // ---- tools/list -----------------------------------------------------
-
     #[test]
     fn tools_list_returns_every_enabled_tool() {
         let out = call(&cfg_all_on(), r#"{"jsonrpc":"2.0","id":2,"method":"tools/list"}"#);
@@ -280,8 +315,6 @@ mod tests {
         assert!(!names.contains(&"create_rule"), "writes are off by default");
         assert_eq!(names.len(), 6);
     }
-
-    // ---- tools/call -----------------------------------------------------
 
     #[test]
     fn tools_call_runs_an_enabled_tool() {
@@ -319,8 +352,6 @@ mod tests {
 
         assert_eq!(out["error"]["code"], -32700);
     }
-
-    // ---- side effects ---------------------------------------------------
 
     #[test]
     fn a_write_reports_that_it_wrote() {

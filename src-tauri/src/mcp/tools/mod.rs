@@ -19,6 +19,11 @@ pub struct ToolSpec {
     pub name: &'static str,
     pub description: &'static str,
     pub schema: fn() -> Value,
+    /// Whether a call to this tool can change the database, independent of
+    /// whether the call actually succeeds — a rule can commit its insert and
+    /// still return `Err` from a later step, so "attempted" is what matters
+    /// here, not "returned Ok".
+    pub write: bool,
 }
 
 fn obj(properties: Value, required: Value) -> Value {
@@ -44,6 +49,7 @@ pub fn specs() -> Vec<ToolSpec> {
                     json!([]),
                 )
             },
+            write: false,
         },
         ToolSpec {
             name: "get_month_summary",
@@ -52,29 +58,34 @@ pub fn specs() -> Vec<ToolSpec> {
                           went to investments. `month` is required unless the user has allowed \
                           unlimited history — only then does omitting it mean all time.",
             schema: || obj(json!({ "month": { "type": "string", "description": "YYYY-MM" } }), json!([])),
+            write: false,
         },
         ToolSpec {
             name: "get_trend",
             description: "Income and expense month by month, to see whether spending is rising \
                           or falling.",
             schema: || obj(json!({ "months_back": { "type": "integer", "default": 12 } }), json!([])),
+            write: false,
         },
         ToolSpec {
             name: "list_bills",
             description: "Recurring bills for a month, each with its due day and whether it is \
                           already paid, still due, or overdue.",
             schema: || obj(json!({ "month": { "type": "string", "description": "YYYY-MM" } }), json!(["month"])),
+            write: false,
         },
         ToolSpec {
             name: "list_categories",
             description: "Every category, with the id needed to categorize a transaction.",
             schema: || obj(json!({}), json!([])),
+            write: false,
         },
         ToolSpec {
             name: "list_rules",
             description: "Every auto-categorization rule. Check this before creating one, so an \
                           existing rule is not duplicated.",
             schema: || obj(json!({}), json!([])),
+            write: false,
         },
         ToolSpec {
             name: "categorize_transactions",
@@ -89,6 +100,7 @@ pub fn specs() -> Vec<ToolSpec> {
                     json!(["transaction_ids"]),
                 )
             },
+            write: true,
         },
         ToolSpec {
             name: "create_rule",
@@ -107,6 +119,7 @@ pub fn specs() -> Vec<ToolSpec> {
                     json!(["patterns", "category_id"]),
                 )
             },
+            write: true,
         },
         ToolSpec {
             name: "settle_bill",
@@ -122,6 +135,7 @@ pub fn specs() -> Vec<ToolSpec> {
                     json!(["rule_id", "due_month"]),
                 )
             },
+            write: true,
         },
     ]
 }
