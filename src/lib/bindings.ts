@@ -316,6 +316,46 @@ async billLinks() : Promise<Result<BillLink[], string>> {
     else return { status: "error", error: e  as any };
 }
 },
+async mcpStatus() : Promise<Result<McpStatus, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("mcp_status") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async setMcpEnabled(enabled: boolean) : Promise<Result<McpStatus, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("set_mcp_enabled", { enabled }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async setMcpTool(name: string, enabled: boolean) : Promise<Result<McpStatus, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("set_mcp_tool", { name, enabled }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async setMcpWindow(months: number) : Promise<Result<McpStatus, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("set_mcp_window", { months }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async mcpRecentCalls() : Promise<Result<CallEntry[], string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("mcp_recent_calls") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async resolveTaxId(taxId: string) : Promise<Result<TaxIdResolution, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("resolve_tax_id", { taxId }) };
@@ -658,6 +698,7 @@ export type BillLink = { transaction_id: number;
  * name when it has one, otherwise its first snippet.
  */
 rule_label: string; due_month: string }
+export type CallEntry = { at: string; tool: string; args: string; ok: boolean; error: string | null }
 /**
  * A calendar event: a rule plus an optional due day plus an optional matching
  * transaction.
@@ -759,6 +800,8 @@ export type InsertResult = { inserted: number; skipped_duplicates: number; auto_
 export type InvestmentSummary = { applied_in_month: string; redeemed_in_month: string; applications_count: number; redemptions_count: number; accumulated_balance: string }
 export type KpiSummary = { income: string; expense: string; net: string; transaction_count: number }
 export type LocaleInfo = { code: string; name: string; flag: string }
+export type McpStatus = { enabled: boolean; port: number | null; url: string | null; window_months: number; tools: McpToolState[] }
+export type McpToolState = { name: string; description: string; write: boolean; enabled: boolean }
 export type MonthSummary = { month: string; income: string; expense: string }
 export type NewAccount = { name: string; bank: string | null; ofx_acctid: string | null; 
 /**

@@ -41,6 +41,11 @@ pub fn run() {
         commands::bills::settle_bill,
         commands::bills::unsettle_bill,
         commands::bills::bill_links,
+        commands::mcp::mcp_status,
+        commands::mcp::set_mcp_enabled,
+        commands::mcp::set_mcp_tool,
+        commands::mcp::set_mcp_window,
+        commands::mcp::mcp_recent_calls,
         commands::tax_id::resolve_tax_id,
         commands::suggestions::suggest_rules,
         commands::suggestions::suggest_pattern_for,
@@ -177,6 +182,22 @@ pub fn run() {
             app.manage(locale_state);
             app.manage(commands::openfile::PendingOpen::default());
             app.manage(commands::enrich_job::EnrichJob::default());
+
+            app.manage(mcp::McpState::new());
+
+            // Comes back up on launch when it was on when the app closed: the
+            // agent's config already points at a port the user already approved,
+            // and making them re-open it every launch would make the feature
+            // useless.
+            let mcp_enabled = {
+                let db = app.state::<db::Db>();
+                let conn = db.conn.lock().expect("db mutex poisoned");
+                mcp::config::McpConfig::load(&conn).map(|c| c.enabled).unwrap_or(false)
+            };
+            if mcp_enabled {
+                let _ = mcp::start(app.handle());
+            }
+
             Ok(())
         })
         .build(tauri::generate_context!())
