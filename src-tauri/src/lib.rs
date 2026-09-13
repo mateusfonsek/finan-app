@@ -4,6 +4,7 @@ mod domain;
 mod enrich;
 mod error;
 mod locale;
+mod mcp;
 
 use tauri::menu::{MenuBuilder, SubmenuBuilder};
 use tauri::{Emitter, Manager};
