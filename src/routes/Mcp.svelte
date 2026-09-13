@@ -44,7 +44,14 @@
   // needing an event of its own. Five seconds is slow enough to cost nothing
   // and fast enough that a call shows up while the user is still watching.
   onMount(() => {
-    const id = setInterval(() => void mcpRecentCalls().then((c) => (calls = c)), 5000);
+    const id = setInterval(async () => {
+      try {
+        calls = await mcpRecentCalls();
+        error = null;
+      } catch (e) {
+        error = e instanceof Error ? e.message : String(e);
+      }
+    }, 5000);
     return () => clearInterval(id);
   });
 
@@ -59,9 +66,13 @@
 
   async function copyUrl() {
     if (!status?.url) return;
-    await navigator.clipboard.writeText(status.url);
-    copied = true;
-    setTimeout(() => (copied = false), 1200);
+    try {
+      await navigator.clipboard.writeText(status.url);
+      copied = true;
+      setTimeout(() => (copied = false), 1200);
+    } catch (e) {
+      error = e instanceof Error ? e.message : String(e);
+    }
   }
 </script>
 
@@ -91,7 +102,7 @@
     {#if status?.url}
       <p class="text-cap text-fg-subtle">{t("mcp.url_label")}</p>
       <div class="card-inset flex items-center gap-2 p-2 animate-rise-in">
-        <span class="flex-1 truncate font-mono text-cap text-fg" title={status.url}>
+        <span class="selectable flex-1 truncate font-mono text-cap text-fg" title={status.url}>
           {status.url}
         </span>
         <button
@@ -148,9 +159,11 @@
         </button>
       {/each}
     </div>
-    <p class="text-cap text-fg-subtle">
-      {cutoff ? t("mcp.window_cutoff", { month: cutoff }) : t("mcp.window_cutoff_none")}
-    </p>
+    {#if status}
+      <p class="text-cap text-fg-subtle">
+        {cutoff ? t("mcp.window_cutoff", { month: cutoff }) : t("mcp.window_cutoff_none")}
+      </p>
+    {/if}
   </Card>
 
   <Card title={t("mcp.activity")} note={t("mcp.activity_desc", { n: 50 })}>
