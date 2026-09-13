@@ -150,11 +150,11 @@ pub fn handle(
                 // An MCP tool failure is a result with `isError`, not a
                 // JSON-RPC error: the agent is meant to read it and adapt,
                 // which it cannot do with a transport-level failure.
-                Ok(out) => Response {
+                Ok(value) => Response {
                     json: result(
                         id,
                         json!({
-                            "content": [{ "type": "text", "text": out.value.to_string() }],
+                            "content": [{ "type": "text", "text": value.to_string() }],
                             "isError": false
                         }),
                     ),
@@ -383,6 +383,42 @@ mod tests {
             &cfg_all_on(),
             &log,
             r#"{"jsonrpc":"2.0","id":7,"method":"tools/call","params":{"name":"list_categories","arguments":{}}}"#,
+        );
+
+        assert!(!out.wrote);
+    }
+
+    /// A write can fail after already committing — `rules::create_with_scope`
+    /// commits the rule insert, then runs `apply_rules_since`/`fetch_rule`
+    /// outside that transaction — so an `Err` here is not evidence that
+    /// nothing was written. Reporting `wrote: false` on this path is exactly
+    /// the bug round 1 fixed; this pins it against a real dispatch failure,
+    /// not just the happy path.
+    #[test]
+    fn a_write_that_fails_still_reports_that_it_wrote() {
+        let (mut conn, pack, log) = ctx();
+
+        let out = handle(
+            &mut conn,
+            &pack,
+            &cfg_all_on(),
+            &log,
+            r#"{"jsonrpc":"2.0","id":11,"method":"tools/call","params":{"name":"create_rule","arguments":{"patterns":["MERCADO"],"category_id":999999}}}"#,
+        );
+
+        assert!(out.wrote, "the tool may have written before failing");
+    }
+
+    #[test]
+    fn a_read_that_fails_does_not_report_a_write() {
+        let (mut conn, pack, log) = ctx();
+
+        let out = handle(
+            &mut conn,
+            &pack,
+            &cfg_all_on(),
+            &log,
+            r#"{"jsonrpc":"2.0","id":12,"method":"tools/call","params":{"name":"get_month_summary","arguments":{"month":"not-a-month"}}}"#,
         );
 
         assert!(!out.wrote);

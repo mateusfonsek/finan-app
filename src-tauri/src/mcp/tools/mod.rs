@@ -140,42 +140,31 @@ pub fn specs() -> Vec<ToolSpec> {
     ]
 }
 
-/// Returns `true` when this tool changed the database, so the caller knows to
-/// tell the webview its screens are stale.
-pub struct Outcome {
-    pub value: Value,
-    pub wrote: bool,
-}
-
+/// Whether the call changed the database is `ToolSpec.write` — a property of
+/// which tool was named, known before the call runs and unaffected by
+/// whether it succeeds. It is not carried on the return value.
 pub fn dispatch(
     conn: &mut Connection,
     pack: &LocalePack,
     cfg: &McpConfig,
     name: &str,
     args: &Value,
-) -> AppResult<Outcome> {
+) -> AppResult<Value> {
     if !cfg.tool_enabled(name) {
         // Same answer for "off" and "does not exist": which tools are enabled
         // is not something an unauthenticated caller gets to enumerate.
         return Err(AppError::Invalid(format!("unknown or disabled tool: {name}")));
     }
-    let value = match name {
-        "list_transactions" => read::list_transactions(conn, cfg, args)?,
-        "get_month_summary" => read::get_month_summary(conn, pack, cfg, args)?,
-        "get_trend" => read::get_trend(conn, cfg, args)?,
-        "list_bills" => read::list_bills(conn, cfg, args)?,
-        "list_categories" => read::list_categories(conn, cfg, args)?,
-        "list_rules" => read::list_rules(conn, cfg, args)?,
-        "categorize_transactions" => {
-            return Ok(Outcome { value: write::categorize(conn, cfg, args)?, wrote: true })
-        }
-        "create_rule" => {
-            return Ok(Outcome { value: write::create_rule(conn, cfg, args)?, wrote: true })
-        }
-        "settle_bill" => {
-            return Ok(Outcome { value: write::settle_bill(conn, cfg, args)?, wrote: true })
-        }
-        other => return Err(AppError::Invalid(format!("unknown or disabled tool: {other}"))),
-    };
-    Ok(Outcome { value, wrote: false })
+    match name {
+        "list_transactions" => read::list_transactions(conn, cfg, args),
+        "get_month_summary" => read::get_month_summary(conn, pack, cfg, args),
+        "get_trend" => read::get_trend(conn, cfg, args),
+        "list_bills" => read::list_bills(conn, cfg, args),
+        "list_categories" => read::list_categories(conn, cfg, args),
+        "list_rules" => read::list_rules(conn, cfg, args),
+        "categorize_transactions" => write::categorize(conn, cfg, args),
+        "create_rule" => write::create_rule(conn, cfg, args),
+        "settle_bill" => write::settle_bill(conn, cfg, args),
+        other => Err(AppError::Invalid(format!("unknown or disabled tool: {other}"))),
+    }
 }
