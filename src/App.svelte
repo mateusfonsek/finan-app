@@ -18,7 +18,6 @@
   void locale.init();
 
   const GITHUB_URL = "https://github.com/MateusFonseK/finan-app";
-  const MCP_DATA_CHANGED = "mcp:data-changed";
 
   let aboutOpen = $state(false);
 
@@ -142,9 +141,11 @@
     listen("open-ofx", () => localeChosen && void handleOpenedOfx()).then((u) =>
       unlisten.push(u),
     );
-    // A tool wrote through the MCP server: every open screen is now showing a
-    // number the agent already changed.
-    listen(MCP_DATA_CHANGED, () => window.location.reload()).then((u) => unlisten.push(u));
+    // A full reload here would discard whatever the current screen has not
+    // saved yet — a parsed OFX batch mid-review, an open form. Each screen
+    // that can safely refresh its own data listens for
+    // `MCP_DATA_CHANGED_EVENT` itself; one with nothing safe to refresh picks
+    // up the change on its next navigation instead.
 
     // Focus is what makes a filesystem watcher unnecessary — the user sends
     // the file from their phone and then comes to look at the Mac.

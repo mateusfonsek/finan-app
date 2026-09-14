@@ -1,6 +1,11 @@
 import { commands } from "../bindings";
 import type { CallEntry, McpStatus } from "../bindings";
 
+/** Emitted after any MCP write tool ran (whether or not it succeeded), so an
+ *  open screen can refresh the state it owns instead of showing a number the
+ *  agent already changed. Mirrors `mcp::DATA_CHANGED_EVENT` on the Rust side. */
+export const MCP_DATA_CHANGED_EVENT = "mcp:data-changed";
+
 function unwrap<T>(result: { status: "ok"; data: T } | { status: "error"; error: string }): T {
   if (result.status === "error") throw new Error(result.error);
   return result.data;
