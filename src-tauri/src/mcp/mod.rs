@@ -19,9 +19,8 @@
 //! freezing the app at quit (`stop` runs on the main thread). The visible
 //! fallout: a stalled thread keeps holding the port, so the next `start`
 //! lands on the fallback port instead of `PREFERRED_PORT`, and a URL an
-//! agent already has stops working. That is a visible failure — the
-//! settings screen always shows the port actually bound — never a silent
-//! one.
+//! agent already has stops working. That is a visible failure — the MCP
+//! screen always shows the port actually bound — never a silent one.
 
 pub mod config;
 pub mod log;
@@ -254,7 +253,11 @@ fn serve(app: &AppHandle, log: &CallLog, mut request: Request) {
             Err(e) => {
                 drop(pack);
                 drop(conn);
-                respond(request, format!(r#"{{"error":"{e}"}}"#), 500);
+                // `e` is a rusqlite message that can carry a quote or a
+                // backslash — interpolating it into a hand-built JSON literal
+                // would produce malformed JSON on exactly the input that most
+                // needs a readable error.
+                respond(request, serde_json::json!({ "error": e.to_string() }).to_string(), 500);
                 return;
             }
         }
