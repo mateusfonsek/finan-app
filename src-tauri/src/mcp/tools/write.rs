@@ -11,6 +11,20 @@ use crate::commands::{bills, rules, transactions};
 use crate::domain::rule::NewRule;
 use crate::error::{AppError, AppResult};
 use crate::mcp::config::McpConfig;
+use crate::mcp::tools::read::oldest_allowed_month;
+
+/// A pattern this short would match essentially every uncategorized
+/// description at once — `create_rule` has no preview and no undo, so a
+/// one- or two-character pattern is a single call that recategorizes the
+/// agent's entire visible window. The UI keeps its own, more permissive
+/// check: it has a preview screen the agent does not.
+const MIN_MCP_PATTERN_LEN: usize = 3;
+
+/// Caps how much one `categorize_transactions` call can touch. The window
+/// already bounds *which* transactions are reachable; this bounds how much of
+/// that reachable set a single call — possibly one step in an agent's retry
+/// loop over bad ids — can rewrite at once.
+const MAX_CATEGORIZE_BATCH: usize = 200;
 
 fn ids(args: &Value) -> AppResult<Vec<i64>> {
     let raw = args
@@ -19,6 +33,12 @@ fn ids(args: &Value) -> AppResult<Vec<i64>> {
         .ok_or_else(|| AppError::Invalid("transaction_ids is required".into()))?;
     if raw.is_empty() {
         return Err(AppError::Invalid("transaction_ids must not be empty".into()));
+    }
+    if raw.len() > MAX_CATEGORIZE_BATCH {
+        return Err(AppError::Invalid(format!(
+            "transaction_ids must not exceed {MAX_CATEGORIZE_BATCH} (got: {})",
+            raw.len()
+        )));
     }
     raw.iter()
         .map(|v| v.as_i64().ok_or_else(|| AppError::Invalid("transaction ids must be integers".into())))
@@ -30,9 +50,16 @@ fn ids(args: &Value) -> AppResult<Vec<i64>> {
 fn assert_within_window(conn: &Connection, cfg: &McpConfig, ids: &[i64]) -> AppResult<()> {
     let Some(cutoff) = cfg.cutoff() else { return Ok(()) };
     for id in ids {
-        let date: Option<String> = conn
+        let date: Option<String> = match conn
             .query_row("SELECT date FROM transactions WHERE id = ?1", [id], |r| r.get(0))
-            .ok();
+        {
+            Ok(d) => Some(d),
+            // Absence is a normal outcome worth its own message below; any
+            // other failure (a locked or corrupt database) must surface as
+            // itself, not collapse into "not found".
+            Err(rusqlite::Error::QueryReturnedNoRows) => None,
+            Err(e) => return Err(e.into()),
+        };
         match date {
             Some(d) if d >= cutoff => {}
             Some(_) => {
@@ -71,6 +98,13 @@ pub fn create_rule(conn: &mut Connection, cfg: &McpConfig, args: &Value) -> AppR
         .map(|a| a.iter().filter_map(Value::as_str).map(str::to_string).collect())
         .unwrap_or_default();
 
+    if let Some(short) = patterns.iter().find(|p| p.trim().chars().count() < MIN_MCP_PATTERN_LEN) {
+        return Err(AppError::Invalid(format!(
+            "pattern {short:?} is shorter than {MIN_MCP_PATTERN_LEN} characters — too broad a \
+             match for a call with no preview and no undo"
+        )));
+    }
+
     let input = NewRule {
         patterns,
         category_id: args
@@ -101,6 +135,18 @@ pub fn settle_bill(conn: &Connection, cfg: &McpConfig, args: &Value) -> AppResul
         .and_then(Value::as_str)
         .ok_or_else(|| AppError::Invalid("due_month is required".into()))?;
     bills::validate_month(due_month)?;
+
+    // `bills::settle` upserts on `(rule_id, due_month)`, so a `due_month`
+    // outside the window is not just an out-of-bounds read: it is a write that
+    // can overwrite — and clear the `transaction_id` of — a settlement the
+    // agent was never allowed to see in the first place.
+    if let Some(oldest) = oldest_allowed_month(cfg) {
+        if due_month < oldest.as_str() {
+            return Err(AppError::Invalid(format!(
+                "due_month {due_month} is older than the allowed window (oldest: {oldest})"
+            )));
+        }
+    }
 
     let transaction_id = args.get("transaction_id").and_then(Value::as_i64);
     if let Some(id) = transaction_id {
@@ -355,5 +401,99 @@ mod tests {
     fn settle_bill_needs_a_real_month() {
         let conn = seeded();
         assert!(settle_bill(&conn, &cfg(0), &json!({ "rule_id": 1, "due_month": "set/26" })).is_err());
+    }
+
+    /// `bills::settle` upserts on `(rule_id, due_month)`: a `due_month`
+    /// outside the window would let the agent silently overwrite — and clear
+    /// the `transaction_id` of — a settlement it cannot even read.
+    #[test]
+    fn settle_bill_refuses_a_due_month_outside_the_window() {
+        let mut conn = seeded();
+        create_rule(&mut conn, &cfg(0), &json!({ "patterns": ["MERCADO"], "category_id": 1 }))
+            .unwrap();
+        let rule: i64 = conn.query_row("SELECT id FROM rules", [], |r| r.get(0)).unwrap();
+
+        let out = settle_bill(&conn, &cfg(12), &json!({ "rule_id": rule, "due_month": "2019-01" }));
+
+        assert!(out.is_err(), "2019-01 is far outside any realistic 12-month window");
+        let count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM bill_settlements", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(count, 0, "nothing may be written when due_month is refused");
+    }
+
+    #[test]
+    fn settle_bill_with_no_window_reaches_any_due_month() {
+        let mut conn = seeded();
+        create_rule(&mut conn, &cfg(0), &json!({ "patterns": ["MERCADO"], "category_id": 1 }))
+            .unwrap();
+        let rule: i64 = conn.query_row("SELECT id FROM rules", [], |r| r.get(0)).unwrap();
+
+        assert!(
+            settle_bill(&conn, &cfg(0), &json!({ "rule_id": rule, "due_month": "2019-01" })).is_ok()
+        );
+    }
+
+    /// The single-character pattern that would recategorize essentially every
+    /// uncategorized transaction in the window at once — no preview, no undo.
+    #[test]
+    fn create_rule_refuses_a_pattern_shorter_than_the_minimum() {
+        let mut conn = seeded();
+
+        let out = create_rule(&mut conn, &cfg(0), &json!({ "patterns": ["a"], "category_id": 1 }));
+
+        assert!(out.is_err());
+        let count: i64 = conn.query_row("SELECT COUNT(*) FROM rules", [], |r| r.get(0)).unwrap();
+        assert_eq!(count, 0, "nothing may be written when a pattern is refused");
+    }
+
+    #[test]
+    fn create_rule_accepts_a_pattern_at_the_minimum_length() {
+        let mut conn = seeded();
+
+        assert!(
+            create_rule(&mut conn, &cfg(0), &json!({ "patterns": ["ABC"], "category_id": 1 }))
+                .is_ok()
+        );
+    }
+
+    /// The UI's own pattern check is untouched: it has a preview screen the
+    /// MCP path does not, so it stays free to accept whatever it accepts
+    /// today. This only pins that `rules::create_with_scope` itself has no
+    /// minimum — the MCP-only floor lives in `create_rule` above.
+    #[test]
+    fn the_shared_rule_creation_path_has_no_minimum_pattern_length() {
+        let mut conn = seeded();
+
+        let input = NewRule {
+            patterns: vec!["a".to_string()],
+            category_id: 1,
+            priority: 0,
+            due_day: None,
+            pay_lead_months: 0,
+            display_name: None,
+        };
+
+        assert!(rules::create_with_scope(&mut conn, input, None).is_ok());
+    }
+
+    #[test]
+    fn categorize_refuses_a_batch_over_the_cap() {
+        let conn = seeded();
+        let ids: Vec<i64> = (0..(MAX_CATEGORIZE_BATCH + 1) as i64).collect();
+
+        let out = categorize(&conn, &cfg(0), &json!({ "transaction_ids": ids, "category_id": 1 }));
+
+        assert!(out.is_err());
+    }
+
+    #[test]
+    fn categorize_accepts_a_batch_at_the_cap() {
+        let conn = seeded();
+        let ids: Vec<i64> = (0..MAX_CATEGORIZE_BATCH as i64).map(|_| tx(&conn, "2026-09-01")).collect();
+
+        let out = categorize(&conn, &cfg(0), &json!({ "transaction_ids": ids, "category_id": 1 }));
+
+        assert!(out.is_ok());
     }
 }
