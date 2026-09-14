@@ -26,6 +26,9 @@ pub struct McpStatus {
     pub url: Option<String>,
     pub window_months: u32,
     pub tools: Vec<McpToolState>,
+    /// `mcp::log::CAPACITY`, so the screen never hardcodes a number that can
+    /// drift from the value the log actually enforces.
+    pub activity_capacity: u32,
 }
 
 fn status_of(db: &Db, state: &McpState) -> AppResult<McpStatus> {
@@ -49,6 +52,7 @@ fn status_of(db: &Db, state: &McpState) -> AppResult<McpStatus> {
         url: port.map(|p| format!("http://127.0.0.1:{p}/mcp")),
         window_months: cfg.window_months,
         tools,
+        activity_capacity: mcp::log::CAPACITY as u32,
     })
 }
 
@@ -66,14 +70,17 @@ pub fn set_mcp_enabled(
     state: State<'_, McpState>,
     enabled: bool,
 ) -> AppResult<McpStatus> {
-    {
-        let conn = db.conn.lock().expect("db mutex poisoned");
-        mcp::config::set_enabled(&conn, enabled)?;
-    }
+    // Persisted only after the server actually reaches the state being
+    // recorded: a bind failure on enable must return `Err` with the DB still
+    // saying off, not "on" while nothing is listening.
     if enabled {
         mcp::start(&app)?;
     } else {
         mcp::stop(&app);
+    }
+    {
+        let conn = db.conn.lock().expect("db mutex poisoned");
+        mcp::config::set_enabled(&conn, enabled)?;
     }
     status_of(&db, &state)
 }
