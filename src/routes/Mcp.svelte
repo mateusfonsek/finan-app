@@ -129,7 +129,9 @@
           <div class="flex items-start justify-between gap-4 py-1.5">
             <div class="flex flex-col gap-0.5 min-w-0">
               <span class="font-mono text-cap text-fg">{tool.name}</span>
-              <span class="text-sub text-fg-subtle leading-relaxed">{tool.description}</span>
+              <span class="text-sub text-fg-subtle leading-relaxed">
+                {t("mcp.tool_" + tool.name + "_desc")}
+              </span>
             </div>
             <Switch
               checked={tool.enabled}
@@ -166,7 +168,10 @@
     {/if}
   </Card>
 
-  <Card title={t("mcp.activity")} note={t("mcp.activity_desc", { n: 50 })}>
+  <Card
+    title={t("mcp.activity")}
+    note={t("mcp.activity_desc", { n: status?.activity_capacity ?? 50 })}
+  >
     {#if calls.length === 0}
       <EmptyState
         icon="clock"
@@ -176,7 +181,7 @@
       />
     {:else}
       <ul class="flex flex-col">
-        {#each calls as call (call.at + call.tool + call.args)}
+        {#each calls as call (call.id)}
           <li
             transition:rise
             class="flex items-baseline gap-2.5 py-1.5 border-b border-border-subtle last:border-0"

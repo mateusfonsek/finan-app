@@ -131,6 +131,8 @@ pub fn handle(
             let outcome = tools::dispatch(conn, pack, cfg, &name, &args);
 
             log.push(CallEntry {
+                // Overwritten by `CallLog::push`, which owns id assignment.
+                id: 0,
                 at: Local::now().format("%Y-%m-%dT%H:%M:%S").to_string(),
                 tool: truncate(&name),
                 args: truncate(&args.to_string()),
@@ -388,12 +390,12 @@ mod tests {
         assert!(!out.wrote);
     }
 
-    /// A write can fail after already committing — `rules::create_with_scope`
-    /// commits the rule insert, then runs `apply_rules_since`/`fetch_rule`
-    /// outside that transaction — so an `Err` here is not evidence that
-    /// nothing was written. Reporting `wrote: false` on this path is exactly
-    /// the bug round 1 fixed; this pins it against a real dispatch failure,
-    /// not just the happy path.
+    /// `wrote` is `ToolSpec.write` — a property of which tool was named — not
+    /// something read off the outcome. This call fails outright (the category
+    /// does not exist, so the `INSERT` trips the foreign key and the
+    /// transaction rolls back, leaving nothing written), and `wrote` is still
+    /// `true`: detection does not look at whether the call actually
+    /// succeeded, only at which tool it was.
     #[test]
     fn a_write_that_fails_still_reports_that_it_wrote() {
         let (mut conn, pack, log) = ctx();
@@ -406,7 +408,7 @@ mod tests {
             r#"{"jsonrpc":"2.0","id":11,"method":"tools/call","params":{"name":"create_rule","arguments":{"patterns":["MERCADO"],"category_id":999999}}}"#,
         );
 
-        assert!(out.wrote, "the tool may have written before failing");
+        assert!(out.wrote, "a write tool reports wrote regardless of the outcome");
     }
 
     #[test]

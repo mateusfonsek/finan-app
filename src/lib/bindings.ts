@@ -719,7 +719,7 @@ paid_date: string | null; paid_amount: string | null; paid_transaction_id: numbe
  * can offer to undo it.
  */
 manually_settled: boolean }
-export type CallEntry = { at: string; tool: string; args: string; ok: boolean; error: string | null }
+export type CallEntry = { id: number; at: string; tool: string; args: string; ok: boolean; error: string | null }
 export type Category = { id: number; name: string; color_token: string | null; kind: string; is_investment: boolean; created_at: string }
 export type CategorySpend = { category_id: number | null; name: string; color_token: string | null; total: string; percent: number }
 export type CategoryWithCount = { id: number; name: string; color_token: string | null; kind: string; created_at: string; transaction_count: number }
@@ -800,7 +800,7 @@ export type InsertResult = { inserted: number; skipped_duplicates: number; auto_
 export type InvestmentSummary = { applied_in_month: string; redeemed_in_month: string; applications_count: number; redemptions_count: number; accumulated_balance: string }
 export type KpiSummary = { income: string; expense: string; net: string; transaction_count: number }
 export type LocaleInfo = { code: string; name: string; flag: string }
-export type McpStatus = { enabled: boolean; port: number | null; url: string | null; window_months: number; tools: McpToolState[] }
+export type McpStatus = { enabled: boolean; port: number | null; url: string | null; window_months: number; tools: McpToolState[]; activity_capacity: number }
 export type McpToolState = { name: string; description: string; write: boolean; enabled: boolean }
 export type MonthSummary = { month: string; income: string; expense: string }
 export type NewAccount = { name: string; bank: string | null; ofx_acctid: string | null; 
