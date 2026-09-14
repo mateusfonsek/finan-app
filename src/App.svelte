@@ -141,11 +141,11 @@
     listen("open-ofx", () => localeChosen && void handleOpenedOfx()).then((u) =>
       unlisten.push(u),
     );
-    // A full reload here would discard whatever the current screen has not
-    // saved yet — a parsed OFX batch mid-review, an open form. Each screen
-    // that can safely refresh its own data listens for
-    // `MCP_DATA_CHANGED_EVENT` itself; one with nothing safe to refresh picks
-    // up the change on its next navigation instead.
+    // MCP writes are handled per screen, not here: a screen that can safely
+    // refresh its own data listens for `MCP_DATA_CHANGED_EVENT` itself, so a
+    // mid-edit form or an in-progress OFX review is never at the mercy of a
+    // change happening somewhere else in the app. One with nothing safe to
+    // refresh just picks the change up on its next navigation.
 
     // Focus is what makes a filesystem watcher unnecessary — the user sends
     // the file from their phone and then comes to look at the Mac.

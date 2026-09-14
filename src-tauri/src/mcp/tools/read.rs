@@ -104,10 +104,12 @@ pub fn get_month_summary(
     let m = month.as_deref();
 
     // `investments(...).accumulated_balance` sums the whole history (by its
-    // own doc) and `income_sources[].recurring_months` counts distinct months
-    // across the whole history — both leak rows the window promises the agent
-    // cannot see, even for a window-legal month. Strip them here rather than
-    // in `summary`, which the Dashboard also reads and must keep seeing both.
+    // own doc), `income_sources[].recurring_months` counts distinct months
+    // across the whole history, and `income_sources[].is_recurring` is a
+    // boolean derived from that same all-time count — all three leak rows the
+    // window promises the agent cannot see, even for a window-legal month.
+    // Stripped here rather than in `summary`, which the Dashboard also reads
+    // and must keep seeing all three.
     let mut investments = serde_json::to_value(summary::investments(conn, m)?)?;
     if let Some(obj) = investments.as_object_mut() {
         obj.remove("accumulated_balance");
@@ -117,6 +119,7 @@ pub fn get_month_summary(
         for row in rows {
             if let Some(obj) = row.as_object_mut() {
                 obj.remove("recurring_months");
+                obj.remove("is_recurring");
             }
         }
     }
@@ -145,11 +148,14 @@ pub fn get_trend(conn: &Connection, cfg: &McpConfig, args: &Value) -> AppResult<
 
     // `summary::by_month` (shared with the Dashboard, not to be touched here)
     // subtracts `months_back` from a Utc "now", while the window's own cutoff
-    // subtracts `months_back - 1` from a Local "now" — one row too many, plus
-    // a possible extra day of drift right at a month boundary. Ask for one
-    // month more than the window needs, which absorbs both, then trim to the
-    // window's real cutoff below.
-    let mut rows = summary::by_month(conn, months_back.saturating_add(1))?;
+    // subtracts `months_back - 1` from a Local "now". No padding is needed to
+    // cover that gap: `compute_cutoff`'s Utc month is never more than one
+    // month ahead of the window's Local month, so `compute_cutoff(months_back)`
+    // is already at or before `oldest` in the worst-case skew — the `retain`
+    // below is enough on its own. Padding the query here would answer more
+    // rows than `months_back` asked for, which is `by_month`'s own contract
+    // to keep, not something this window guard should widen.
+    let mut rows = summary::by_month(conn, months_back)?;
     rows.retain(|r| r.month.as_str() >= oldest.as_str());
     Ok(serde_json::to_value(rows)?)
 }
@@ -499,9 +505,10 @@ mod tests {
         assert!(list_bills(&conn, &cfg12, &json!({ "month": next })).is_ok());
     }
 
-    /// `accumulated_balance` sums the whole history and `recurring_months`
-    /// counts distinct months across the whole history — both leak exactly
-    /// what the window promises to hide, even for a month inside it.
+    /// `accumulated_balance` sums the whole history, `recurring_months`
+    /// counts distinct months across the whole history, and `is_recurring` is
+    /// a boolean derived from that same all-time count — all three leak
+    /// exactly what the window promises to hide, even for a month inside it.
     #[test]
     fn get_month_summary_omits_all_time_figures() {
         let conn = seeded();
@@ -518,6 +525,10 @@ mod tests {
             assert!(
                 source.get("recurring_months").is_none(),
                 "recurring_months is all-time, the window must not leak it"
+            );
+            assert!(
+                source.get("is_recurring").is_none(),
+                "is_recurring is derived from the all-time count, the window must not leak it either"
             );
         }
     }
@@ -549,5 +560,34 @@ mod tests {
             "no row may be older than the window: {months:?}"
         );
         assert!(months.contains(&oldest.as_str()), "the oldest allowed month must still show up");
+    }
+
+    /// The bug this guards against: padding the underlying query to absorb
+    /// the window's Utc/Local skew also widened what `months_back` itself
+    /// answers — `months_back: 3` came back with 5 rows instead of the 4
+    /// `by_month`'s own contract gives (the current month plus 3 previous).
+    /// A window wide enough not to trim anything isolates that the request,
+    /// not the window, is what should bound the answer here.
+    #[test]
+    fn get_trend_does_not_answer_more_than_the_request_implies() {
+        let conn = seeded();
+        let today = chrono::Local::now().date_naive();
+        for i in 0..=5u32 {
+            let month = today
+                .checked_sub_months(chrono::Months::new(i))
+                .unwrap()
+                .format("%Y-%m")
+                .to_string();
+            tx(&conn, &format!("{month}-01"), "-1.00", "X");
+        }
+
+        let out = get_trend(&conn, &cfg(24), &json!({ "months_back": 3 })).unwrap();
+
+        let rows = out.as_array().unwrap();
+        assert_eq!(
+            rows.len(),
+            4,
+            "current month plus 3 previous — by_month's own contract, not padded further: {rows:?}"
+        );
     }
 }
