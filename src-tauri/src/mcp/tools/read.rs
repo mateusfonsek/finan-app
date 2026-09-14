@@ -66,7 +66,10 @@ pub fn list_transactions(conn: &Connection, cfg: &McpConfig, args: &Value) -> Ap
 
 /// Oldest month the window still allows, as `YYYY-MM` — the first seven
 /// characters of `cutoff()`'s `YYYY-MM-01`. `None` when there is no window.
-fn oldest_allowed_month(cfg: &McpConfig) -> Option<String> {
+///
+/// `pub(super)` because `write::settle_bill` bounds `due_month` against the
+/// same window.
+pub(super) fn oldest_allowed_month(cfg: &McpConfig) -> Option<String> {
     cfg.cutoff().map(|c| c[..7].to_string())
 }
 
@@ -99,11 +102,30 @@ pub fn get_month_summary(
     }
 
     let m = month.as_deref();
+
+    // `investments(...).accumulated_balance` sums the whole history (by its
+    // own doc) and `income_sources[].recurring_months` counts distinct months
+    // across the whole history — both leak rows the window promises the agent
+    // cannot see, even for a window-legal month. Strip them here rather than
+    // in `summary`, which the Dashboard also reads and must keep seeing both.
+    let mut investments = serde_json::to_value(summary::investments(conn, m)?)?;
+    if let Some(obj) = investments.as_object_mut() {
+        obj.remove("accumulated_balance");
+    }
+    let mut income_sources = serde_json::to_value(summary::income(conn, pack, m)?)?;
+    if let Some(rows) = income_sources.as_array_mut() {
+        for row in rows {
+            if let Some(obj) = row.as_object_mut() {
+                obj.remove("recurring_months");
+            }
+        }
+    }
+
     Ok(json!({
         "kpis": summary::kpis(conn, m)?,
         "by_category": summary::by_category(conn, m)?,
-        "income_sources": summary::income(conn, pack, m)?,
-        "investments": summary::investments(conn, m)?,
+        "income_sources": income_sources,
+        "investments": investments,
     }))
 }
 
@@ -116,13 +138,39 @@ pub fn get_trend(conn: &Connection, cfg: &McpConfig, args: &Value) -> AppResult<
     } else {
         asked.min(cfg.window_months)
     };
-    Ok(serde_json::to_value(summary::by_month(conn, months_back)?)?)
+
+    let Some(oldest) = oldest_allowed_month(cfg) else {
+        return Ok(serde_json::to_value(summary::by_month(conn, months_back)?)?);
+    };
+
+    // `summary::by_month` (shared with the Dashboard, not to be touched here)
+    // subtracts `months_back` from a Utc "now", while the window's own cutoff
+    // subtracts `months_back - 1` from a Local "now" — one row too many, plus
+    // a possible extra day of drift right at a month boundary. Ask for one
+    // month more than the window needs, which absorbs both, then trim to the
+    // window's real cutoff below.
+    let mut rows = summary::by_month(conn, months_back.saturating_add(1))?;
+    rows.retain(|r| r.month.as_str() >= oldest.as_str());
+    Ok(serde_json::to_value(rows)?)
 }
 
-pub fn list_bills(conn: &Connection, _cfg: &McpConfig, args: &Value) -> AppResult<Value> {
+pub fn list_bills(conn: &Connection, cfg: &McpConfig, args: &Value) -> AppResult<Value> {
     let month = opt_str(args, "month")
         .ok_or_else(|| AppError::Invalid("month is required".into()))?;
     validate_month(&month)?;
+
+    // `calendar_events_with_conn` also reads the month immediately before the
+    // one asked for (to resolve a lead-1 bill's payment), so the guard must
+    // bound that earlier month too, not just the argument — a strict `>`
+    // against the oldest allowed month, not `>=`.
+    if let Some(oldest) = oldest_allowed_month(cfg) {
+        if month.as_str() <= oldest.as_str() {
+            return Err(AppError::Invalid(format!(
+                "month {month} is older than the allowed window: reading it also reads the \
+                 month before it, which would reach before {oldest}"
+            )));
+        }
+    }
     Ok(serde_json::to_value(rules::calendar_events_with_conn(conn, &month)?)?)
 }
 
@@ -228,9 +276,12 @@ mod tests {
         assert_eq!(out.as_array().unwrap().len(), 2);
     }
 
-    /// The window filter must run before the limit is applied, or a window
-    /// that happens to trim the SQL-ordered result could hand back fewer rows
-    /// than requested even though enough recent ones exist.
+    /// Pins that the window filter and the limit agree on ordering: rows
+    /// outside the window sort last under `ORDER BY date DESC`, and `limit` is
+    /// a Rust-side `truncate` rather than a SQL `LIMIT`, so there is no clause
+    /// ordering for this test to actually depend on — it exists to catch a
+    /// regression that would reintroduce one (e.g. a SQL-side `LIMIT`) and
+    /// silently start truncating before the window filter runs.
     #[test]
     fn a_limit_is_applied_after_the_window_filter_not_before() {
         let conn = seeded();
@@ -394,5 +445,109 @@ mod tests {
         let conn = seeded();
 
         assert!(list_bills(&conn, &cfg(0), &json!({ "month": "2026-9" })).is_err());
+    }
+
+    #[test]
+    fn list_bills_with_no_window_reaches_any_month() {
+        let conn = seeded();
+
+        assert!(list_bills(&conn, &cfg(0), &json!({ "month": "2019-01" })).is_ok());
+    }
+
+    /// The bug this guards against: `list_bills` ignored `cfg` entirely, so an
+    /// agent could walk the whole history two months at a time even though the
+    /// tool is on by default.
+    #[test]
+    fn list_bills_refuses_a_month_outside_the_window() {
+        let conn = seeded();
+
+        let out = list_bills(&conn, &cfg(12), &json!({ "month": "2019-01" }));
+
+        assert!(out.is_err(), "2019-01 is far outside any realistic 12-month window");
+    }
+
+    /// `calendar_events_with_conn` reads `month` AND `month - 1`, so a month
+    /// equal to the oldest allowed one would still leak the month before it —
+    /// the guard must refuse that month too, not just anything strictly older.
+    #[test]
+    fn list_bills_refuses_the_oldest_allowed_month_because_it_reads_one_month_before_it() {
+        let conn = seeded();
+        let cfg12 = cfg(12);
+        let oldest = oldest_allowed_month(&cfg12).unwrap();
+
+        let out = list_bills(&conn, &cfg12, &json!({ "month": oldest }));
+
+        assert!(out.is_err(), "the oldest allowed month still reads one month before it");
+    }
+
+    #[test]
+    fn list_bills_for_the_month_after_the_oldest_allowed_one_still_works() {
+        let conn = seeded();
+        let cfg12 = cfg(12);
+        let oldest = oldest_allowed_month(&cfg12).unwrap();
+        let (y, m): (i32, u32) = {
+            let (y, m) = oldest.split_once('-').unwrap();
+            (y.parse().unwrap(), m.parse().unwrap())
+        };
+        let next = chrono::NaiveDate::from_ymd_opt(y, m, 1)
+            .unwrap()
+            .checked_add_months(chrono::Months::new(1))
+            .unwrap()
+            .format("%Y-%m")
+            .to_string();
+
+        assert!(list_bills(&conn, &cfg12, &json!({ "month": next })).is_ok());
+    }
+
+    /// `accumulated_balance` sums the whole history and `recurring_months`
+    /// counts distinct months across the whole history — both leak exactly
+    /// what the window promises to hide, even for a month inside it.
+    #[test]
+    fn get_month_summary_omits_all_time_figures() {
+        let conn = seeded();
+        let pack = crate::locale::LocalePack::embedded_pt_br();
+        tx(&conn, "2026-09-01", "3000.00", "SALARY");
+
+        let out = get_month_summary(&conn, &pack, &cfg(12), &json!({ "month": "2026-09" })).unwrap();
+
+        assert!(
+            out["investments"].get("accumulated_balance").is_none(),
+            "accumulated_balance is all-time, the window must not leak it"
+        );
+        for source in out["income_sources"].as_array().unwrap() {
+            assert!(
+                source.get("recurring_months").is_none(),
+                "recurring_months is all-time, the window must not leak it"
+            );
+        }
+    }
+
+    #[test]
+    fn get_trend_never_returns_a_month_older_than_the_window() {
+        let conn = seeded();
+        let cfg12 = cfg(12);
+        let oldest = oldest_allowed_month(&cfg12).unwrap();
+        // One month exactly at the boundary the bug used to leak (one older
+        // than the window), one exactly at the oldest allowed edge.
+        let (y, m): (i32, u32) = {
+            let (y, m) = oldest.split_once('-').unwrap();
+            (y.parse().unwrap(), m.parse().unwrap())
+        };
+        let leaked = chrono::NaiveDate::from_ymd_opt(y, m, 1)
+            .unwrap()
+            .checked_sub_months(chrono::Months::new(1))
+            .unwrap();
+        tx(&conn, &format!("{}-01", leaked.format("%Y-%m")), "-1.00", "LEAKED");
+        tx(&conn, &format!("{oldest}-01"), "-1.00", "OLDEST_ALLOWED");
+
+        let out = get_trend(&conn, &cfg12, &json!({ "months_back": 12 })).unwrap();
+
+        let months: Vec<&str> =
+            out.as_array().unwrap().iter().map(|r| r["month"].as_str().unwrap()).collect();
+        assert!(
+            months.iter().all(|m| *m >= oldest.as_str()),
+            "no row may be older than the window: {months:?}"
+        );
+        assert!(months.contains(&oldest.as_str()), "the oldest allowed month must still show up");
     }
 }
