@@ -3,6 +3,8 @@
 
   const t = locale.t;
   import { onMount } from "svelte";
+  import { listen } from "@tauri-apps/api/event";
+  import { MCP_DATA_CHANGED_EVENT } from "$lib/api/mcp";
   import Page from "$lib/components/ui/Page.svelte";
   import ErrorNote from "$lib/components/ui/ErrorNote.svelte";
   import Spinner from "$lib/components/ui/Spinner.svelte";
@@ -166,6 +168,16 @@
   onMount(() => {
     void loadCategoriesOnce();
     void loadRulesOnce();
+  });
+
+  // `create_rule`/`settle_bill` through MCP change what this month shows —
+  // re-fetch in place rather than reload the whole app.
+  onMount(() => {
+    const unlisten = listen(MCP_DATA_CHANGED_EVENT, () => {
+      void loadMonthData(viewMonth);
+      void loadRulesOnce();
+    });
+    return () => void unlisten.then((u) => u());
   });
 
   // The only reactive effect: refetch and reset the selection when the month

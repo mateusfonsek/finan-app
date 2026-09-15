@@ -7,6 +7,7 @@ pub mod enrich_job;
 pub mod enrichment;
 pub mod freshness;
 pub mod health;
+pub mod mcp;
 pub mod openfile;
 pub mod rules;
 pub mod suggestions;

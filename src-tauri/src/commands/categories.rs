@@ -5,10 +5,7 @@ use crate::db::Db;
 use crate::domain::category::{Category, CategoryWithCount, NewCategory, UpdateCategory};
 use crate::error::{AppError, AppResult};
 
-#[tauri::command]
-#[specta::specta]
-pub fn list_categories(db: State<'_, Db>) -> AppResult<Vec<Category>> {
-    let conn = db.conn.lock().expect("db mutex poisoned");
+pub fn all(conn: &rusqlite::Connection) -> AppResult<Vec<Category>> {
     let mut stmt = conn.prepare(
         "SELECT id, name, color_token, kind, is_investment, created_at FROM categories ORDER BY kind, name",
     )?;
@@ -24,6 +21,13 @@ pub fn list_categories(db: State<'_, Db>) -> AppResult<Vec<Category>> {
     })?;
     rows.collect::<rusqlite::Result<Vec<_>>>()
         .map_err(AppError::from)
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn list_categories(db: State<'_, Db>) -> AppResult<Vec<Category>> {
+    let conn = db.conn.lock().expect("db mutex poisoned");
+    all(&conn)
 }
 
 #[tauri::command]

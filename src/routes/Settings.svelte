@@ -606,7 +606,7 @@
 
     <!-- Shortcuts in a grid: hunting one inside running prose is work. -->
     <div class="grid grid-cols-3 gap-x-5 gap-y-1.5 pt-1">
-      {#each [["⌘1", t("nav.dashboard")], ["⌘2", t("nav.transactions")], ["⌘3", t("nav.calendar")], ["⌘4", t("sidebar.import")], ["⌘5", t("nav.categories")], ["⌘6", t("nav.rules")], ["⌘7", t("nav.suggestions")], ["⌘F", t("settings.shortcut_search")], ["⌘O", t("settings.shortcut_open_ofx")]] as [key, label]}
+      {#each [["⌘1", t("nav.dashboard")], ["⌘2", t("nav.transactions")], ["⌘3", t("nav.calendar")], ["⌘4", t("sidebar.import")], ["⌘5", t("nav.categories")], ["⌘6", t("nav.rules")], ["⌘7", t("nav.suggestions")], ["⌘8", t("nav.mcp")], ["⌘F", t("settings.shortcut_search")], ["⌘O", t("settings.shortcut_open_ofx")]] as [key, label]}
         <div class="flex items-center gap-2 min-w-0">
           <kbd
             class="shrink-0 min-w-[26px] h-5 px-1.5 grid place-items-center rounded-[5px] border border-border

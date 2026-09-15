@@ -53,7 +53,8 @@
     "categories": "Categories",
     "rules": "Rules",
     "suggestions": "Suggestions",
-    "settings": "Settings"
+    "settings": "Settings",
+    "mcp": "MCP"
   },
   "sidebar": {
     "overview": "Overview",
@@ -614,5 +615,41 @@
     "error_create_icloud": "Couldn't create the folder in iCloud Drive.",
     "error_reveal": "Couldn't open that folder in Finder.",
     "error_scan": "Couldn't scan the folders right now."
+  },
+  "mcp": {
+    "title": "MCP server",
+    "subtitle": "Let an AI agent on this Mac read — and, if you allow it, change — your finances.",
+    "connection": "Connection",
+    "connection_desc": "Turns on a server on this Mac. Nothing is published to the internet.",
+    "listening": "Listening on port {port}",
+    "only_while_open": "Answers only while finan app is open.",
+    "copy": "Copy",
+    "copied": "Copied",
+    "url_label": "Paste this URL into your agent",
+    "tools": "Tools",
+    "tools_read": "Reading",
+    "tools_read_desc": "What the agent can consult.",
+    "tools_write": "Writing",
+    "tools_write_desc": "The agent changes your data. Every one starts off.",
+    "tool_list_transactions_desc": "Lists bank transactions, newest first. Filters by month, category, a text fragment of the description, or only the ones with no category yet.",
+    "tool_get_month_summary_desc": "Everything about one month in a single answer: income, expense and balance, spending per category, who paid the money in, and how much went to investments.",
+    "tool_get_trend_desc": "Income and expense month by month, to see whether spending is rising or falling.",
+    "tool_list_bills_desc": "Recurring bills for a month, each with its due day and whether it is already paid, still due, or overdue.",
+    "tool_list_categories_desc": "Every category, with the id needed to categorize a transaction.",
+    "tool_list_rules_desc": "Every auto-categorization rule.",
+    "tool_categorize_transactions_desc": "Assigns a category to one or more transactions.",
+    "tool_create_rule_desc": "Creates a rule that categorizes any transaction whose description contains one of the given fragments.",
+    "tool_settle_bill_desc": "Marks a bill occurrence as settled for a month.",
+    "window": "Data window",
+    "window_desc": "How far back the agent can reach — for reading and for changing.",
+    "window_months": "{n} months",
+    "window_none": "No limit",
+    "window_cutoff": "The agent sees nothing before {month}.",
+    "window_cutoff_none": "The agent sees your whole history.",
+    "activity": "Activity",
+    "activity_desc": "The last {n} calls. Kept in memory only — gone when you quit.",
+    "activity_empty": "No calls yet",
+    "activity_empty_desc": "What your agent asks for shows up here.",
+    "activity_failed": "Failed"
   }
 }

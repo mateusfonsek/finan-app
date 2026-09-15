@@ -32,6 +32,7 @@
   }
 
   let settingsActive = $derived(router.location === "/settings");
+  let mcpActive = $derived(router.location === "/mcp");
 </script>
 
 <!-- The top strip is the window drag area: with `titleBarStyle: Overlay` the
@@ -111,9 +112,26 @@
 
   <a
     use:link
+    href="/mcp"
+    aria-current={mcpActive ? "page" : undefined}
+    class="group flex items-center gap-2.5 px-2 h-7 mt-2 rounded-[var(--radius-md)] text-callout font-medium
+           transition-colors duration-[var(--dur-fast)] ease-[var(--ease-snap)]
+           {mcpActive ? 'bg-accent text-accent-on' : 'text-fg-muted hover:bg-hover hover:text-fg'}"
+  >
+    <Icon
+      name="plug"
+      size={15}
+      stroke={mcpActive ? 2 : 1.7}
+      class={mcpActive ? "" : "opacity-75 group-hover:opacity-100"}
+    />
+    <span class="flex-1 truncate">{t("nav.mcp")}</span>
+  </a>
+
+  <a
+    use:link
     href="/settings"
     aria-current={settingsActive ? "page" : undefined}
-    class="group flex items-center gap-2.5 px-2 h-7 mt-2 rounded-[var(--radius-md)] text-callout font-medium
+    class="group flex items-center gap-2.5 px-2 h-7 rounded-[var(--radius-md)] text-callout font-medium
            transition-colors duration-[var(--dur-fast)] ease-[var(--ease-snap)]
            {settingsActive ? 'bg-accent text-accent-on' : 'text-fg-muted hover:bg-hover hover:text-fg'}"
   >

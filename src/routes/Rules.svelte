@@ -4,6 +4,8 @@
   const t = locale.t;
   import { onMount } from "svelte";
   import { confirm } from "@tauri-apps/plugin-dialog";
+  import { listen } from "@tauri-apps/api/event";
+  import { MCP_DATA_CHANGED_EVENT } from "$lib/api/mcp";
   import { Button } from "$lib/components/ui/button";
   import Page from "$lib/components/ui/Page.svelte";
   import Loading from "$lib/components/ui/Loading.svelte";
@@ -50,6 +52,13 @@
     } finally {
       loading = false;
     }
+  });
+
+  // `create_rule` through MCP adds a rule behind this screen's back —
+  // re-fetch the list in place rather than reload the whole app.
+  onMount(() => {
+    const unlisten = listen(MCP_DATA_CHANGED_EVENT, () => void refresh());
+    return () => void unlisten.then((u) => u());
   });
 
   async function onCreate(data: {

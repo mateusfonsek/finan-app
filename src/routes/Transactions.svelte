@@ -3,6 +3,8 @@
 
   const t = locale.t;
   import { onMount } from "svelte";
+  import { listen } from "@tauri-apps/api/event";
+  import { MCP_DATA_CHANGED_EVENT } from "$lib/api/mcp";
   import Page from "$lib/components/ui/Page.svelte";
   import Loading from "$lib/components/ui/Loading.svelte";
   import ErrorNote from "$lib/components/ui/ErrorNote.svelte";
@@ -54,6 +56,13 @@
     } finally {
       loading = false;
     }
+  });
+
+  // An MCP write tool (categorize, settle) touched what this screen lists —
+  // re-fetch in place rather than reload the whole app.
+  onMount(() => {
+    const unlisten = listen(MCP_DATA_CHANGED_EVENT, () => void refresh());
+    return () => void unlisten.then((u) => u());
   });
 
   async function onCategoryChange(transactionId: number, categoryId: number | null) {

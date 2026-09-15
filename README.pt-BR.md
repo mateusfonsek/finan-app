@@ -31,7 +31,7 @@ Finanças pessoais **100% locais** no seu Mac — sem nuvem, sem conta, sem rast
 
 <br>
 
-O **finan app** organiza suas finanças pessoais sem que seus dados saiam do seu computador. Você importa o extrato `.ofx` do banco, ele categoriza com regras, sugere padrões e mostra tudo num painel claro. Tudo fica num único arquivo no seu Mac e nunca vai pra lugar nenhum.
+O **finan app** organiza suas finanças pessoais sem que seus dados saiam do seu computador. Você importa o extrato `.ofx` do banco, ele categoriza com regras, sugere padrões e mostra tudo num painel claro. Tudo fica num único arquivo no seu Mac e nunca vai pra lugar nenhum — a menos que você ligue o servidor MCP opcional, coberto em Privacidade.
 
 E é **leve**: ~13 MB que baixam num instante, abrem rápido e quase não ocupam espaço no seu Mac.
 
@@ -55,6 +55,7 @@ E é **leve**: ~13 MB que baixam num instante, abrem rápido e quase não ocupam
 - 📊 **Dashboard** — renda, gastos e saldo do mês, gastos por categoria, fontes de renda (com marcação de recorrentes), investimentos e tendência dos últimos 12 meses.
 - 📅 **Calendário** — vencimentos e pagamentos derivados das suas regras.
 - 💾 **Backup** — exporte e restaure o seu banco de dados a qualquer momento.
+- 🔌 **Servidor MCP** — opcional e local: conecte um agente de IA que roda no seu Mac e pergunte sobre suas finanças. Você escolhe cada tool e até onde ele enxerga.
 - 🪶 **Leve e rápido** — ~13 MB pra baixar, ~18 MB instalado. Abre num piscar e quase não pesa no seu Mac.
 - 🖥️ **Nativo do macOS** — menu nativo, atalhos de teclado, tema claro/escuro, universal (Apple Silicon + Intel).
 
@@ -78,7 +79,28 @@ E é **leve**: ~13 MB que baixam num instante, abrem rápido e quase não ocupam
 
 Não há conta, login, telemetria ou anúncios. Tudo fica em `~/Library/Application Support/app.finan/finan.db`, no seu Mac.
 
-A **única** requisição de rede acontece **durante a importação**: o app consulta a [BrasilAPI](https://brasilapi.com.br) para descobrir o nome de empresas a partir do **CNPJ** que aparece nas transações e sugerir categorias automaticamente. Sai apenas o **número do CNPJ** (informação pública) — nunca valores, descrições nem dados pessoais. Se as transações importadas não tiverem CNPJ, nenhuma requisição é feita.
+A **única** requisição de rede que o **próprio finan app** faz acontece **durante a importação**: ele consulta a [BrasilAPI](https://brasilapi.com.br) para descobrir o nome de empresas a partir do **CNPJ** que aparece nas transações e sugerir categorias automaticamente. (O servidor MCP, logo abaixo, não faz requisição nenhuma — ele só aceita uma conexão, e o que sai depois disso é o agente conectado que envia, não o finan app.) Sai apenas o **número do CNPJ** (informação pública) — nunca valores, descrições nem dados pessoais. Se as transações importadas não tiverem CNPJ, nenhuma requisição é feita.
+
+### O servidor MCP
+
+Existe mais uma forma de dado se mover, e ela só existe se você ligar. O
+**servidor MCP** (em **MCP**, na barra lateral) abre uma porta em `127.0.0.1`
+pra que um agente de IA rodando **neste mesmo Mac** possa consultar suas
+finanças. Ele vem desligado, e um agente hospedado na nuvem não consegue
+alcançá-lo de jeito nenhum — a porta não está na rede.
+
+Duas coisas valem a pena deixar claras:
+
+- **O servidor em si não manda nada pra lugar nenhum.** Ele escuta; nunca liga
+  pra fora.
+- **O agente que você conecta, sim.** O que ele lê, ele envia pro provedor
+  dele. Essa é a troca, e a decisão é sua.
+
+Você escolhe cada tool que o agente pode chamar — leitura vem ligada, escrita
+começa desligada — e até onde ele enxerga pra trás. Toda chamada aparece na
+tela enquanto o app está aberto. Não há token: o servidor recusa qualquer
+requisição que traga um `Origin` de navegador, e é isso que impede uma página
+aberta no seu navegador de alcançá-lo.
 
 ## 🛠️ Buildar do código
 

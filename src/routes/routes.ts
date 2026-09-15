@@ -8,6 +8,7 @@ import Rules from "./Rules.svelte";
 import Suggestions from "./Suggestions.svelte";
 import Calendar from "./Calendar.svelte";
 import Settings from "./Settings.svelte";
+import Mcp from "./Mcp.svelte";
 
 export const routes = {
   "/": IndexRedirect,
@@ -20,4 +21,5 @@ export const routes = {
   "/suggestions": Suggestions,
   "/calendar": Calendar,
   "/settings": Settings,
+  "/mcp": Mcp,
 };

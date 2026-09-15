@@ -82,6 +82,7 @@
     "5": () => push("/categories"),
     "6": () => push("/rules"),
     "7": () => push("/suggestions"),
+    "8": () => push("/mcp"),
   };
 
   function onKeydown(e: KeyboardEvent) {
@@ -140,6 +141,11 @@
     listen("open-ofx", () => localeChosen && void handleOpenedOfx()).then((u) =>
       unlisten.push(u),
     );
+    // MCP writes are handled per screen, not here: a screen that can safely
+    // refresh its own data listens for `MCP_DATA_CHANGED_EVENT` itself, so a
+    // mid-edit form or an in-progress OFX review is never at the mercy of a
+    // change happening somewhere else in the app. One with nothing safe to
+    // refresh just picks the change up on its next navigation.
 
     // Focus is what makes a filesystem watcher unnecessary — the user sends
     // the file from their phone and then comes to look at the Mac.

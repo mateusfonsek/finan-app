@@ -316,6 +316,46 @@ async billLinks() : Promise<Result<BillLink[], string>> {
     else return { status: "error", error: e  as any };
 }
 },
+async mcpStatus() : Promise<Result<McpStatus, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("mcp_status") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async setMcpEnabled(enabled: boolean) : Promise<Result<McpStatus, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("set_mcp_enabled", { enabled }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async setMcpTool(name: string, enabled: boolean) : Promise<Result<McpStatus, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("set_mcp_tool", { name, enabled }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async setMcpWindow(months: number) : Promise<Result<McpStatus, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("set_mcp_window", { months }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async mcpRecentCalls() : Promise<Result<CallEntry[], string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("mcp_recent_calls") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async resolveTaxId(taxId: string) : Promise<Result<TaxIdResolution, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("resolve_tax_id", { taxId }) };
@@ -423,11 +463,6 @@ async transferSummary(month: string | null) : Promise<Result<TransferSummary, st
     else return { status: "error", error: e  as any };
 }
 },
-/**
- * Aggregates the month's inflows (`amount > 0`, kind != 'transfer') by
- * counterparty. Marks a source recurring when it also appeared in BOTH months
- * immediately before the displayed one (see `is_recurring`).
- */
 async incomeSources(month: string | null) : Promise<Result<IncomeSource[], string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("income_sources", { month }) };
@@ -679,6 +714,23 @@ paid_date: string | null; paid_amount: string | null; paid_transaction_id: numbe
  * can offer to undo it.
  */
 manually_settled: boolean }
+export type CallEntry = { 
+/**
+ * Assigned by `CallLog::push`, in call order. `at` has only one-second
+ * resolution and two calls can land in the same second, so the screen
+ * keys its list on this instead — a duplicate key throws in Svelte 5's
+ * release build, not just in dev.
+ */
+id: number; 
+/**
+ * Local time, `YYYY-MM-DDTHH:MM:SS`. The reader is in the same timezone as
+ * the server — it is the same machine.
+ */
+at: string; tool: string; 
+/**
+ * Arguments as received, already truncated for display.
+ */
+args: string; ok: boolean; error: string | null }
 export type Category = { id: number; name: string; color_token: string | null; kind: string; is_investment: boolean; created_at: string }
 export type CategorySpend = { category_id: number | null; name: string; color_token: string | null; total: string; percent: number }
 export type CategoryWithCount = { id: number; name: string; color_token: string | null; kind: string; created_at: string; transaction_count: number }
@@ -759,6 +811,25 @@ export type InsertResult = { inserted: number; skipped_duplicates: number; auto_
 export type InvestmentSummary = { applied_in_month: string; redeemed_in_month: string; applications_count: number; redemptions_count: number; accumulated_balance: string }
 export type KpiSummary = { income: string; expense: string; net: string; transaction_count: number }
 export type LocaleInfo = { code: string; name: string; flag: string }
+export type McpStatus = { enabled: boolean; 
+/**
+ * `None` while the server is down — a URL for a closed port is a lie.
+ */
+port: number | null; url: string | null; window_months: number; tools: McpToolState[]; 
+/**
+ * `mcp::log::CAPACITY`, so the screen never hardcodes a number that can
+ * drift from the value the log actually enforces.
+ */
+activity_capacity: number }
+export type McpToolState = { name: string; 
+/**
+ * English, from the registry — it is protocol, not interface.
+ */
+description: string; 
+/**
+ * Writes are grouped apart on screen and start off.
+ */
+write: boolean; enabled: boolean }
 export type MonthSummary = { month: string; income: string; expense: string }
 export type NewAccount = { name: string; bank: string | null; ofx_acctid: string | null; 
 /**
