@@ -16,7 +16,7 @@ No cloud. No account. No telemetry. One SQLite file you own.
 <div>
 <a href="https://github.com/MateusFonseK/finan-app/releases/latest"><img src="https://img.shields.io/badge/⬇%20Download-.dmg-3fa34d?logo=apple&logoColor=white" alt="Download for macOS" /></a>
 <img src="https://img.shields.io/badge/macOS-12%2B%20·%20Apple%20Silicon%20%2B%20Intel-111111?logo=apple&logoColor=white" alt="macOS 12+" />
-<img src="https://img.shields.io/badge/download-~14%20MB-3fa34d" alt="~14 MB" />
+<img src="https://img.shields.io/badge/size-~20%20MB-3fa34d" alt="~20 MB" />
 <img src="https://img.shields.io/badge/network%20calls-0%20by%20default-3fa34d" alt="Zero network calls by default" />
 <img src="https://img.shields.io/badge/license-MIT-3fa34d" alt="MIT license" />
 <img src="https://img.shields.io/badge/built%20with-Tauri%20%2B%20Svelte%20%2B%20Rust-ff3e00" alt="Tauri + Svelte + Rust" />
@@ -51,7 +51,7 @@ anywhere, and any SQLite client can open it.
 
 ## 📥 Install
 
-1. Download the latest `.dmg` from **[Releases](https://github.com/MateusFonseK/finan-app/releases/latest)** — ~14 MB, universal (Apple Silicon + Intel), macOS 12 or newer.
+1. Download the latest `.dmg` from **[Releases](https://github.com/MateusFonseK/finan-app/releases/latest)** — universal (Apple Silicon + Intel), macOS 12 or newer.
 2. Open it and drag **finan app** into **Applications**.
 3. **First launch.** The app is not signed with a paid Apple Developer certificate, so macOS blocks it once with *"Apple could not verify 'finan app' is free of malware…"*. Click **OK** — never *Move to Trash* — then run this in Terminal:
 
@@ -220,7 +220,7 @@ folder and translating JSON. Pull requests welcome.
 
 ## 🪶 Why it's this small
 
-**~14 MB to download, ~20 MB installed.** No Electron, no bundled Chromium: the interface
+**~20 MB installed.** No Electron, no bundled Chromium: the interface
 is [Svelte 5](https://svelte.dev) running in the WebKit view macOS already ships, and
 everything underneath is Rust. Of those ~20 MB, 18 are the binary — and it is universal, so
 that single file carries both Apple Silicon and Intel. The entire interface, both locale

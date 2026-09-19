@@ -16,7 +16,7 @@ Sem nuvem. Sem conta. Sem telemetria. Um arquivo SQLite que é seu.
 <div>
 <a href="https://github.com/MateusFonseK/finan-app/releases/latest"><img src="https://img.shields.io/badge/⬇%20Baixar-.dmg-3fa34d?logo=apple&logoColor=white" alt="Baixar para macOS" /></a>
 <img src="https://img.shields.io/badge/macOS-12%2B%20·%20Apple%20Silicon%20%2B%20Intel-111111?logo=apple&logoColor=white" alt="macOS 12+" />
-<img src="https://img.shields.io/badge/download-~14%20MB-3fa34d" alt="~14 MB" />
+<img src="https://img.shields.io/badge/tamanho-~20%20MB-3fa34d" alt="~20 MB" />
 <img src="https://img.shields.io/badge/chamadas%20de%20rede-0%20por%20padrão-3fa34d" alt="Zero chamadas de rede por padrão" />
 <img src="https://img.shields.io/badge/licença-MIT-3fa34d" alt="Licença MIT" />
 <img src="https://img.shields.io/badge/feito%20com-Tauri%20%2B%20Svelte%20%2B%20Rust-ff3e00" alt="Tauri + Svelte + Rust" />
@@ -50,7 +50,7 @@ onde quiser e abrir com qualquer cliente SQLite.
 
 ## 📥 Instalação
 
-1. Baixe o `.dmg` mais recente em **[Releases](https://github.com/MateusFonseK/finan-app/releases/latest)** — ~14 MB, universal (Apple Silicon + Intel), macOS 12 ou superior.
+1. Baixe o `.dmg` mais recente em **[Releases](https://github.com/MateusFonseK/finan-app/releases/latest)** — universal (Apple Silicon + Intel), macOS 12 ou superior.
 2. Abra e arraste o **finan app** pra pasta **Aplicativos**.
 3. **Primeira abertura.** O app não é assinado com certificado pago da Apple, então o macOS bloqueia uma vez com *"não foi possível verificar se o 'finan app' está livre de malware…"*. Clique em **OK** — nunca em *Mover pro Lixo* — e rode no Terminal:
 
@@ -218,7 +218,7 @@ traduzir JSON. Pull requests são bem-vindos.
 
 ## 🪶 Por que ele é tão pequeno
 
-**~14 MB pra baixar, ~20 MB instalado.** Sem Electron, sem Chromium embutido: a interface é
+**~20 MB instalado.** Sem Electron, sem Chromium embutido: a interface é
 [Svelte 5](https://svelte.dev) rodando na WebKit que o macOS já tem, e tudo por baixo é
 Rust. Dos ~20 MB instalados, 18 são o binário — e ele é universal, ou seja, carrega Apple
 Silicon e Intel no mesmo arquivo. A interface inteira, os dois pacotes de idioma e todos os
